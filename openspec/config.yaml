@@ -1,0 +1,47 @@
+schema: spec-driven
+
+context: |
+  Project: LifeOS — Sistema de gestión personal web (local)
+  Goal: Organizar vida personal, académica y financiera de un solo usuario
+
+  ## Tech Stack
+
+  ### Frontend
+  - React + TypeScript (.tsx) + Vite
+  - Tailwind CSS — diseño estilo "bento box" / dashboard minimalista
+  - Axios — consumo del backend
+  - recharts — gráficos (torta, barras)
+  - @uiw/react-md-editor — editor Markdown
+  - lucide-react — íconos
+
+  ### Backend (ya implementado)
+  - Python + FastAPI
+  - Endpoints bajo /api/v1:
+    - /notes: CRUD completo (fields: folder, tags, is_code_snippet, language)
+    - /finance/summary: totales y balance
+    - /finance/transactions: CRUD de ingresos/egresos
+
+  ## Módulos del frontend
+  - Dashboard (src/pages/Dashboard/DashboardPage.tsx): widgets FinanceWidget + NotesWidget
+  - Finance (src/pages/Finance/FinancePage.tsx): tabla de transacciones + gráficos + modal agregar
+  - Notes (src/pages/Notes/NotesPage.tsx): sidebar + editor Markdown + soporte code snippets
+  - Tasks (src/pages/Tasks/KanbanBoard.tsx): tablero Kanban (Pendiente / En Proceso / Completado)
+
+  ## Domain Context
+  - El usuario es estudiante de tecnicatura con tesis en curso
+  - Es tutor de programación en UTN (PSeInt, Java, Intro a la Programación)
+  - Gestiona finanzas personales (ingresos/egresos con categorías)
+  - Organiza material académico y notas técnicas / code snippets
+
+  ## Conventions
+  - TypeScript estricto en todo el frontend
+  - Componentes organizados por página en src/pages/<Modulo>/
+  - Separar lógica de UI: hooks propios en src/hooks/ si aplica
+  - Loaders/estados de carga en todas las peticiones Axios
+  - Ingresos en verde, egresos en rojo en vistas financieras
+  - Mock data permitida en módulo Tasks (Kanban)
+  - Commits descriptivos en español o inglés
+
+  ## Constraints
+  - App de uso local, un solo usuario, sin auth compleja
+  - Backend ya está construido — el frontend consume los endpoints, no los modifica

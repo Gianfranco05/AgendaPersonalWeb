@@ -1,0 +1,59 @@
+Collecting google-auth
+  Downloading google_auth-2.53.0-py3-none-any.whl.metadata (5.5 kB)
+Collecting google-auth-oauthlib
+  Downloading google_auth_oauthlib-1.4.0-py3-none-any.whl.metadata (2.6 kB)
+Collecting google-api-python-client
+  Downloading google_api_python_client-2.197.0-py3-none-any.whl.metadata (7.0 kB)
+Collecting pyasn1-modules>=0.2.1 (from google-auth)
+  Downloading pyasn1_modules-0.4.2-py3-none-any.whl.metadata (3.5 kB)
+Requirement already satisfied: cryptography>=38.0.3 in C:\Users\gianf\miniconda3\Lib\site-packages (from google-auth) (46.0.5)
+Collecting requests-oauthlib>=0.7.0 (from google-auth-oauthlib)
+  Downloading requests_oauthlib-2.0.0-py2.py3-none-any.whl.metadata (11 kB)
+Collecting httplib2<1.0.0,>=0.19.0 (from google-api-python-client)
+  Downloading httplib2-0.31.2-py3-none-any.whl.metadata (2.2 kB)
+Collecting google-auth-httplib2<1.0.0,>=0.2.0 (from google-api-python-client)
+  Downloading google_auth_httplib2-0.4.0-py3-none-any.whl.metadata (3.0 kB)
+Collecting google-api-core!=2.0.*,!=2.1.*,!=2.2.*,!=2.3.0,<3.0.0,>=1.31.5 (from google-api-python-client)
+  Downloading google_api_core-2.31.0-py3-none-any.whl.metadata (3.2 kB)
+Collecting uritemplate<5,>=3.0.1 (from google-api-python-client)
+  Downloading uritemplate-4.2.0-py3-none-any.whl.metadata (2.6 kB)
+Collecting googleapis-common-protos<2.0.0,>=1.63.2 (from google-api-core!=2.0.*,!=2.1.*,!=2.2.*,!=2.3.0,<3.0.0,>=1.31.5->google-api-python-client)
+  Downloading googleapis_common_protos-1.75.0-py3-none-any.whl.metadata (8.6 kB)
+Collecting protobuf<8.0.0,>=5.29.6 (from google-api-core!=2.0.*,!=2.1.*,!=2.2.*,!=2.3.0,<3.0.0,>=1.31.5->google-api-python-client)
+  Downloading protobuf-7.35.0-cp310-abi3-win_amd64.whl.metadata (595 bytes)
+Collecting proto-plus<2.0.0,>=1.24.0 (from google-api-core!=2.0.*,!=2.1.*,!=2.2.*,!=2.3.0,<3.0.0,>=1.31.5->google-api-python-client)
+  Downloading proto_plus-1.28.0-py3-none-any.whl.metadata (2.2 kB)
+Collecting requests<3.0.0,>=2.33.0 (from google-api-core!=2.0.*,!=2.1.*,!=2.2.*,!=2.3.0,<3.0.0,>=1.31.5->google-api-python-client)
+  Using cached requests-2.34.2-py3-none-any.whl.metadata (4.8 kB)
+Requirement already satisfied: pyparsing<4,>=3.1 in C:\Users\gianf\miniconda3\Lib\site-packages (from httplib2<1.0.0,>=0.19.0->google-api-python-client) (3.3.2)
+Requirement already satisfied: charset_normalizer<4,>=2 in C:\Users\gianf\miniconda3\Lib\site-packages (from requests<3.0.0,>=2.33.0->google-api-core!=2.0.*,!=2.1.*,!=2.2.*,!=2.3.0,<3.0.0,>=1.31.5->google-api-python-client) (3.4.4)
+Requirement already satisfied: idna<4,>=2.5 in C:\Users\gianf\miniconda3\Lib\site-packages (from requests<3.0.0,>=2.33.0->google-api-core!=2.0.*,!=2.1.*,!=2.2.*,!=2.3.0,<3.0.0,>=1.31.5->google-api-python-client) (3.11)
+Requirement already satisfied: urllib3<3,>=1.26 in C:\Users\gianf\miniconda3\Lib\site-packages (from requests<3.0.0,>=2.33.0->google-api-core!=2.0.*,!=2.1.*,!=2.2.*,!=2.3.0,<3.0.0,>=1.31.5->google-api-python-client) (2.6.3)
+Requirement already satisfied: certifi>=2023.5.7 in C:\Users\gianf\miniconda3\Lib\site-packages (from requests<3.0.0,>=2.33.0->google-api-core!=2.0.*,!=2.1.*,!=2.2.*,!=2.3.0,<3.0.0,>=1.31.5->google-api-python-client) (2026.1.4)
+Requirement already satisfied: cffi>=2.0.0 in C:\Users\gianf\miniconda3\Lib\site-packages (from cryptography>=38.0.3->google-auth) (2.0.0)
+Requirement already satisfied: pycparser in C:\Users\gianf\miniconda3\Lib\site-packages (from cffi>=2.0.0->cryptography>=38.0.3->google-auth) (2.23)
+Requirement already satisfied: pyasn1<0.7.0,>=0.6.1 in C:\Users\gianf\miniconda3\Lib\site-packages (from pyasn1-modules>=0.2.1->google-auth) (0.6.3)
+Collecting oauthlib>=3.0.0 (from requests-oauthlib>=0.7.0->google-auth-oauthlib)
+  Downloading oauthlib-3.3.1-py3-none-any.whl.metadata (7.9 kB)
+Downloading google_auth-2.53.0-py3-none-any.whl (246 kB)
+Downloading google_auth_oauthlib-1.4.0-py3-none-any.whl (19 kB)
+Downloading google_api_python_client-2.197.0-py3-none-any.whl (15.3 MB)
+   ---------------------------------------- 15.3/15.3 MB 12.4 MB/s  0:00:01
+Downloading google_api_core-2.31.0-py3-none-any.whl (173 kB)
+Downloading google_auth_httplib2-0.4.0-py3-none-any.whl (9.5 kB)
+Downloading googleapis_common_protos-1.75.0-py3-none-any.whl (300 kB)
+Downloading httplib2-0.31.2-py3-none-any.whl (91 kB)
+Downloading proto_plus-1.28.0-py3-none-any.whl (50 kB)
+Downloading protobuf-7.35.0-cp310-abi3-win_amd64.whl (439 kB)
+Using cached requests-2.34.2-py3-none-any.whl (73 kB)
+Downloading uritemplate-4.2.0-py3-none-any.whl (11 kB)
+Downloading pyasn1_modules-0.4.2-py3-none-any.whl (181 kB)
+Downloading requests_oauthlib-2.0.0-py2.py3-none-any.whl (24 kB)
+Downloading oauthlib-3.3.1-py3-none-any.whl (160 kB)
+Installing collected packages: uritemplate, requests, pyasn1-modules, protobuf, oauthlib, httplib2, requests-oauthlib, proto-plus, googleapis-common-protos, google-auth, google-auth-oauthlib, google-auth-httplib2, google-api-core, google-api-python-client
+  Attempting uninstall: requests
+    Found existing installation: requests 2.32.5
+    Uninstalling requests-2.32.5:
+      Successfully uninstalled requests-2.32.5
+
+Successfully installed google-api-core-2.31.0 google-api-python-client-2.197.0 google-auth-2.53.0 google-auth-httplib2-0.4.0 google-auth-oauthlib-1.4.0 googleapis-common-protos-1.75.0 httplib2-0.31.2 oauthlib-3.3.1 proto-plus-1.28.0 protobuf-7.35.0 pyasn1-modules-0.4.2 requests-2.34.2 requests-oauthlib-2.0.0 uritemplate-4.2.0

@@ -1,0 +1,125 @@
+import { useState, useEffect, useCallback } from 'react';
+import MDEditor from '@uiw/react-md-editor';
+import { Pin, PinOff, Trash2, Palette } from 'lucide-react';
+import type { Note } from '../../types';
+
+const NOTE_COLORS = [
+  '#7C3AED', '#3B82F6', '#10B981', '#F59E0B', '#EF4444',
+  '#EC4899', '#8B5CF6', '#06B6D4', '#84CC16', '#F97316',
+];
+
+interface NoteEditorProps {
+  note: Note;
+  onSave: (note: Note) => void;
+  onDelete: (id: string) => void;
+  onColorChange: (id: string, color: string) => void;
+}
+
+export default function NoteEditor({ note, onSave, onDelete, onColorChange }: NoteEditorProps) {
+  const [title, setTitle] = useState(note.title);
+  const [content, setContent] = useState(note.content);
+  const [showColors, setShowColors] = useState(false);
+
+  useEffect(() => {
+    setTitle(note.title);
+    setContent(note.content);
+  }, [note.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const save = useCallback(() => {
+    onSave({ ...note, title, content, updated_at: new Date().toISOString() });
+  }, [note, title, content, onSave]);
+
+  useEffect(() => {
+    const timer = setTimeout(save, 1000);
+    return () => clearTimeout(timer);
+  }, [title, content, save]);
+
+  function handleDelete() {
+    if (window.confirm('¿Eliminar esta nota?')) {
+      onDelete(note.id);
+    }
+  }
+
+  return (
+    <div className="flex flex-1 flex-col">
+      {/* Toolbar */}
+      <div
+        className="flex items-center gap-2 border-b px-4 py-2"
+        style={{ borderLeftColor: note.color, borderLeftWidth: '3px' }}
+      >
+        <button
+          onClick={() => onSave({ ...note, is_pinned: !note.is_pinned })}
+          className="rounded p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-[#7C3AED]"
+          title={note.is_pinned ? 'Desfijar' : 'Fijar'}
+        >
+          {note.is_pinned ? <PinOff size={16} /> : <Pin size={16} />}
+        </button>
+
+        {/* Color picker */}
+        <div className="relative">
+          <button
+            onClick={() => setShowColors(!showColors)}
+            className="rounded p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+            title="Color"
+          >
+            <Palette size={16} />
+          </button>
+          {showColors && (
+            <div className="absolute left-0 top-full z-10 mt-1 flex gap-1 rounded-lg border border-gray-200 bg-white p-2 shadow-lg">
+              {NOTE_COLORS.map((color) => (
+                <button
+                  key={color}
+                  onClick={() => {
+                    onColorChange(note.id, color);
+                    setShowColors(false);
+                  }}
+                  className="h-6 w-6 rounded-full border-2 transition-transform hover:scale-110"
+                  style={{
+                    backgroundColor: color,
+                    borderColor: note.color === color ? '#374151' : 'transparent',
+                  }}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="flex-1" />
+
+        <button
+          onClick={handleDelete}
+          className="rounded p-1 text-gray-400 transition-colors hover:bg-rose-50 hover:text-rose-500"
+          title="Eliminar"
+        >
+          <Trash2 size={16} />
+        </button>
+      </div>
+
+      {/* Title */}
+      <input
+        type="text"
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        placeholder="Título de la nota"
+        className="border-b border-gray-100 px-4 py-3 text-lg font-semibold text-gray-800 outline-none placeholder:text-gray-300"
+      />
+
+      {/* Editor */}
+      <div className="flex-1 overflow-hidden" data-color-mode="light">
+        <MDEditor
+          value={content}
+          onChange={(val) => setContent(val || '')}
+          height="100%"
+          preview="live"
+          visibleDragbar={false}
+        />
+      </div>
+
+      <div className="border-t border-gray-100 px-4 py-2">
+        <span className="text-xs text-gray-400">
+          Última edición: {new Date(note.updated_at).toLocaleString('es-AR')}
+        </span>
+      </div>
+    </div>
+  );
+}
