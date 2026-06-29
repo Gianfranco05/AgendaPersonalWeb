@@ -1,5 +1,7 @@
 from uuid import uuid4
 from datetime import date, datetime, timedelta
+from typing import List
+
 from app.core.security import get_user_id_from_request
 from app.core.templates import templates
 
@@ -10,6 +12,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.modules.metas.models import Goal, HabitRecord
+from app.modules.metas.service import GoalsService
+from app.modules.metas.schemas import GoalOut
 
 router = APIRouter(prefix="/metas", tags=["metas"])
 
@@ -248,6 +252,17 @@ async def completar_meta(
         await db.commit()
 
     return RedirectResponse(url="/metas/", status_code=303)
+
+
+@router.get("/api/goals", response_model=List[GoalOut])
+async def api_goals(request: Request, db: AsyncSession = Depends(get_db)):
+    user_id = get_user_id_from_request(request)
+    if not user_id:
+        return RedirectResponse(url="/auth/login", status_code=303)
+
+    service = GoalsService(db)
+    goals = await service.list_active_goals(user_id)
+    return goals
 
 
 def calculate_streak(dates):

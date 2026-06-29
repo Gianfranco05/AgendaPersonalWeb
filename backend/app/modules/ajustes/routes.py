@@ -3,7 +3,7 @@ import secrets
 from datetime import timedelta
 
 from fastapi import APIRouter, Depends, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,10 +12,11 @@ from app.core.security import (
     create_access_token,
     get_user_id_from_request,
 )
+from app.core.templates import templates
 from app.database import get_db
 from app.modules.ajustes.models import UserPreference
 from app.modules.ajustes.service import SettingsService
-from app.modules.ajustes.schemas import UserPreferenceUpdate, UserPreferenceOut
+from app.modules.ajustes.schemas import UserPreferenceOut
 
 router = APIRouter(prefix="/ajustes", tags=["ajustes"])
 
@@ -29,6 +30,21 @@ THEME_COLORS = {
 }
 
 CURRENCIES = ["ARS", "USD", "EUR", "BRL", "CLP", "UYU"]
+
+DATE_FORMATS = [("DD/MM/YYYY", "31/12/2024"), ("MM/DD/YYYY", "12/31/2024"), ("YYYY-MM-DD", "2024-12-31")]
+
+
+async def get_or_create_prefs(user_id: str, db: AsyncSession) -> UserPreference:
+    result = await db.execute(
+        select(UserPreference).where(UserPreference.user_id == user_id)
+    )
+    prefs = result.scalar_one_or_none()
+    if prefs is None:
+        prefs = UserPreference(user_id=user_id)
+        db.add(prefs)
+        await db.commit()
+        await db.refresh(prefs)
+    return prefs
 
 
 def _make_auth_response(url: str, user_id: str, theme_color: str) -> RedirectResponse:
@@ -62,42 +78,80 @@ async def ajustes_page(
     user_result = await db.execute(select(User).where(User.id == user_id))
     user = user_result.scalar_one_or_none()
 
-    service = SettingsService(db)
-    prefs = await service.get_preferences(user_id)
+    prefs = await get_or_create_prefs(user_id, db)
     google_configured = bool(settings.GOOGLE_CLIENT_ID and settings.GOOGLE_CLIENT_SECRET)
     google_connected = bool(prefs.google_refresh_token)
 
-    return HTMLResponse(
-        content=render_ajustes(
-            user=user,
-            prefs=prefs,
-            google_configured=google_configured,
-            google_connected=google_connected,
-            success=success,
-            error=error,
-            synced=synced,
-        )
-    )
+    alert_message = None
+    alert_bg = ""
+    alert_icon = ""
+    alert_icon_color = ""
 
+    if success == "saved":
+        alert_message = "Preferencias guardadas correctamente."
+        alert_bg = "bg-green-50 border-green-200 text-green-800"
+        alert_icon = "check-circle"
+        alert_icon_color = "text-green-500"
+    elif success == "google_connected":
+        alert_message = "Google Calendar conectado exitosamente."
+        alert_bg = "bg-green-50 border-green-200 text-green-800"
+        alert_icon = "check-circle"
+        alert_icon_color = "text-green-500"
+    elif success == "google_disconnected":
+        alert_message = "Google Calendar desconectado."
+        alert_bg = "bg-blue-50 border-blue-200 text-blue-800"
+        alert_icon = "info-circle"
+        alert_icon_color = "text-blue-500"
+    elif synced is not None:
+        alert_message = f"{synced} evento(s) sincronizado(s) con Google Calendar."
+        alert_bg = "bg-green-50 border-green-200 text-green-800"
+        alert_icon = "check-circle"
+        alert_icon_color = "text-green-500"
+    elif error == "google_not_configured":
+        alert_message = "Configurá GOOGLE_CLIENT_ID y GOOGLE_CLIENT_SECRET en el .env para usar esta función."
+        alert_bg = "bg-yellow-50 border-yellow-200 text-yellow-800"
+        alert_icon = "exclamation-triangle"
+        alert_icon_color = "text-yellow-500"
+    elif error == "google_denied":
+        alert_message = "Acceso a Google Calendar denegado."
+        alert_bg = "bg-red-50 border-red-200 text-red-800"
+        alert_icon = "exclamation-circle"
+        alert_icon_color = "text-red-500"
+    elif error == "sync_failed":
+        alert_message = "Error al sincronizar con Google Calendar. Verificá la conexión."
+        alert_bg = "bg-red-50 border-red-200 text-red-800"
+        alert_icon = "exclamation-circle"
+        alert_icon_color = "text-red-500"
+    elif error == "not_connected":
+        alert_message = "Primero conectá tu cuenta de Google Calendar."
+        alert_bg = "bg-yellow-50 border-yellow-200 text-yellow-800"
+        alert_icon = "exclamation-triangle"
+        alert_icon_color = "text-yellow-500"
+    elif error:
+        alert_message = f"Error: {error}"
+        alert_bg = "bg-red-50 border-red-200 text-red-800"
+        alert_icon = "exclamation-circle"
+        alert_icon_color = "text-red-500"
 
-@router.get("/api/preferences")
-async def api_preferences(request: Request, db: AsyncSession = Depends(get_db)):
-    user_id = get_user_id_from_request(request)
-    if not user_id:
-        return RedirectResponse(url="/auth/login", status_code=303)
-    service = SettingsService(db)
-    prefs = await service.get_preferences(user_id)
-    return {
-        "id": prefs.id,
-        "user_id": prefs.user_id,
-        "currency": prefs.currency,
-        "theme_color": prefs.theme_color,
-        "date_format": prefs.date_format,
-        "google_calendar_id": prefs.google_calendar_id,
-        "google_connected": bool(prefs.google_refresh_token),
-        "created_at": prefs.created_at.isoformat() if prefs.created_at else None,
-        "updated_at": prefs.updated_at.isoformat() if prefs.updated_at else None,
-    }
+    user_name = user.full_name if user else "Usuario"
+    user_email = user.email if user else ""
+
+    return templates.TemplateResponse(request, "ajustes/preferencias.html", {
+        "active_page": "ajustes",
+        "user": user,
+        "user_name": user_name,
+        "user_email": user_email,
+        "prefs": prefs,
+        "google_configured": google_configured,
+        "google_connected": google_connected,
+        "alert_message": alert_message,
+        "alert_bg": alert_bg,
+        "alert_icon": alert_icon,
+        "alert_icon_color": alert_icon_color,
+        "theme_colors": THEME_COLORS,
+        "currencies": CURRENCIES,
+        "date_formats": DATE_FORMATS,
+    })
 
 
 @router.post("/")
@@ -117,20 +171,26 @@ async def save_ajustes(
     if currency not in CURRENCIES:
         currency = "ARS"
 
-    service = SettingsService(db)
-    await service.update_preferences(
-        user_id,
-        UserPreferenceUpdate(
-            currency=currency,
-            theme_color=theme_color,
-            date_format=date_format,
-        ),
-    )
+    prefs = await get_or_create_prefs(user_id, db)
+    prefs.currency = currency
+    prefs.theme_color = theme_color
+    prefs.date_format = date_format
+    db.add(prefs)
+    await db.commit()
 
     return _make_auth_response("/ajustes/?success=saved", user_id, theme_color)
 
 
-# ── Google Calendar OAuth ─────────────────────────────────────────────────────
+@router.get("/api/preferences", response_model=UserPreferenceOut)
+async def api_preferences(request: Request, db: AsyncSession = Depends(get_db)):
+    user_id = get_user_id_from_request(request)
+    if not user_id:
+        return RedirectResponse(url="/auth/login", status_code=303)
+
+    service = SettingsService(db)
+    prefs = await service.get_preferences(user_id)
+    return prefs
+
 
 @router.get("/google/connect")
 async def google_connect(request: Request, db: AsyncSession = Depends(get_db)):
@@ -182,8 +242,7 @@ async def google_callback(
         await asyncio.to_thread(flow.fetch_token, code=code)
         credentials = flow.credentials
 
-        service = SettingsService(db)
-        prefs = await service.get_preferences(user_id)
+        prefs = await get_or_create_prefs(user_id, db)
         prefs.google_access_token = credentials.token
         prefs.google_refresh_token = credentials.refresh_token or prefs.google_refresh_token
         prefs.google_token_expiry = credentials.expiry
@@ -203,8 +262,7 @@ async def google_disconnect(request: Request, db: AsyncSession = Depends(get_db)
     if not user_id:
         return RedirectResponse(url="/auth/login", status_code=303)
 
-    service = SettingsService(db)
-    prefs = await service.get_preferences(user_id)
+    prefs = await get_or_create_prefs(user_id, db)
     prefs.google_access_token = None
     prefs.google_refresh_token = None
     prefs.google_token_expiry = None
@@ -220,8 +278,7 @@ async def google_sync(request: Request, db: AsyncSession = Depends(get_db)):
     if not user_id:
         return RedirectResponse(url="/auth/login", status_code=303)
 
-    service = SettingsService(db)
-    prefs = await service.get_preferences(user_id)
+    prefs = await get_or_create_prefs(user_id, db)
     if not prefs.google_refresh_token:
         return RedirectResponse(url="/ajustes/?error=not_connected", status_code=303)
 
@@ -232,8 +289,6 @@ async def google_sync(request: Request, db: AsyncSession = Depends(get_db)):
 
     return RedirectResponse(url=f"/ajustes/?synced={count}", status_code=303)
 
-
-# ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _build_google_flow():
     from google_auth_oauthlib.flow import Flow
@@ -309,254 +364,3 @@ async def _sync_events_to_google(
         synced += 1
 
     return synced
-
-
-# ── HTML ──────────────────────────────────────────────────────────────────────
-
-def render_ajustes(user, prefs, google_configured, google_connected, success=None, error=None, synced=None):
-    alert_html = ""
-    if success == "saved":
-        alert_html = _alert("Preferencias guardadas correctamente.", "green")
-    elif success == "google_connected":
-        alert_html = _alert("Google Calendar conectado exitosamente.", "green")
-    elif success == "google_disconnected":
-        alert_html = _alert("Google Calendar desconectado.", "blue")
-    elif synced is not None:
-        alert_html = _alert(f"{synced} evento(s) sincronizado(s) con Google Calendar.", "green")
-    elif error == "google_not_configured":
-        alert_html = _alert("Configurá GOOGLE_CLIENT_ID y GOOGLE_CLIENT_SECRET en el .env para usar esta función.", "yellow")
-    elif error == "google_denied":
-        alert_html = _alert("Acceso a Google Calendar denegado.", "red")
-    elif error == "sync_failed":
-        alert_html = _alert("Error al sincronizar con Google Calendar. Verificá la conexión.", "red")
-    elif error == "not_connected":
-        alert_html = _alert("Primero conectá tu cuenta de Google Calendar.", "yellow")
-    elif error:
-        alert_html = _alert(f"Error: {error}", "red")
-
-    # Theme swatches
-    theme_swatches = ""
-    for key, hex_color in THEME_COLORS.items():
-        labels = {
-            "violet": "Violeta", "indigo": "Índigo", "blue": "Azul",
-            "emerald": "Verde", "rose": "Rosa", "amber": "Ámbar"
-        }
-        checked = "ring-4 ring-offset-2 ring-gray-400 scale-110" if prefs.theme_color == key else ""
-        theme_swatches += f"""
-        <label class="cursor-pointer flex flex-col items-center gap-2 group">
-            <input type="radio" name="theme_color" value="{key}" {"checked" if prefs.theme_color == key else ""}
-                   class="sr-only" onchange="this.form.submit()">
-            <div class="w-10 h-10 rounded-full transition-all duration-200 {checked}"
-                 style="background-color:{hex_color};"></div>
-            <span class="text-xs text-[#64748B] group-hover:text-[#1E293B] transition">{labels[key]}</span>
-        </label>"""
-
-    # Currency options
-    currency_options = "".join(
-        f'<option value="{c}" {"selected" if prefs.currency == c else ""}>{c}</option>'
-        for c in CURRENCIES
-    )
-
-    # Date format options
-    date_formats = [("DD/MM/YYYY", "31/12/2024"), ("MM/DD/YYYY", "12/31/2024"), ("YYYY-MM-DD", "2024-12-31")]
-    date_format_options = "".join(
-        f'<option value="{fmt}" {"selected" if prefs.date_format == fmt else ""}>{fmt} — ej: {ex}</option>'
-        for fmt, ex in date_formats
-    )
-
-    # Google Calendar section
-    if not google_configured:
-        google_html = """
-        <div class="flex items-start gap-4 p-4 bg-yellow-50 rounded-xl border border-yellow-200">
-            <i class="fas fa-info-circle text-yellow-500 mt-0.5 text-lg"></i>
-            <div>
-                <p class="font-medium text-[#1E293B] text-sm">Integración no configurada</p>
-                <p class="text-xs text-[#64748B] mt-1">
-                    Para conectar Google Calendar, configurá las variables
-                    <code class="bg-yellow-100 px-1 rounded">GOOGLE_CLIENT_ID</code> y
-                    <code class="bg-yellow-100 px-1 rounded">GOOGLE_CLIENT_SECRET</code> en tu <code class="bg-yellow-100 px-1 rounded">.env</code>.
-                    <a href="https://console.cloud.google.com/" target="_blank" class="text-[#7C3AED] hover:underline ml-1">Google Cloud Console →</a>
-                </p>
-            </div>
-        </div>"""
-    elif google_connected:
-        google_html = f"""
-        <div class="flex items-center justify-between p-4 bg-green-50 rounded-xl border border-green-200">
-            <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center">
-                    <i class="fab fa-google text-green-600"></i>
-                </div>
-                <div>
-                    <p class="font-semibold text-[#1E293B] text-sm">Google Calendar conectado</p>
-                    <p class="text-xs text-green-600">Calendario: {prefs.google_calendar_id}</p>
-                </div>
-            </div>
-            <div class="flex items-center gap-2">
-                <form method="POST" action="/ajustes/google/sync">
-                    <button type="submit"
-                            class="px-4 py-2 bg-[#7C3AED] text-white text-sm rounded-lg hover:bg-[#6D28D9] transition font-medium flex items-center gap-2">
-                        <i class="fas fa-sync-alt"></i>Sincronizar eventos
-                    </button>
-                </form>
-                <form method="POST" action="/ajustes/google/disconnect"
-                      onsubmit="return confirm('¿Desconectar Google Calendar?');">
-                    <button type="submit"
-                            class="px-4 py-2 bg-white text-red-500 text-sm rounded-lg border border-red-200 hover:bg-red-50 transition font-medium">
-                        <i class="fas fa-unlink mr-1"></i>Desconectar
-                    </button>
-                </form>
-            </div>
-        </div>"""
-    else:
-        google_html = """
-        <div class="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-200">
-            <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-xl bg-white border border-gray-200 flex items-center justify-center">
-                    <i class="fab fa-google text-gray-400"></i>
-                </div>
-                <div>
-                    <p class="font-semibold text-[#1E293B] text-sm">Google Calendar</p>
-                    <p class="text-xs text-[#94A3B8]">No conectado — sincronizá tus eventos automáticamente</p>
-                </div>
-            </div>
-            <a href="/ajustes/google/connect"
-               class="px-4 py-2 bg-[#7C3AED] text-white text-sm rounded-lg hover:bg-[#6D28D9] transition font-medium flex items-center gap-2">
-                <i class="fab fa-google"></i>Conectar
-            </a>
-        </div>"""
-
-    user_name = user.full_name if user else "Usuario"
-    user_email = user.email if user else ""
-
-    return f"""
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ajustes - Vida Personal</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-</head>
-<body class="bg-[#F8FAFC] min-h-screen">
-
-    <nav class="bg-[#0F172A] text-white sticky top-0 z-50">
-        <div class="max-w-7xl mx-auto px-6 py-4">
-            <div class="flex justify-between items-center">
-                <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-[#7C3AED] to-[#22D3EE] flex items-center justify-center">
-                        <i class="fas fa-sparkles"></i>
-                    </div>
-                    <span class="text-xl font-bold tracking-tight">Vida Personal</span>
-                </div>
-                <div class="flex items-center gap-2">
-                    <a href="/finanzas/" class="px-5 py-2.5 rounded-xl hover:bg-white/10 text-sm font-medium transition">Dashboard</a>
-                    <a href="/finanzas/transacciones" class="px-5 py-2.5 rounded-xl hover:bg-white/10 text-sm font-medium transition">Finanzas</a>
-                    <a href="/anotaciones/" class="px-5 py-2.5 rounded-xl hover:bg-white/10 text-sm font-medium transition">Notas</a>
-                    <a href="/eventos/" class="px-5 py-2.5 rounded-xl hover:bg-white/10 text-sm font-medium transition">Calendario</a>
-                    <a href="/metas/" class="px-5 py-2.5 rounded-xl hover:bg-white/10 text-sm font-medium transition">Metas</a>
-                    <a href="/ajustes/" class="px-5 py-2.5 rounded-xl bg-[#7C3AED] text-sm font-medium">Ajustes</a>
-                    <div class="w-px h-8 bg-white/20 mx-2"></div>
-                    <a href="/auth/logout" class="px-5 py-2.5 rounded-xl hover:bg-white/10 text-sm font-medium transition">
-                        <i class="fas fa-sign-out-alt mr-2"></i>Salir
-                    </a>
-                </div>
-            </div>
-        </div>
-    </nav>
-
-    <main class="max-w-3xl mx-auto px-6 py-10">
-        <div class="mb-8">
-            <a href="/finanzas/" class="text-[#64748B] hover:text-[#7C3AED] transition text-sm mb-2 inline-flex items-center gap-1">
-                <i class="fas fa-arrow-left"></i>Volver al Dashboard
-            </a>
-            <h1 class="text-3xl font-bold text-[#1E293B]">Ajustes</h1>
-            <p class="text-[#64748B] mt-1">Personalizá la aplicación a tu gusto</p>
-        </div>
-
-        {alert_html}
-
-        <!-- Perfil -->
-        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
-            <h2 class="text-lg font-semibold text-[#1E293B] mb-4 flex items-center gap-2">
-                <i class="fas fa-user-circle text-[#7C3AED]"></i>Perfil
-            </h2>
-            <div class="flex items-center gap-4">
-                <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#7C3AED] to-[#22D3EE] flex items-center justify-center text-white text-xl font-bold">
-                    {user_name[0].upper() if user_name else "?"}
-                </div>
-                <div>
-                    <p class="font-semibold text-[#1E293B]">{user_name}</p>
-                    <p class="text-sm text-[#64748B]">{user_email}</p>
-                </div>
-            </div>
-        </div>
-
-        <!-- Preferencias -->
-        <form method="POST" action="/ajustes/" id="prefs-form">
-            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
-                <h2 class="text-lg font-semibold text-[#1E293B] mb-5 flex items-center gap-2">
-                    <i class="fas fa-sliders text-[#7C3AED]"></i>Preferencias
-                </h2>
-                <div class="grid grid-cols-2 gap-5">
-                    <div>
-                        <label class="block text-sm font-medium text-[#374151] mb-1.5">Moneda por defecto</label>
-                        <select name="currency"
-                                class="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#7C3AED]/40 focus:border-[#7C3AED]">
-                            {currency_options}
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-[#374151] mb-1.5">Formato de fecha</label>
-                        <select name="date_format"
-                                class="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#7C3AED]/40 focus:border-[#7C3AED]">
-                            {date_format_options}
-                        </select>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Apariencia -->
-            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
-                <h2 class="text-lg font-semibold text-[#1E293B] mb-5 flex items-center gap-2">
-                    <i class="fas fa-palette text-[#7C3AED]"></i>Apariencia
-                </h2>
-                <p class="text-sm text-[#64748B] mb-4">Color de acento de la interfaz</p>
-                <div class="flex items-center gap-6">
-                    {theme_swatches}
-                </div>
-            </div>
-
-            <div class="flex justify-end">
-                <button type="submit"
-                        class="px-6 py-3 bg-[#7C3AED] text-white rounded-xl font-semibold hover:bg-[#6D28D9] transition shadow-sm flex items-center gap-2">
-                    <i class="fas fa-save"></i>Guardar cambios
-                </button>
-            </div>
-        </form>
-
-        <!-- Integraciones -->
-        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mt-6">
-            <h2 class="text-lg font-semibold text-[#1E293B] mb-2 flex items-center gap-2">
-                <i class="fas fa-plug text-[#7C3AED]"></i>Integraciones
-            </h2>
-            <p class="text-sm text-[#64748B] mb-5">Conectá servicios externos para ampliar las funcionalidades</p>
-
-            {google_html}
-        </div>
-    </main>
-</body>
-</html>
-"""
-
-
-def _alert(message: str, color: str) -> str:
-    icons = {"green": "check-circle", "red": "exclamation-circle", "yellow": "exclamation-triangle", "blue": "info-circle"}
-    bg = {"green": "bg-green-50 border-green-200 text-green-800", "red": "bg-red-50 border-red-200 text-red-800",
-          "yellow": "bg-yellow-50 border-yellow-200 text-yellow-800", "blue": "bg-blue-50 border-blue-200 text-blue-800"}
-    icon_color = {"green": "text-green-500", "red": "text-red-500", "yellow": "text-yellow-500", "blue": "text-blue-500"}
-    return f"""
-    <div class="{bg.get(color, bg['blue'])} border rounded-xl p-4 mb-6 flex items-center gap-3">
-        <i class="fas fa-{icons.get(color, 'info-circle')} {icon_color.get(color, '')}"></i>
-        <p class="text-sm font-medium">{message}</p>
-    </div>"""
