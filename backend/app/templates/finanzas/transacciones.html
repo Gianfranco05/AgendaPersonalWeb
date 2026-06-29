@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block title %}Transacciones - Vida Personal{% endblock %}
+{% block content %}
+        <div class="flex justify-between items-center mb-8">
+            <div>
+                <a href="/finanzas/" class="text-[#64748B] hover:text-[#7C3AED] transition text-sm mb-2 inline-flex items-center gap-1">
+                    <i class="fas fa-arrow-left"></i>Volver al Dashboard
+                </a>
+                <h1 class="text-3xl font-bold text-[#1E293B]">Transacciones</h1>
+            </div>
+            <div class="flex items-center gap-3">
+                <a href="/finanzas/reportes" class="px-5 py-2.5 rounded-xl bg-white border border-gray-200 text-[#64748B] hover:border-[#7C3AED] hover:text-[#7C3AED] text-sm font-medium transition flex items-center gap-2">
+                    <i class="fas fa-chart-pie"></i>Reportes
+                </a>
+                <a href="/finanzas/transacciones/nueva" class="btn-primary text-white px-6 py-3 rounded-xl font-medium flex items-center gap-2">
+                    <i class="fas fa-plus"></i>Nueva Transacción
+                </a>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-2xl card-shadow border border-gray-100 overflow-hidden">
+            <table class="w-full">
+                <thead class="bg-[#F8FAFC] border-b border-gray-100">
+                    <tr>
+                        <th class="px-6 py-4 text-left text-xs font-semibold text-[#64748B] uppercase tracking-wider">Descripción</th>
+                        <th class="px-6 py-4 text-left text-xs font-semibold text-[#64748B] uppercase tracking-wider">Tipo</th>
+                        <th class="px-6 py-4 text-left text-xs font-semibold text-[#64748B] uppercase tracking-wider">Fecha</th>
+                        <th class="px-6 py-4 text-left text-xs font-semibold text-[#64748B] uppercase tracking-wider">Monto</th>
+                        <th class="px-6 py-4 text-left text-xs font-semibold text-[#64748B] uppercase tracking-wider">Método</th>
+                        <th class="px-6 py-4 text-left text-xs font-semibold text-[#64748B] uppercase tracking-wider"></th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-50">
+                    {% if not transactions %}
+                    <tr>
+                        <td colspan="6" class="px-6 py-16 text-center">
+                            <div class="flex flex-col items-center text-[#94A3B8]">
+                                <i class="fas fa-receipt text-5xl mb-4"></i>
+                                <p class="text-lg font-medium">No hay transacciones registradas</p>
+                                <p class="text-sm">Comienza agregando tu primera transacción</p>
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    {% for t in transactions %}
+                    <tr class="border-b border-gray-50 hover:bg-[#F8FAFC] transition">
+                        <td class="px-6 py-4">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-xl {{ "bg-green-100" if t.type == "income" else "bg-red-100" }} flex items-center justify-center">
+                                    <i class="fas fa-{{ "arrow-up text-green-600" if t.type == "income" else "arrow-down text-red-600" }}"></i>
+                                </div>
+                                <div>
+                                    <p class="font-medium text-[#1E293B]">{{ t.product_name }}</p>
+                                    <p class="text-sm text-[#94A3B8]">{{ t.merchant_name or "Sin comercio" }}</p>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4">
+                            {% if t.type == "income" %}
+                            <span class="px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">Ingreso</span>
+                            {% else %}
+                            <span class="px-2.5 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700">Gasto</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 text-sm text-[#64748B]">{{ t.transaction_date }}</td>
+                        <td class="px-6 py-4 font-semibold {{ "text-green-600" if t.type == "income" else "text-red-600" }}">{{ "+" if t.type == "income" else "-" }}${{ "{:,.2f}".format(t.amount) }}</td>
+                        <td class="px-6 py-4 text-[#64748B]">{{ t.payment_method }}</td>
+                        <td class="px-6 py-4">
+                            <div class="flex items-center gap-2">
+                                <a href="/finanzas/transacciones/editar/{{ t.id }}" class="text-[#94A3B8] hover:text-[#7C3AED] transition p-1.5 rounded-lg hover:bg-[#EDE9FE]">
+                                    <i class="fas fa-pen text-xs"></i>
+                                </a>
+                                <form action="/finanzas/transacciones/eliminar/{{ t.id }}" method="POST" onsubmit="return confirm('¿Eliminar esta transacción?');">
+                                    <button type="submit" class="text-[#94A3B8] hover:text-red-500 transition p-1.5 rounded-lg hover:bg-red-50">
+                                        <i class="fas fa-trash-alt text-xs"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    {% endif %}
+                </tbody>
+            </table>
+            <div class="px-6 py-4 border-t border-gray-100 flex items-center justify-between">
+                <p class="text-sm text-[#64748B]">
+                    Mostrando {{ ((page-1)*per_page)+1 if total > 0 else 0 }}–{{ [page*per_page, total] | min }} de <span class="font-medium">{{ total }}</span> transacciones
+                </p>
+                <div class="flex items-center gap-2">
+                    <a href="?page={{ [1, page - 1] | max }}&per_page={{ per_page }}"
+                       class="px-4 py-2 rounded-xl border border-gray-200 text-sm font-medium text-[#64748B] hover:border-[#7C3AED] hover:text-[#7C3AED] transition {{ "pointer-events-none opacity-40" if page <= 1 else "" }}">
+                        <i class="fas fa-chevron-left mr-1"></i>Anterior
+                    </a>
+                    <span class="px-4 py-2 text-sm font-medium text-[#1E293B]">
+                        Página {{ page }} de {{ total_pages }}
+                    </span>
+                    <a href="?page={{ [total_pages, page + 1] | min }}&per_page={{ per_page }}"
+                       class="px-4 py-2 rounded-xl border border-gray-200 text-sm font-medium text-[#64748B] hover:border-[#7C3AED] hover:text-[#7C3AED] transition {{ "pointer-events-none opacity-40" if page >= total_pages else "" }}">
+                        Siguiente<i class="fas fa-chevron-right ml-1"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+{% endblock %}

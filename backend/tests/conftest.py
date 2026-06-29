@@ -39,7 +39,7 @@ async def db_session(engine):
 @pytest_asyncio.fixture(scope="function")
 async def test_user(db_session):
     user = User(
-        id="test-user-id",
+        id="a1b2c3d4-e5f6-7890-abcd-ef1234567890",
         email="test@test.com",
         password_hash=hash_password("test123"),
         full_name="Test User",
@@ -67,6 +67,15 @@ async def client(engine, db_session):
 @pytest_asyncio.fixture(scope="function")
 async def auth_client(client, test_user):
     await client.post("/auth/login", data={
+        "email": "test@test.com",
+        "password": "test123",
+    })
+    return client
+
+
+@pytest_asyncio.fixture(scope="function")
+async def api_auth_client(client, test_user):
+    await client.post("/auth/api/login", json={
         "email": "test@test.com",
         "password": "test123",
     })

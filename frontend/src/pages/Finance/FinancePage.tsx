@@ -1,9 +1,8 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useState } from 'react';
 import { TrendingUp, TrendingDown, Wallet, Plus } from 'lucide-react';
 import { LoadingSkeleton } from '../../components/LoadingSkeleton';
-import { fetchFinanceSummary, fetchTransactions, deleteTransaction } from '../../api/endpoints';
+import { useFinanceSummary, useTransactions, removeTransaction } from '../../hooks/useFinance';
 import type { Transaction } from '../../types';
-import type { FinanceSummary } from '../../types';
 import TransactionTable from './TransactionTable';
 import TransactionModal from './TransactionModal';
 import FinanceCharts from './FinanceCharts';
@@ -16,40 +15,35 @@ interface Filters {
   type: string;
 }
 
+const PER_PAGE = 20;
+
 export default function FinancePage() {
-  const [summary, setSummary] = useState<FinanceSummary | null>(null);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
-  const [filters, setFilters] = useState<Filters>({ date_from: '', date_to: '', category: '', type: '' });
-  const [loading, setLoading] = useState(true);
+  const [filters, setFilters] = useState<Filters>({
+    date_from: '',
+    date_to: '',
+    category: '',
+    type: '',
+  });
   const [showModal, setShowModal] = useState(false);
   const [editingTx, setEditingTx] = useState<Transaction | null>(null);
 
-  const perPage = 20;
+  const txParams = {
+    page,
+    per_page: PER_PAGE,
+    ...(filters.type && { type: filters.type }),
+    ...(filters.category && { category: filters.category }),
+    ...(filters.date_from && { date_from: filters.date_from }),
+    ...(filters.date_to && { date_to: filters.date_to }),
+  };
 
-  const loadData = useCallback(async (currentPage: number, currentFilters: Filters) => {
-    setLoading(true);
-    const [summaryData, txData] = await Promise.all([
-      fetchFinanceSummary(),
-      fetchTransactions({
-        page: currentPage,
-        per_page: perPage,
-        ...(currentFilters.type && { type: currentFilters.type }),
-        ...(currentFilters.category && { category: currentFilters.category }),
-        ...(currentFilters.date_from && { date_from: currentFilters.date_from }),
-        ...(currentFilters.date_to && { date_to: currentFilters.date_to }),
-      }),
-    ]);
-    setSummary(summaryData);
-    setTransactions(txData.transactions);
-    setTotal(txData.total);
-    setLoading(false);
-  }, []);
+  const { data: summary, isLoading: summaryLoading } = useFinanceSummary();
+  const { data: txData, isLoading: txLoading } = useTransactions(txParams);
 
-  useEffect(() => {
-    loadData(page, filters);
-  }, [page, filters, loadData]);
+  const transactions = txData?.transactions ?? [];
+  const total = txData?.total ?? 0;
+  const totalPages = Math.ceil(total / PER_PAGE);
+  const loading = summaryLoading || txLoading;
 
   function handleNew() {
     setEditingTx(null);
@@ -62,21 +56,17 @@ export default function FinancePage() {
   }
 
   async function handleDelete(id: string) {
-    await deleteTransaction(id);
-    loadData(page, filters);
+    await removeTransaction(id, txParams);
   }
 
   function handleSaved() {
     setShowModal(false);
-    loadData(page, filters);
   }
 
   function handleFiltersChange(newFilters: Filters) {
     setFilters(newFilters);
     setPage(1);
   }
-
-  const totalPages = Math.ceil(total / perPage);
 
   return (
     <div className="space-y-6">
@@ -92,7 +82,7 @@ export default function FinancePage() {
       </div>
 
       {/* Summary Cards */}
-      {loading && !summary ? (
+      {summaryLoading && !summary ? (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <LoadingSkeleton type="card" />
           <LoadingSkeleton type="card" />
@@ -123,21 +113,22 @@ export default function FinancePage() {
               <Wallet size={16} className="text-[#7C3AED]" />
               Balance
             </div>
-            <p className={`mt-1 text-2xl font-bold ${summary.balance >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+            <p
+              className={`mt-1 text-2xl font-bold ${
+                summary.balance >= 0 ? 'text-emerald-500' : 'text-rose-500'
+              }`}
+            >
               ${summary.balance.toLocaleString('es-AR')}
             </p>
           </div>
         </div>
       ) : null}
 
-      {/* Charts */}
       <FinanceCharts transactions={transactions} loading={loading} />
 
-      {/* Filters */}
       <TransactionFilters filters={filters} onChange={handleFiltersChange} />
 
-      {/* Table */}
-      {loading ? (
+      {txLoading ? (
         <LoadingSkeleton type="table" rows={5} />
       ) : (
         <>
@@ -147,11 +138,10 @@ export default function FinancePage() {
             onDelete={handleDelete}
           />
 
-          {/* Pagination */}
-          {total > perPage && (
+          {total > PER_PAGE && (
             <div className="flex items-center justify-between rounded-xl bg-white p-4 shadow-sm">
               <span className="text-sm text-gray-500">
-                Mostrando {(page - 1) * perPage + 1}-{Math.min(page * perPage, total)} de {total}
+                Mostrando {(page - 1) * PER_PAGE + 1}–{Math.min(page * PER_PAGE, total)} de {total}
               </span>
               <div className="flex gap-2">
                 <button
@@ -174,10 +164,10 @@ export default function FinancePage() {
         </>
       )}
 
-      {/* Modal */}
       {showModal && (
         <TransactionModal
           transaction={editingTx}
+          txParams={txParams}
           onClose={() => setShowModal(false)}
           onSaved={handleSaved}
         />

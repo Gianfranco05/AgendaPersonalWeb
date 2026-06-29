@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Etiquetas - Vida Personal{% endblock %}
+{% block content %}
+<a href="/anotaciones/" class="text-[#64748B] hover:text-[#7C3AED] transition text-sm mb-4 inline-flex items-center gap-1">
+    <i class="fas fa-arrow-left"></i>Volver a Notas
+</a>
+<h1 class="text-3xl font-bold text-[#1E293B] mb-8">Etiquetas</h1>
+
+<div class="bg-white rounded-2xl p-6 card-shadow border border-gray-100 mb-8">
+    <h2 class="text-lg font-semibold text-[#1E293B] mb-4">Crear Nueva Etiqueta</h2>
+    <form method="POST" action="/anotaciones/etiquetas" class="flex gap-4 items-end">
+        <div class="flex-1">
+            <label class="block text-sm font-medium text-[#374151] mb-2">Nombre</label>
+            <input type="text" name="name" required
+                class="w-full px-4 py-3 rounded-xl border border-gray-200 input-focus transition outline-none"
+                placeholder="Nombre de la etiqueta">
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-[#374151] mb-2">Color</label>
+            <input type="color" name="color" value="#7C3AED"
+                class="h-12 w-20 rounded-xl cursor-pointer border-2 border-gray-200">
+        </div>
+        <button type="submit" class="btn-primary text-white px-6 py-3 rounded-xl font-medium h-fit">
+            <i class="fas fa-plus mr-2"></i>Crear
+        </button>
+    </form>
+</div>
+
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+    {% if not tags %}
+    <div class="text-center py-12 text-[#94A3B8] col-span-full">
+        <i class="fas fa-tags text-5xl mb-4 opacity-50"></i>
+        <p class="text-lg font-medium">No hay etiquetas</p>
+        <p class="text-sm">Crea tu primera etiqueta</p>
+    </div>
+    {% else %}
+    {% for t in tags %}
+    <div class="bg-white rounded-xl p-4 border border-gray-100 flex items-center gap-4">
+        <div class="w-10 h-10 rounded-lg flex items-center justify-center" style="background-color: {{ t.color }}20;">
+            <i class="fas fa-tag" style="color: {{ t.color }};"></i>
+        </div>
+        <span class="font-medium text-[#1E293B] flex-1">{{ t.name }}</span>
+        <form action="/anotaciones/etiquetas/eliminar/{{ t.id }}" method="POST" onsubmit="return confirm('¿Eliminar esta etiqueta?');">
+            <button type="submit" class="text-[#94A3B8] hover:text-red-500 transition">
+                <i class="fas fa-trash-alt"></i>
+            </button>
+        </form>
+    </div>
+    {% endfor %}
+    {% endif %}
+</div>
+{% endblock %}

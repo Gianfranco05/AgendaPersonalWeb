@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block title %}Metas y Hábitos - Vida Personal{% endblock %}
+{% block content %}
+<div class="flex justify-between items-center mb-8">
+    <div>
+        <a href="/finanzas/" class="text-[#64748B] hover:text-[#7C3AED] transition text-sm mb-2 inline-flex items-center gap-1">
+            <i class="fas fa-arrow-left"></i>Volver al Dashboard
+        </a>
+        <h1 class="text-3xl font-bold text-[#1E293B]">Metas y Hábitos</h1>
+        <p class="text-[#64748B] mt-1">{{ goals|length }} meta{{ "s" if goals|length != 1 else "" }} activa{{ "s" if goals|length != 1 else "" }}</p>
+    </div>
+    <a href="/metas/nueva" class="btn-primary text-white px-6 py-3 rounded-xl font-medium flex items-center gap-2">
+        <i class="fas fa-plus"></i>Nueva Meta
+    </a>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
+    {% if not goals %}
+    <div class="text-center py-12 text-[#94A3B8] col-span-full">
+        <i class="fas fa-bullseye text-5xl mb-4 opacity-50"></i>
+        <p class="text-lg font-medium">No hay metas activas</p>
+        <p class="text-sm">Crea tu primera meta para comenzar</p>
+    </div>
+    {% else %}
+    {% for g in goals %}
+    {% set progress = [100, (g.current_value / g.target_value * 100) if g.target_value > 0 else 0] | min %}
+    {% set streak = g.streak if g.streak is defined else 0 %}
+    {% set week_days = ["L", "M", "X", "J", "V", "S", "D"] %}
+    <div class="bg-white rounded-2xl p-6 card-shadow border border-gray-100">
+        <div class="flex items-start gap-4 mb-4">
+            <div class="w-12 h-12 rounded-xl flex items-center justify-center" style="background-color: {{ g.color }}20;">
+                <i class="{{ g.icon }}" style="color: {{ g.color }};"></i>
+            </div>
+            <div class="flex-1 min-w-0">
+                <h3 class="font-semibold text-[#1E293B]">{{ g.title }}</h3>
+                {% if g.description %}
+                <p class="text-sm text-[#64748B]">{{ g.description }}</p>
+                {% endif %}
+            </div>
+            <a href="/metas/editar/{{ g.id }}" class="text-[#94A3B8] hover:text-[#7C3AED] transition">
+                <i class="fas fa-ellipsis-v"></i>
+            </a>
+        </div>
+
+        <div class="mb-4">
+            <div class="flex justify-between text-sm mb-1">
+                <span class="text-[#64748B]">{{ g.current_value }} / {{ g.target_value }} {{ g.unit or "" }}</span>
+                <span class="font-medium" style="color: {{ g.color }};">{{ "%.0f"|format(progress) }}%</span>
+            </div>
+            <div class="h-2 bg-gray-100 rounded-full overflow-hidden">
+                <div class="h-full rounded-full transition-all" style="width: {{ progress }}%; background-color: {{ g.color }};"></div>
+            </div>
+        </div>
+
+        <div class="flex gap-1 justify-center mt-2">
+            {% for i in range(7) %}
+            {% set d = today - timedelta(days=6 - i) %}
+            {% set found = false %}
+            {% for r in g.recent_records %}
+                {% if r.record_date == d %}
+                    {% set found = true %}
+                {% endif %}
+            {% endfor %}
+            {% set bg = "#22D3EE" if found else "#E2E8F0" %}
+            <div class="w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium" style="background-color: {{ bg }}; color: {{ "white" if found else "#94A3B8" }};">{{ week_days[d.weekday()] }}</div>
+            {% endfor %}
+        </div>
+
+        <div class="flex justify-between items-center mt-4 text-sm">
+            <span class="text-[#94A3B8]">
+                <i class="fas fa-fire mr-1"></i>{{ streak }} días seguidos
+            </span>
+            {% if g.end_date %}
+            {% set days = (g.end_date - today).days %}
+            <span class="text-[#64748B]">
+                {% if days < 0 %}
+                <span class="text-red-500">Venció hace {{ -days }} días</span>
+                {% elif days == 0 %}
+                <span class="text-[#F59E0B]">Último día</span>
+                {% else %}
+                {{ days }} días restantes
+                {% endif %}
+            </span>
+            {% endif %}
+        </div>
+
+        <form method="POST" action="/metas/registrar/{{ g.id }}" class="mt-4 flex gap-2">
+            <input type="hidden" name="value" value="{{ 1 if g.goal_type == "binary" else 0.1 }}">
+            <button type="submit" class="flex-1 py-2 rounded-xl font-medium text-white transition" style="background-color: {{ g.color }};">
+                <i class="fas fa-check mr-2"></i>{{ "Marcar hoy" if g.goal_type == "binary" else "Sumar 0.1" }}
+            </button>
+        </form>
+    </div>
+    {% endfor %}
+    {% endif %}
+</div>
+
+{% if completed_goals %}
+<div class="border-t border-gray-200 pt-10">
+    <h2 class="text-xl font-semibold text-[#1E293B] mb-6">Completadas Recientemente</h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {% for g in completed_goals[:6] %}
+        <div class="bg-[#D1FAE5] rounded-xl p-4 border border-[#10B981]/20 opacity-75">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-lg flex items-center justify-center bg-white/50">
+                    <i class="{{ g.icon }}" style="color: {{ g.color }};"></i>
+                </div>
+                <div class="flex-1">
+                    <p class="font-medium text-[#065F46]">{{ g.title }}</p>
+                    <p class="text-xs text-[#059669]"><i class="fas fa-check-circle mr-1"></i>Completada</p>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}Calendario - Vida Personal{% endblock %}
+{% block head_extra %}
+<link href='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.css' rel='stylesheet' />
+<script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js'></script>
+<style>
+    .fc {
+        font-family: 'Inter', sans-serif;
+    }
+    .fc .fc-button {
+        background: linear-gradient(135deg, #7C3AED 0%, #6D28D9 100%);
+        border: none;
+        padding: 8px 16px;
+        border-radius: 8px;
+        font-weight: 500;
+    }
+    .fc .fc-button:hover {
+        background: linear-gradient(135deg, #6D28D9 0%, #5B21B6 100%);
+    }
+    .fc .fc-button-primary:not(:disabled).fc-button-active {
+        background: #0F172A;
+    }
+    .fc .fc-toolbar-title {
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: #1E293B;
+    }
+    .fc .fc-daygrid-day-number {
+        color: #64748B;
+        font-weight: 500;
+    }
+    .fc .fc-daygrid-day.fc-day-today {
+        background: rgba(124, 58, 237, 0.1);
+    }
+    .fc .fc-event {
+        border-radius: 6px;
+        padding: 2px 6px;
+        font-size: 0.85rem;
+    }
+</style>
+{% endblock %}
+{% block content %}
+<div class="flex justify-between items-center mb-8">
+    <div>
+        <a href="/finanzas/" class="text-[#64748B] hover:text-[#7C3AED] transition text-sm mb-2 inline-flex items-center gap-1">
+            <i class="fas fa-arrow-left"></i>Volver al Dashboard
+        </a>
+        <h1 class="text-3xl font-bold text-[#1E293B]">Calendario</h1>
+        <p class="text-[#64748B] mt-1">{{ events_list|length }} elemento{{ "s" if events_list|length != 1 else "" }}</p>
+    </div>
+    <a href="/eventos/nuevo" class="btn-primary text-white px-6 py-3 rounded-xl font-medium flex items-center gap-2">
+        <i class="fas fa-plus"></i>Nuevo Evento
+    </a>
+</div>
+
+<div class="bg-white rounded-2xl p-6 card-shadow border border-gray-100">
+    <div id='calendar'></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var calendar = new FullCalendar.Calendar(document.getElementById('calendar'), {
+        initialView: 'dayGridMonth',
+        initialDate: '{{ today }}',
+        headerToolbar: {
+            left: 'prev,next today',
+            center: 'title',
+            right: 'dayGridMonth,timeGridWeek,timeGridDay'
+        },
+        events: {{ events_json | safe }},
+        locale: 'es',
+        buttonText: { today: 'Hoy', month: 'Mes', week: 'Semana', day: 'Día' },
+        monthNames: ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'],
+        monthNamesShort: ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'],
+        dayNames: ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'],
+        dayNamesShort: ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'],
+        eventClick: function(info) {
+            var eventId = info.event.id;
+            if (eventId.startsWith('note_')) {
+                var noteId = eventId.replace('note_', '');
+                var noteData = info.event.extendedProps;
+                document.getElementById('noteModalTitle').textContent = info.event.title.replace('📝 ', '');
+                document.getElementById('noteModalContent').textContent = noteData.description || 'Sin contenido';
+                document.getElementById('noteModalLink').href = '/anotaciones/editar/' + noteId;
+                document.getElementById('noteModal').classList.remove('hidden');
+            } else {
+                if (confirm('¿Editar este evento?')) {
+                    window.location.href = '/eventos/editar/' + eventId;
+                }
+            }
+        },
+        eventDidMount: function(info) {
+            info.el.style.borderLeft = '3px solid ' + info.event.backgroundColor;
+        }
+    });
+    calendar.render();
+});
+
+function closeModal() {
+    document.getElementById('noteModal').classList.add('hidden');
+}
+</script>
+
+<div id="noteModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
+    <div class="bg-white rounded-2xl p-8 max-w-lg w-full mx-4 shadow-2xl">
+        <div class="flex justify-between items-start mb-4">
+            <h2 id="noteModalTitle" class="text-xl font-bold text-[#1E293B]"></h2>
+            <button onclick="closeModal()" class="w-8 h-8 rounded-lg flex items-center justify-center bg-gray-100 text-gray-500 hover:bg-gray-200">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <p id="noteModalContent" class="text-[#64748B] whitespace-pre-wrap mb-6"></p>
+        <div class="flex gap-4 pt-4 border-t border-gray-100">
+            <a id="noteModalLink" href="#" class="btn-primary text-white px-6 py-3 rounded-xl font-medium flex items-center gap-2">
+                <i class="fas fa-pen"></i>Editar Nota
+            </a>
+            <button onclick="closeModal()" class="px-6 py-3 rounded-xl font-medium bg-gray-100 text-[#64748B] hover:bg-gray-200 transition">
+                Cerrar
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}

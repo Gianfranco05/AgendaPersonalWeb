@@ -104,6 +104,7 @@ async def health():
 
 
 from app.modules.auth.routes import router as auth_router
+from app.modules.auth.api_routes import router as auth_api_router
 from app.modules.finanzas.routes import router as finanzas_router
 from app.modules.finanzas.cuentas_routes import router as cuentas_router
 from app.modules.anotaciones.routes import router as anotaciones_router
@@ -112,8 +113,10 @@ from app.modules.eventos.routes import router as eventos_router
 from app.modules.eventos.export_routes import router as eventos_export_router
 from app.modules.metas.routes import router as metas_router
 from app.modules.ajustes.routes import router as ajustes_router
+from app.api.v1.router import api_router
 
 app.include_router(auth_router)
+app.include_router(auth_api_router)
 app.include_router(finanzas_router)
 app.include_router(cuentas_router)
 app.include_router(anotaciones_router)
@@ -122,3 +125,4 @@ app.include_router(eventos_router)
 app.include_router(eventos_export_router)
 app.include_router(metas_router)
 app.include_router(ajustes_router)
+app.include_router(api_router, prefix="/api/v1")

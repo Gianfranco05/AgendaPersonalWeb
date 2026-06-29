@@ -1,0 +1,171 @@
+import pytest
+from sqlalchemy import select
+from app.modules.metas.models import Goal, HabitRecord
+
+
+@pytest.mark.asyncio
+async def test_create_goal(auth_client, db_session):
+    response = await auth_client.post("/metas/nueva", data={
+        "title": "Ejercicio diario",
+        "description": "Hacer ejercicio todos los dias",
+        "goal_type": "binary",
+        "target_value": "30",
+        "unit": "dias",
+        "color": "#7C3AED",
+        "icon": "fa-dumbbell",
+    })
+    assert response.status_code == 303
+    assert response.headers["location"] == "/metas/"
+
+    result = await db_session.execute(
+        select(Goal).where(Goal.title == "Ejercicio diario")
+    )
+    goal = result.scalar_one_or_none()
+    assert goal is not None
+    assert goal.goal_type == "binary"
+    assert goal.target_value == 30
+
+
+@pytest.mark.asyncio
+async def test_list_goals(auth_client):
+    response = await auth_client.get("/metas/")
+    assert response.status_code == 200
+    assert "Metas" in response.text
+
+
+@pytest.mark.asyncio
+async def test_list_goals_empty(auth_client):
+    response = await auth_client.get("/metas/")
+    assert response.status_code == 200
+    assert "No hay metas activas" in response.text
+
+
+@pytest.mark.asyncio
+async def test_checkin_habit(auth_client, db_session):
+    await auth_client.post("/metas/nueva", data={
+        "title": "Leer",
+        "goal_type": "binary",
+        "target_value": "30",
+    })
+
+    result = await db_session.execute(
+        select(Goal).where(Goal.title == "Leer")
+    )
+    goal = result.scalar_one_or_none()
+    assert goal is not None
+
+    response = await auth_client.post(f"/metas/registrar/{goal.id}", data={
+        "value": "1",
+        "notes": "Lei 30 minutos",
+    })
+    assert response.status_code == 303
+
+    records_result = await db_session.execute(
+        select(HabitRecord).where(HabitRecord.goal_id == goal.id)
+    )
+    records = records_result.scalars().all()
+    assert len(records) == 1
+    assert records[0].value == 1
+
+
+@pytest.mark.asyncio
+async def test_complete_goal(auth_client, db_session):
+    await auth_client.post("/metas/nueva", data={
+        "title": "Meditar",
+        "goal_type": "binary",
+        "target_value": "1",
+    })
+
+    result = await db_session.execute(
+        select(Goal).where(Goal.title == "Meditar")
+    )
+    goal = result.scalar_one_or_none()
+    assert goal is not None
+
+    response = await auth_client.post(f"/metas/completar/{goal.id}")
+    assert response.status_code == 303
+
+    await db_session.refresh(goal)
+    assert goal.is_completed is True
+
+
+@pytest.mark.asyncio
+async def test_edit_goal(auth_client, db_session):
+    await auth_client.post("/metas/nueva", data={
+        "title": "Meta original",
+        "goal_type": "binary",
+        "target_value": "10",
+    })
+
+    result = await db_session.execute(
+        select(Goal).where(Goal.title == "Meta original")
+    )
+    goal = result.scalar_one_or_none()
+    assert goal is not None
+
+    response = await auth_client.post(f"/metas/editar/{goal.id}", data={
+        "title": "Meta editada",
+        "goal_type": "progress",
+        "target_value": "20",
+        "action": "save",
+    })
+    assert response.status_code == 303
+
+    await db_session.refresh(goal)
+    assert goal.title == "Meta editada"
+    assert goal.target_value == 20
+
+
+@pytest.mark.asyncio
+async def test_delete_goal(auth_client, db_session):
+    await auth_client.post("/metas/nueva", data={
+        "title": "Para borrar",
+        "goal_type": "binary",
+        "target_value": "1",
+    })
+
+    result = await db_session.execute(
+        select(Goal).where(Goal.title == "Para borrar")
+    )
+    goal = result.scalar_one_or_none()
+    assert goal is not None
+
+    response = await auth_client.post(f"/metas/editar/{goal.id}", data={
+        "title": "Para borrar",
+        "action": "delete",
+    })
+    assert response.status_code == 303
+
+    result = await db_session.execute(
+        select(Goal).where(Goal.id == goal.id)
+    )
+    assert result.scalar_one_or_none() is None
+
+
+@pytest.mark.asyncio
+async def test_goal_requires_auth(client):
+    response = await client.get("/metas/", follow_redirects=False)
+    assert response.status_code == 303
+    assert "/auth/login" in response.headers["location"]
+
+
+@pytest.mark.asyncio
+async def test_nueva_meta_form(auth_client):
+    response = await auth_client.get("/metas/nueva")
+    assert response.status_code == 200
+    assert "Nueva Meta" in response.text
+
+
+@pytest.mark.asyncio
+async def test_api_goals(auth_client, db_session):
+    await auth_client.post("/metas/nueva", data={
+        "title": "API Goal",
+        "goal_type": "binary",
+        "target_value": "5",
+    })
+
+    response = await auth_client.get("/metas/api/goals")
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) >= 1
+    assert any(g["title"] == "API Goal" for g in data)

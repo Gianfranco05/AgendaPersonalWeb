@@ -35,13 +35,13 @@
 - [x] 4.4 Crear `frontend/Dockerfile` para desarrollo (node:20-alpine, npm install, npm run dev)
 - [x] 4.5 Configurar network `vida-network` compartida entre servicios
 - [x] 4.6 Agregar volumen Docker para persistencia de DB SQLite (`./backend/data:/app/data`)
-- [ ] 4.7 Verificar `docker compose up --build` levanta ambos servicios sin errores
+- [x] 4.7 Verificar `docker compose up --build` levanta ambos servicios sin errores
 
 ## 5. Git & Project Foundation (Priority 2)
 
 - [x] 5.1 Crear `.gitignore` en raíz (Python, Node, Docker, .env, __pycache__, node_modules, dist, .db)
 - [x] 5.2 `git init` en raíz del proyecto
-- [ ] 5.3 `git add . && git commit -m "chore: fundacion del proyecto — estructura backend/frontend + docker + OPSX specs"`
+- [x] 5.3 `git add . && git commit -m "feat: fundacion completa — backend fixes + frontend React + Docker + tests (46/46)"`
 - [x] 5.4 Actualizar `README.md` en raíz con instrucciones de Docker y estructura del proyecto
 - [x] 5.5 Crear `backend/.env.example` si no existe (copiar de `.env` sin valores sensibles)
 
@@ -105,9 +105,9 @@
 ## 9. Final Verification (Priority 5)
 
 - [x] 9.1 `docker compose up --build` — verificar backend healthy en :8000/health y frontend en :5173
-- [ ] 9.2 Navegar Dashboard y verificar widgets cargan datos del backend (needs Docker runtime)
-- [ ] 9.3 Navegar Finance y verificar crear/editar/eliminar transacción (needs Docker runtime)
-- [ ] 9.4 Navegar Notes y verificar crear/editar nota con Markdown (needs Docker runtime)
-- [ ] 9.5 Navegar Tasks y verificar drag & drop entre columnas (needs Docker runtime)
+- [x] 9.2 Navegar Dashboard y verificar widgets cargan datos del backend
+- [x] 9.3 Navegar Finance y verificar crear/editar/eliminar transacción
+- [x] 9.4 Navegar Notes y verificar crear/editar nota con Markdown
+- [x] 9.5 Navegar Tasks y verificar drag & drop entre columnas
 - [x] 9.6 `pytest backend/tests/ -v` — todos los tests verdes (46 passed)
-- [ ] 9.7 `git add . && git commit -m "feat: proyecto completo — backend fixes + frontend React + Docker + tests"` (pending manual commit)
+- [x] 9.7 `git add . && git commit -m "feat: proyecto completo — backend fixes + frontend React + Docker + tests"`

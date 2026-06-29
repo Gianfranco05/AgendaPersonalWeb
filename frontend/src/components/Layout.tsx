@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { NavLink, Outlet } from 'react-router-dom';
-import { LayoutDashboard, PiggyBank, StickyNote, ListTodo, Menu, X } from 'lucide-react';
+import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { LayoutDashboard, PiggyBank, StickyNote, ListTodo, Menu, X, LogOut } from 'lucide-react';
+import { useAuthStore } from '../store/authStore';
 
 const navItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -11,10 +12,25 @@ const navItems = [
 
 export default function Layout() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { user, logout } = useAuthStore();
+  const navigate = useNavigate();
+
+  async function handleLogout() {
+    await logout();
+    navigate('/login', { replace: true });
+  }
+
+  const initials = user?.full_name
+    ? user.full_name
+        .split(' ')
+        .slice(0, 2)
+        .map((w) => w[0])
+        .join('')
+        .toUpperCase()
+    : 'U';
 
   return (
     <div className="flex h-screen bg-gray-50 text-gray-900">
-      {/* Mobile overlay */}
       {mobileOpen && (
         <div
           className="fixed inset-0 z-40 bg-black/50 lg:hidden"
@@ -22,7 +38,6 @@ export default function Layout() {
         />
       )}
 
-      {/* Sidebar */}
       <aside
         className={`
           fixed inset-y-0 left-0 z-50 w-64 transform bg-[#7C3AED] text-white transition-transform duration-200 ease-in-out
@@ -63,18 +78,28 @@ export default function Layout() {
         </nav>
 
         <div className="absolute bottom-0 left-0 right-0 border-t border-white/20 p-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20 text-sm font-semibold">
-              U
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/20 text-xs font-semibold">
+                {initials}
+              </div>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium">{user?.full_name ?? 'Usuario'}</p>
+                <p className="truncate text-xs text-white/60">{user?.email ?? ''}</p>
+              </div>
             </div>
-            <span className="text-sm font-medium">Usuario</span>
+            <button
+              onClick={handleLogout}
+              className="ml-2 shrink-0 rounded-lg p-1.5 text-white/70 hover:bg-white/20 hover:text-white"
+              title="Cerrar sesión"
+            >
+              <LogOut size={16} />
+            </button>
           </div>
         </div>
       </aside>
 
-      {/* Main content */}
       <div className="flex flex-1 flex-col overflow-hidden">
-        {/* Top bar (mobile) */}
         <header className="flex h-16 items-center gap-4 border-b border-gray-200 bg-white px-4 lg:hidden">
           <button
             onClick={() => setMobileOpen(true)}
@@ -86,7 +111,6 @@ export default function Layout() {
           <h1 className="text-lg font-bold text-[#7C3AED]">Vida Personal</h1>
         </header>
 
-        {/* Page content */}
         <main className="flex-1 overflow-y-auto p-4 lg:p-6">
           <Outlet />
         </main>

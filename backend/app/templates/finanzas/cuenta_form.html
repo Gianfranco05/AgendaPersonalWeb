@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}{{ "Editar Cuenta" if account else "Nueva Cuenta" }} - Vida Personal{% endblock %}
+{% block content %}
+<div class="max-w-2xl mx-auto">
+    <a href="/finanzas/cuentas/" class="text-[#64748B] hover:text-[#7C3AED] transition text-sm mb-4 inline-flex items-center gap-1">
+        <i class="fas fa-arrow-left"></i> Volver a Cuentas
+    </a>
+
+    <div class="bg-white rounded-2xl p-8 card-shadow border border-gray-100 mt-4">
+        <h1 class="text-2xl font-bold text-[#1E293B] mb-6">{{ "Editar Cuenta" if account else "Nueva Cuenta" }}</h1>
+
+        <form method="POST" action="{{ '/finanzas/cuentas/editar/' ~ account.id if account else '/finanzas/cuentas/nueva' }}" class="space-y-5">
+            <div>
+                <label class="block text-sm font-medium text-[#374151] mb-2">Nombre de la cuenta</label>
+                <input type="text" name="name" required value="{{ account.name if account else '' }}"
+                    class="w-full px-4 py-3 rounded-xl border border-gray-200 input-focus transition outline-none"
+                    placeholder="Ej: Cuenta Sueldo, Tarjeta Visa...">
+            </div>
+
+            <div class="grid grid-cols-2 gap-5">
+                <div>
+                    <label class="block text-sm font-medium text-[#374151] mb-2">Tipo de cuenta</label>
+                    <select name="account_type"
+                        class="w-full px-4 py-3 rounded-xl border border-gray-200 input-focus transition outline-none">
+                        {% for val, label in ACCOUNT_TYPE_LABELS.items() %}
+                        <option value="{{ val }}" {% if account and account.account_type == val %}selected{% elif not account and val == "checking" %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-[#374151] mb-2">Banco / Entidad</label>
+                    <input type="text" name="bank_name" value="{{ account.bank_name if account else '' }}"
+                        class="w-full px-4 py-3 rounded-xl border border-gray-200 input-focus transition outline-none"
+                        placeholder="Ej: Santander, Naranja X...">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-5">
+                <div>
+                    <label class="block text-sm font-medium text-[#374151] mb-2">Número de cuenta (opcional)</label>
+                    <input type="text" name="account_number" value="{{ account.account_number if account else '' }}"
+                        class="w-full px-4 py-3 rounded-xl border border-gray-200 input-focus transition outline-none"
+                        placeholder="Número de cuenta">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-[#374151] mb-2">Últimos 4 dígitos (opcional)</label>
+                    <input type="text" name="last4" value="{{ account.last4 if account else '' }}" maxlength="4"
+                        class="w-full px-4 py-3 rounded-xl border border-gray-200 input-focus transition outline-none"
+                        placeholder="1234">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-5">
+                <div>
+                    <label class="block text-sm font-medium text-[#374151] mb-2">Moneda</label>
+                    <select name="currency"
+                        class="w-full px-4 py-3 rounded-xl border border-gray-200 input-focus transition outline-none">
+                        {% set currency_val = account.currency if account else "ARS" %}
+                        {% for c in ["ARS", "USD", "EUR", "BRL"] %}
+                        <option value="{{ c }}" {% if currency_val == c %}selected{% endif %}>{{ c }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-[#374151] mb-2">Saldo actual</label>
+                    <div class="relative">
+                        <span class="absolute left-4 top-1/2 -translate-y-1/2 text-[#64748B]">$</span>
+                        <input type="number" name="balance" step="0.01" value="{{ account.balance | float if account else '0' }}"
+                            class="w-full pl-8 pr-4 py-3 rounded-xl border border-gray-200 input-focus transition outline-none"
+                            placeholder="0.00">
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex gap-4 pt-4 border-t border-gray-100">
+                <button type="submit" class="btn-primary text-white px-8 py-3 rounded-xl font-medium flex items-center gap-2">
+                    <i class="fas fa-check"></i>{{ 'Guardar Cambios' if account else 'Crear Cuenta' }}
+                </button>
+                <a href="/finanzas/cuentas/" class="px-8 py-3 rounded-xl font-medium bg-gray-100 text-[#64748B] hover:bg-gray-200 transition">
+                    Cancelar
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

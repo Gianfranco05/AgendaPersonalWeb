@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% block title %}{{ "Editar Nota" if note else "Nueva Nota" }} - Vida Personal{% endblock %}
+{% block head_extra %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/easymde/dist/easymde.min.css">
+<script src="https://cdn.jsdelivr.net/npm/easymde/dist/easymde.min.js"></script>
+<style>
+    .peer:checked + span {
+        border-color: #7C3AED !important;
+        background-color: rgba(124, 58, 237, 0.1) !important;
+    }
+    .EasyMDEContainer .CodeMirror {
+        border-radius: 0.75rem;
+        border-color: #E5E7EB;
+        font-family: 'Inter', sans-serif;
+    }
+    .editor-toolbar {
+        border-radius: 0.75rem 0.75rem 0 0;
+        border-color: #E5E7EB;
+    }
+</style>
+{% endblock %}
+{% block content %}
+<main class="max-w-2xl mx-auto px-6 py-10">
+    <a href="/finanzas/" class="text-[#64748B] hover:text-[#7C3AED] transition text-sm mb-4 inline-flex items-center gap-1">
+        <i class="fas fa-arrow-left"></i>Volver al Dashboard
+    </a>
+
+    <div class="bg-white rounded-2xl p-8 card-shadow border border-gray-100">
+        <div class="flex items-center gap-3 mb-6">
+            <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-[#7C3AED] to-[#22D3EE] flex items-center justify-center">
+                <i class="fas fa-{{ "pen" if note else "plus" }} text-white"></i>
+            </div>
+            <h1 class="text-2xl font-bold text-[#1E293B]">{{ "Editar Nota" if note else "Nueva Nota" }}</h1>
+        </div>
+
+        <form method="POST" action="{{ "/anotaciones/editar/" ~ note.id if note else "/anotaciones/nueva" }}" class="space-y-6" onsubmit="if(typeof easyMDE !== 'undefined'){ easyMDE.codemirror.save(); } return true;">
+            <input type="hidden" name="action" value="save">
+
+            <div>
+                <label class="block text-sm font-medium text-[#374151] mb-2">Título</label>
+                <input type="text" name="title" required value="{{ note.title if note else "" }}"
+                    class="w-full px-4 py-3 rounded-xl border border-gray-200 input-focus transition outline-none"
+                    placeholder="Escribe un título...">
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-[#374151] mb-2">Contenido</label>
+                <textarea id="content-editor" name="content">{{ note.content if note else "" }}</textarea>
+                <script>
+                  var easyMDE = new EasyMDE({
+                    element: document.getElementById('content-editor'),
+                    spellChecker: false,
+                    autosave: { enabled: false },
+                    toolbar: ['bold','italic','heading','|','quote','unordered-list','ordered-list','|','link','|','preview','side-by-side','fullscreen'],
+                    minHeight: "200px",
+                  });
+                </script>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-[#374151] mb-3">Color de Nota</label>
+                <div class="flex gap-3">
+                    {% set colors = [("#ffffff", "Blanco", "border-gray-300"), ("#fef3c7", "Amarillo", "border-yellow-400"), ("#dcfce7", "Verde", "border-green-400"), ("#dbeafe", "Azul", "border-blue-400"), ("#fce7f3", "Rosa", "border-pink-400"), ("#ede9fe", "Violeta", "border-purple-400")] %}
+                    {% set color_val = note.color if note else "#ffffff" %}
+                    {% for c, name, border in colors %}
+                    <label class="cursor-pointer">
+                        <input type="radio" name="color" value="{{ c }}" {{ "checked" if color_val == c else "" }} class="sr-only peer">
+                        <div class="w-10 h-10 rounded-xl border-2 {{ border }} {{ "ring-2 ring-[#7C3AED] ring-offset-2" if color_val == c else "" }} peer-checked:ring-2 peer-checked:ring-[#7C3AED] peer-checked:ring-offset-2 transition-all" style="background-color: {{ c }};"></div>
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+
+            {% if tags %}
+            {% set note_tag_ids = [t.id for t in (note.tags if note and note.tags else [])] %}
+            <div>
+                <label class="block text-sm font-medium text-[#374151] mb-3">Etiquetas</label>
+                <div class="flex flex-wrap gap-2">
+                    {% for t in tags %}
+                    <label class="cursor-pointer">
+                        <input type="checkbox" name="tag_{{ t.id }}" value="{{ t.id }}" {{ "checked" if t.id in note_tag_ids else "" }} class="sr-only peer" onchange="updateTags()">
+                        <span class="px-3 py-1.5 rounded-full text-sm border-2 transition-all {{ "ring-2 ring-[#7C3AED]" if t.id in note_tag_ids else "" }}" style="border-color: {{ t.color }}40; background-color: {{ t.color }}10; color: {{ t.color }};">{{ t.name }}</span>
+                    </label>
+                    {% endfor %}
+                </div>
+                <input type="hidden" name="tags" id="tagsInput" value="{{ note_tag_ids | join(",") }}">
+            </div>
+            {% endif %}
+
+            <div>
+                <label class="block text-sm font-medium text-[#374151] mb-2">Fecha (opcional, para mostrar en calendario)</label>
+                <input type="date" name="event_date" value="{{ note.event_date.isoformat() if note and note.event_date else "" }}"
+                    class="w-full px-4 py-3 rounded-xl border border-gray-200 input-focus transition outline-none">
+                <p class="text-xs text-[#94A3B8] mt-1">Dejá vacío si no querés que aparezca en el calendario</p>
+            </div>
+
+            <div class="flex gap-4 pt-4 border-t border-gray-100">
+                <button type="submit" class="btn-primary text-white px-6 py-3 rounded-xl font-medium flex items-center gap-2">
+                    <i class="fas fa-check"></i>Guardar
+                </button>
+                {% if note %}
+                <button type="submit" name="action" value="delete" class="px-6 py-3 rounded-xl font-medium bg-red-50 text-red-600 hover:bg-red-100 transition flex items-center gap-2">
+                    <i class="fas fa-trash"></i>Eliminar
+                </button>
+                {% endif %}
+                <a href="/finanzas/" class="px-6 py-3 rounded-xl font-medium bg-gray-100 text-[#64748B] hover:bg-gray-200 transition ml-auto">
+                    Cancelar
+                </a>
+            </div>
+        </form>
+    </div>
+</main>
+{% endblock %}
+{% block scripts %}
+<script>
+function updateTags() {
+    const checkboxes = document.querySelectorAll('input[type="checkbox"][name^="tag_"]');
+    const selected = [];
+    checkboxes.forEach(cb => {
+        if (cb.checked) selected.push(cb.value);
+    });
+    document.getElementById('tagsInput').value = selected.join(',');
+}
+
+document.querySelectorAll('input[type="checkbox"][name^="tag_"]').forEach(cb => {
+    cb.addEventListener('change', updateTags);
+});
+</script>
+{% endblock %}

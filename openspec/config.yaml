@@ -10,6 +10,9 @@ context: |
   - React + TypeScript (.tsx) + Vite
   - Tailwind CSS — diseño estilo "bento box" / dashboard minimalista
   - Axios — consumo del backend
+  - SWR (Vercel) — data fetching y caché (reemplaza TanStack Query)
+  - Zustand — estado global (auth store)
+  - React Hook Form + Zod — formularios con validación
   - recharts — gráficos (torta, barras)
   - @uiw/react-md-editor — editor Markdown
   - lucide-react — íconos

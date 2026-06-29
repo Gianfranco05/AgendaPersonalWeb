@@ -1,6 +1,5 @@
 from datetime import datetime, date
 from typing import Sequence, Optional
-from uuid import UUID
 
 from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,7 +13,7 @@ class EventRepository:
 
     async def get_all(
         self,
-        user_id: UUID,
+        user_id: str,
         date_from: Optional[date] = None,
         date_to: Optional[date] = None,
     ) -> Sequence[Event]:
@@ -36,13 +35,13 @@ class EventRepository:
         result = await self.db.execute(query)
         return result.scalars().all()
 
-    async def get_by_id(self, event_id: UUID, user_id: UUID) -> Optional[Event]:
+    async def get_by_id(self, event_id: str, user_id: str) -> Optional[Event]:
         result = await self.db.execute(
             select(Event).where(and_(Event.id == event_id, Event.user_id == user_id))
         )
         return result.scalar_one_or_none()
 
-    async def get_upcoming(self, user_id: UUID, limit: int = 5) -> Sequence[Event]:
+    async def get_upcoming(self, user_id: str, limit: int = 5) -> Sequence[Event]:
         now = datetime.utcnow()
         result = await self.db.execute(
             select(Event)

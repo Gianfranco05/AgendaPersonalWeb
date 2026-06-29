@@ -14,6 +14,8 @@ from app.core.security import (
 )
 from app.database import get_db
 from app.modules.ajustes.models import UserPreference
+from app.modules.ajustes.service import SettingsService
+from app.modules.ajustes.schemas import UserPreferenceUpdate, UserPreferenceOut
 
 router = APIRouter(prefix="/ajustes", tags=["ajustes"])
 
@@ -27,19 +29,6 @@ THEME_COLORS = {
 }
 
 CURRENCIES = ["ARS", "USD", "EUR", "BRL", "CLP", "UYU"]
-
-
-async def get_or_create_prefs(user_id: str, db: AsyncSession) -> UserPreference:
-    result = await db.execute(
-        select(UserPreference).where(UserPreference.user_id == user_id)
-    )
-    prefs = result.scalar_one_or_none()
-    if prefs is None:
-        prefs = UserPreference(user_id=user_id)
-        db.add(prefs)
-        await db.commit()
-        await db.refresh(prefs)
-    return prefs
 
 
 def _make_auth_response(url: str, user_id: str, theme_color: str) -> RedirectResponse:
@@ -73,7 +62,8 @@ async def ajustes_page(
     user_result = await db.execute(select(User).where(User.id == user_id))
     user = user_result.scalar_one_or_none()
 
-    prefs = await get_or_create_prefs(user_id, db)
+    service = SettingsService(db)
+    prefs = await service.get_preferences(user_id)
     google_configured = bool(settings.GOOGLE_CLIENT_ID and settings.GOOGLE_CLIENT_SECRET)
     google_connected = bool(prefs.google_refresh_token)
 
@@ -88,6 +78,26 @@ async def ajustes_page(
             synced=synced,
         )
     )
+
+
+@router.get("/api/preferences")
+async def api_preferences(request: Request, db: AsyncSession = Depends(get_db)):
+    user_id = get_user_id_from_request(request)
+    if not user_id:
+        return RedirectResponse(url="/auth/login", status_code=303)
+    service = SettingsService(db)
+    prefs = await service.get_preferences(user_id)
+    return {
+        "id": prefs.id,
+        "user_id": prefs.user_id,
+        "currency": prefs.currency,
+        "theme_color": prefs.theme_color,
+        "date_format": prefs.date_format,
+        "google_calendar_id": prefs.google_calendar_id,
+        "google_connected": bool(prefs.google_refresh_token),
+        "created_at": prefs.created_at.isoformat() if prefs.created_at else None,
+        "updated_at": prefs.updated_at.isoformat() if prefs.updated_at else None,
+    }
 
 
 @router.post("/")
@@ -107,12 +117,15 @@ async def save_ajustes(
     if currency not in CURRENCIES:
         currency = "ARS"
 
-    prefs = await get_or_create_prefs(user_id, db)
-    prefs.currency = currency
-    prefs.theme_color = theme_color
-    prefs.date_format = date_format
-    db.add(prefs)
-    await db.commit()
+    service = SettingsService(db)
+    await service.update_preferences(
+        user_id,
+        UserPreferenceUpdate(
+            currency=currency,
+            theme_color=theme_color,
+            date_format=date_format,
+        ),
+    )
 
     return _make_auth_response("/ajustes/?success=saved", user_id, theme_color)
 
@@ -169,7 +182,8 @@ async def google_callback(
         await asyncio.to_thread(flow.fetch_token, code=code)
         credentials = flow.credentials
 
-        prefs = await get_or_create_prefs(user_id, db)
+        service = SettingsService(db)
+        prefs = await service.get_preferences(user_id)
         prefs.google_access_token = credentials.token
         prefs.google_refresh_token = credentials.refresh_token or prefs.google_refresh_token
         prefs.google_token_expiry = credentials.expiry
@@ -189,7 +203,8 @@ async def google_disconnect(request: Request, db: AsyncSession = Depends(get_db)
     if not user_id:
         return RedirectResponse(url="/auth/login", status_code=303)
 
-    prefs = await get_or_create_prefs(user_id, db)
+    service = SettingsService(db)
+    prefs = await service.get_preferences(user_id)
     prefs.google_access_token = None
     prefs.google_refresh_token = None
     prefs.google_token_expiry = None
@@ -205,7 +220,8 @@ async def google_sync(request: Request, db: AsyncSession = Depends(get_db)):
     if not user_id:
         return RedirectResponse(url="/auth/login", status_code=303)
 
-    prefs = await get_or_create_prefs(user_id, db)
+    service = SettingsService(db)
+    prefs = await service.get_preferences(user_id)
     if not prefs.google_refresh_token:
         return RedirectResponse(url="/ajustes/?error=not_connected", status_code=303)
 

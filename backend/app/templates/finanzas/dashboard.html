@@ -1,0 +1,243 @@
+{% extends "base.html" %}
+{% block title %}Dashboard - Vida Personal{% endblock %}
+{% block content %}
+        <div class="mb-8">
+            <h1 class="text-3xl font-bold text-[#1E293B] mb-2">Bienvenido a tu Vida Personal</h1>
+            <p class="text-[#64748B]">Organizá tus finanzas, eventos y notas en un solo lugar</p>
+        </div>
+
+        {% if notas_sin_evento %}
+        <div class="mb-6 p-4 rounded-xl bg-[#FEF3C7] border border-[#F59E0B]/30">
+            <div class="flex items-center gap-3 mb-3">
+                <i class="fas fa-lightbulb text-[#F59E0B]"></i>
+                <span class="font-medium text-[#1E293B]">Nota con fecha sin evento</span>
+            </div>
+            <div class="space-y-2">
+                {% for n in notas_sin_evento[:3] %}
+                <div class="flex items-center gap-3 p-3 rounded-xl bg-[#FEF3C7] border border-[#F59E0B]/30">
+                    <i class="fas fa-exclamation-circle text-[#F59E0B]"></i>
+                    <div class="flex-1 min-w-0">
+                        <p class="font-medium text-[#1E293B] text-sm truncate">{{ n.title }}</p>
+                        <p class="text-xs text-[#F59E0B]">{{ n.event_date.strftime("%d %b") if n.event_date else "" }}</p>
+                    </div>
+                    <a href="/anotaciones/editar/{{ n.id }}" class="text-xs text-[#7C3AED] hover:underline">Crear evento</a>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div class="bg-white rounded-2xl p-6 card-shadow card-hover border border-gray-100">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="w-12 h-12 rounded-xl bg-[#22D3EE]/10 flex items-center justify-center">
+                        <i class="fas fa-wallet text-[#22D3EE] text-xl"></i>
+                    </div>
+                    <span class="text-xs font-medium text-[#64748B] bg-[#F1F5F9] px-3 py-1 rounded-full">Balance</span>
+                </div>
+                <p class="text-xs text-[#94A3B8] mb-0.5 uppercase tracking-wider">Este mes</p>
+                <p class="text-3xl font-bold {{ "text-green-600" if month_balance >= 0 else "text-red-600" }}">${{ "{:,.2f}".format(month_balance) }}</p>
+                <p class="text-xs text-[#94A3B8] mt-2">Total histórico: <span class="font-medium text-[#64748B]">${{ "{:,.2f}".format(balance) }}</span></p>
+            </div>
+
+            <div class="bg-white rounded-2xl p-6 card-shadow card-hover border border-gray-100">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="w-12 h-12 rounded-xl bg-green-100 flex items-center justify-center">
+                        <i class="fas fa-arrow-trend-up text-green-500 text-xl"></i>
+                    </div>
+                    <span class="text-xs font-medium text-[#64748B] bg-[#F1F5F9] px-3 py-1 rounded-full">Ingresos</span>
+                </div>
+                <p class="text-xs text-[#94A3B8] mb-0.5 uppercase tracking-wider">Este mes</p>
+                <p class="text-3xl font-bold text-green-600">+${{ "{:,.2f}".format(month_income) }}</p>
+                <p class="text-xs text-[#94A3B8] mt-2">Total histórico: <span class="font-medium text-[#64748B]">+${{ "{:,.2f}".format(total_income) }}</span></p>
+            </div>
+
+            <div class="bg-white rounded-2xl p-6 card-shadow card-hover border border-gray-100">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="w-12 h-12 rounded-xl bg-red-100 flex items-center justify-center">
+                        <i class="fas fa-arrow-trend-down text-red-500 text-xl"></i>
+                    </div>
+                    <span class="text-xs font-medium text-[#64748B] bg-[#F1F5F9] px-3 py-1 rounded-full">Gastos</span>
+                </div>
+                <p class="text-xs text-[#94A3B8] mb-0.5 uppercase tracking-wider">Este mes</p>
+                <p class="text-3xl font-bold text-red-600">-${{ "{:,.2f}".format(month_expense) }}</p>
+                <p class="text-xs text-[#94A3B8] mt-2">Total histórico: <span class="font-medium text-[#64748B]">-${{ "{:,.2f}".format(total_expense) }}</span></p>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-2xl p-6 card-shadow border border-gray-100 mb-8">
+            <h2 class="text-xl font-semibold text-[#1E293B] mb-6">Acciones Rápidas</h2>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <a href="/finanzas/transacciones/nueva" class="flex flex-col items-center gap-3 p-4 rounded-xl bg-[#FEF3C7] hover:bg-[#FDE68A] transition group">
+                    <div class="w-12 h-12 rounded-xl bg-white flex items-center justify-center shadow-sm">
+                        <i class="fas fa-receipt text-[#D97706] text-xl"></i>
+                    </div>
+                    <span class="text-sm font-medium text-[#92400E]">Nueva Transacción</span>
+                </a>
+                <a href="/eventos/nuevo" class="flex flex-col items-center gap-3 p-4 rounded-xl bg-[#DBEAFE] hover:bg-[#BFDBFE] transition group">
+                    <div class="w-12 h-12 rounded-xl bg-white flex items-center justify-center shadow-sm">
+                        <i class="fas fa-calendar-plus text-[#2563EB] text-xl"></i>
+                    </div>
+                    <span class="text-sm font-medium text-[#1E40AF]">Nuevo Evento</span>
+                </a>
+                <a href="/anotaciones/nueva" class="flex flex-col items-center gap-3 p-4 rounded-xl bg-[#D1FAE5] hover:bg-[#A7F3D0] transition group">
+                    <div class="w-12 h-12 rounded-xl bg-white flex items-center justify-center shadow-sm">
+                        <i class="fas fa-sticky-note text-[#059669] text-xl"></i>
+                    </div>
+                    <span class="text-sm font-medium text-[#065F46]">Nueva Nota</span>
+                </a>
+                <a href="/finanzas/categorias" class="flex flex-col items-center gap-3 p-4 rounded-xl bg-[#EDE9FE] hover:bg-[#DDD6FE] transition group">
+                    <div class="w-12 h-12 rounded-xl bg-white flex items-center justify-center shadow-sm">
+                        <i class="fas fa-tags text-[#7C3AED] text-xl"></i>
+                    </div>
+                    <span class="text-sm font-medium text-[#5B21B6]">Categorías</span>
+                </a>
+                <a href="/finanzas/reportes" class="flex flex-col items-center gap-3 p-4 rounded-xl bg-[#F0FDF4] hover:bg-[#DCFCE7] transition group">
+                    <div class="w-12 h-12 rounded-xl bg-white flex items-center justify-center shadow-sm">
+                        <i class="fas fa-chart-pie text-[#059669] text-xl"></i>
+                    </div>
+                    <span class="text-sm font-medium text-[#065F46]">Reportes</span>
+                </a>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <div class="bg-white rounded-2xl card-shadow border border-gray-100">
+                <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
+                    <h3 class="font-semibold text-[#1E293B]">Transacciones Recientes</h3>
+                    <a href="/finanzas/transacciones" class="text-sm text-[#7C3AED] hover:underline">Ver todas</a>
+                </div>
+                <div class="divide-y divide-gray-50">
+                    <table class="w-full">
+                        <tbody>
+                            {% if not recent_transactions %}
+                            <tr><td colspan="4" class="px-6 py-8 text-center text-[#94A3B8]"><i class="fas fa-receipt text-2xl mb-2"></i><p>Sin transacciones</p></td></tr>
+                            {% else %}
+                            {% for t in recent_transactions %}
+                            <tr class="border-b border-gray-50 hover:bg-[#F8FAFC] transition">
+                                <td class="px-4 py-3">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-8 h-8 rounded-lg flex items-center justify-center {{ "bg-green-100" if t.type == "income" else "bg-red-100" }}">
+                                            <i class="fas fa-{{ "arrow-up text-green-600" if t.type == "income" else "arrow-down text-red-600" }} text-xs"></i>
+                                        </div>
+                                        <div>
+                                            <p class="font-medium text-[#1E293B] text-sm">{{ t.product_name }}</p>
+                                            <p class="text-xs text-[#94A3B8]">{{ t.merchant_name or "Sin comercio" }}</p>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-4 py-3 text-xs text-[#64748B]">{{ t.transaction_date }}</td>
+                                <td class="px-4 py-3 text-sm font-semibold {{ "text-green-600" if t.type == "income" else "text-red-600" }}">{{ "+" if t.type == "income" else "-" }}${{ "{:,.2f}".format(t.amount) }}</td>
+                                <td class="px-4 py-3">
+                                    <form action="/finanzas/transacciones/eliminar/{{ t.id }}" method="POST" onsubmit="return confirm('¿Eliminar esta transacción?');">
+                                        <button type="submit" class="text-[#94A3B8] hover:text-red-500 transition">
+                                            <i class="fas fa-trash-alt text-xs"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-2xl card-shadow border border-gray-100">
+                <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
+                    <h3 class="font-semibold text-[#1E293B]">Eventos</h3>
+                    <div class="flex gap-3">
+                        <a href="/eventos/nuevo" class="text-sm text-[#7C3AED] hover:underline">+ Nuevo</a>
+                        <a href="/eventos/" class="text-sm text-[#64748B] hover:text-[#7C3AED]">Ver calendario</a>
+                    </div>
+                </div>
+                <div class="p-4 space-y-3 max-h-80 overflow-y-auto">
+                    {% if not upcoming_events and not today_events %}
+                    <div class="text-center py-6 text-[#94A3B8]"><i class="fas fa-calendar text-2xl mb-2"></i><p>Sin eventos próximos</p></div>
+                    {% else %}
+                    {% for e in today_events %}
+                    <div class="flex items-start gap-3 p-3 rounded-xl bg-[#7C3AED]/10 border border-[#7C3AED]/20">
+                        <div class="w-10 h-10 rounded-lg flex items-center justify-center" style="background-color: {{ e.color }}20;">
+                            <i class="fas fa-calendar-day" style="color: {{ e.color }};"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <p class="font-medium text-[#1E293B] text-sm">{{ e.title }}</p>
+                            <p class="text-xs text-[#7C3AED] font-medium">HOY &bull; {{ e.start_datetime.strftime("%H:%M") }}</p>
+                            {% if e.location %}<p class="text-xs text-[#64748B] truncate">{{ e.location }}</p>{% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                    {% for e in upcoming_events[:4] %}
+                    <div class="flex items-start gap-3 p-3 rounded-xl bg-white border border-gray-100 hover:border-[#7C3AED]/30 transition">
+                        <div class="w-10 h-10 rounded-lg flex items-center justify-center" style="background-color: {{ e.color }}20;">
+                            <i class="fas fa-calendar" style="color: {{ e.color }};"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <p class="font-medium text-[#1E293B] text-sm">{{ e.title }}</p>
+                            <p class="text-xs text-[#64748B]">{{ e.start_datetime.strftime("%d %b") }} &bull; {{ e.start_datetime.strftime("%H:%M") }}</p>
+                            {% if e.location %}<p class="text-xs text-[#94A3B8] truncate">{{ e.location }}</p>{% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-2xl card-shadow border border-gray-100">
+            <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
+                <h3 class="font-semibold text-[#1E293B]">Notas Recientes</h3>
+                <div class="flex gap-3">
+                    <a href="/anotaciones/nueva" class="text-sm text-[#7C3AED] hover:underline">+ Nueva</a>
+                    <a href="/anotaciones/" class="text-sm text-[#64748B] hover:text-[#7C3AED]">Ver todas</a>
+                </div>
+            </div>
+            <div class="p-4 divide-y divide-gray-50 max-h-64 overflow-y-auto">
+                {% if not recent_notes %}
+                <div class="text-center py-6 text-[#94A3B8]"><i class="fas fa-sticky-note text-2xl mb-2"></i><p>Sin notas recientes</p></div>
+                {% else %}
+                {% for n in recent_notes %}
+                <a href="/anotaciones/editar/{{ n.id }}" class="flex items-start gap-3 p-3 rounded-xl hover:bg-[#F8FAFC] transition group" style="border-left: 3px solid {{ n.color }};">
+                    <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background-color: {{ n.color }}20;">
+                        <i class="fas fa-sticky-note" style="color: {{ n.color }};"></i>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="font-medium text-[#1E293B] text-sm">{{ n.title }}</p>
+                        <p class="text-xs text-[#94A3B8] line-clamp-1">{{ (n.content[:60] if n.content else "Sin contenido") }}...</p>
+                    </div>
+                    <i class="fas fa-pen text-xs text-[#94A3B8] opacity-0 group-hover:opacity-100 transition"></i>
+                </a>
+                {% endfor %}
+                {% endif %}
+            </div>
+        </div>
+
+        {% if goals %}
+        <div class="mt-8">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-semibold text-[#1E293B]">Metas y Hábitos</h2>
+                <a href="/metas/" class="text-sm text-[#7C3AED] hover:underline">Ver todas</a>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {% for g in goals %}
+                {% set progress = [100, (g.current_value / g.target_value * 100) if g.target_value > 0 else 0] | min %}
+                <div class="bg-white rounded-xl p-4 border border-gray-100 {{ "opacity-75" if g.completed_today else "" }}">
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="w-10 h-10 rounded-lg flex items-center justify-center" style="background-color: {{ g.color }}20;">
+                            <i class="{{ g.icon }}" style="color: {{ g.color }};"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <p class="font-medium text-[#1E293B] text-sm truncate">{{ g.title }}</p>
+                            {% if g.completed_today %}<i class="fas fa-check-circle text-green-500"></i>{% endif %}
+                        </div>
+                    </div>
+                    <div class="h-2 bg-gray-100 rounded-full overflow-hidden mb-2">
+                        <div class="h-full rounded-full transition-all" style="width: {{ progress }}%; background-color: {{ g.color }};"></div>
+                    </div>
+                    <p class="text-xs text-[#64748B] text-center">{{ g.current_value }} / {{ g.target_value }} {{ g.unit or "" }}</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+{% endblock %}

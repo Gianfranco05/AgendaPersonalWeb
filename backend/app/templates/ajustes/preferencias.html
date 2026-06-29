@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% block title %}Ajustes - Vida Personal{% endblock %}
+{% block content %}
+<div class="mb-8">
+    <a href="/finanzas/" class="text-[#64748B] hover:text-[#7C3AED] transition text-sm mb-2 inline-flex items-center gap-1">
+        <i class="fas fa-arrow-left"></i>Volver al Dashboard
+    </a>
+    <h1 class="text-3xl font-bold text-[#1E293B]">Ajustes</h1>
+    <p class="text-[#64748B] mt-1">Personalizá la aplicación a tu gusto</p>
+</div>
+
+{% if alert_message %}
+<div class="{{ alert_bg }} border rounded-xl p-4 mb-6 flex items-center gap-3">
+    <i class="fas fa-{{ alert_icon }} {{ alert_icon_color }}"></i>
+    <p class="text-sm font-medium">{{ alert_message }}</p>
+</div>
+{% endif %}
+
+<div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
+    <h2 class="text-lg font-semibold text-[#1E293B] mb-4 flex items-center gap-2">
+        <i class="fas fa-user-circle text-[#7C3AED]"></i>Perfil
+    </h2>
+    <div class="flex items-center gap-4">
+        <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#7C3AED] to-[#22D3EE] flex items-center justify-center text-white text-xl font-bold">
+            {{ user_name[0].upper() if user_name else "?" }}
+        </div>
+        <div>
+            <p class="font-semibold text-[#1E293B]">{{ user_name }}</p>
+            <p class="text-sm text-[#64748B]">{{ user_email }}</p>
+        </div>
+    </div>
+</div>
+
+<form method="POST" action="/ajustes/" id="prefs-form">
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
+        <h2 class="text-lg font-semibold text-[#1E293B] mb-5 flex items-center gap-2">
+            <i class="fas fa-sliders text-[#7C3AED]"></i>Preferencias
+        </h2>
+        <div class="grid grid-cols-2 gap-5">
+            <div>
+                <label class="block text-sm font-medium text-[#374151] mb-1.5">Moneda por defecto</label>
+                <select name="currency"
+                        class="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#7C3AED]/40 focus:border-[#7C3AED]">
+                    {% for c in currencies %}
+                    <option value="{{ c }}" {{ "selected" if prefs.currency == c else "" }}>{{ c }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-[#374151] mb-1.5">Formato de fecha</label>
+                <select name="date_format"
+                        class="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#7C3AED]/40 focus:border-[#7C3AED]">
+                    {% for fmt, ex in date_formats %}
+                    <option value="{{ fmt }}" {{ "selected" if prefs.date_format == fmt else "" }}>{{ fmt }} — ej: {{ ex }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
+        <h2 class="text-lg font-semibold text-[#1E293B] mb-5 flex items-center gap-2">
+            <i class="fas fa-palette text-[#7C3AED]"></i>Apariencia
+        </h2>
+        <p class="text-sm text-[#64748B] mb-4">Color de acento de la interfaz</p>
+        <div class="flex items-center gap-6">
+            {% for key, hex_color in theme_colors.items() %}
+            {% set labels = {"violet": "Violeta", "indigo": "Índigo", "blue": "Azul", "emerald": "Verde", "rose": "Rosa", "amber": "Ámbar"} %}
+            <label class="cursor-pointer flex flex-col items-center gap-2 group">
+                <input type="radio" name="theme_color" value="{{ key }}" {{ "checked" if prefs.theme_color == key else "" }}
+                       class="sr-only" onchange="this.form.submit()">
+                <div class="w-10 h-10 rounded-full transition-all duration-200 {{ "ring-4 ring-offset-2 ring-gray-400 scale-110" if prefs.theme_color == key else "" }}"
+                     style="background-color:{{ hex_color }};"></div>
+                <span class="text-xs text-[#64748B] group-hover:text-[#1E293B] transition">{{ labels[key] }}</span>
+            </label>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="flex justify-end">
+        <button type="submit"
+                class="px-6 py-3 bg-[#7C3AED] text-white rounded-xl font-semibold hover:bg-[#6D28D9] transition shadow-sm flex items-center gap-2">
+            <i class="fas fa-save"></i>Guardar cambios
+        </button>
+    </div>
+</form>
+
+<div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mt-6">
+    <h2 class="text-lg font-semibold text-[#1E293B] mb-2 flex items-center gap-2">
+        <i class="fas fa-plug text-[#7C3AED]"></i>Integraciones
+    </h2>
+    <p class="text-sm text-[#64748B] mb-5">Conectá servicios externos para ampliar las funcionalidades</p>
+
+    {% if not google_configured %}
+    <div class="flex items-start gap-4 p-4 bg-yellow-50 rounded-xl border border-yellow-200">
+        <i class="fas fa-info-circle text-yellow-500 mt-0.5 text-lg"></i>
+        <div>
+            <p class="font-medium text-[#1E293B] text-sm">Integración no configurada</p>
+            <p class="text-xs text-[#64748B] mt-1">
+                Para conectar Google Calendar, configurá las variables
+                <code class="bg-yellow-100 px-1 rounded">GOOGLE_CLIENT_ID</code> y
+                <code class="bg-yellow-100 px-1 rounded">GOOGLE_CLIENT_SECRET</code> en tu <code class="bg-yellow-100 px-1 rounded">.env</code>.
+                <a href="https://console.cloud.google.com/" target="_blank" class="text-[#7C3AED] hover:underline ml-1">Google Cloud Console →</a>
+            </p>
+        </div>
+    </div>
+    {% elif google_connected %}
+    <div class="flex items-center justify-between p-4 bg-green-50 rounded-xl border border-green-200">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center">
+                <i class="fab fa-google text-green-600"></i>
+            </div>
+            <div>
+                <p class="font-semibold text-[#1E293B] text-sm">Google Calendar conectado</p>
+                <p class="text-xs text-green-600">Calendario: {{ prefs.google_calendar_id }}</p>
+            </div>
+        </div>
+        <div class="flex items-center gap-2">
+            <form method="POST" action="/ajustes/google/sync">
+                <button type="submit"
+                        class="px-4 py-2 bg-[#7C3AED] text-white text-sm rounded-lg hover:bg-[#6D28D9] transition font-medium flex items-center gap-2">
+                    <i class="fas fa-sync-alt"></i>Sincronizar eventos
+                </button>
+            </form>
+            <form method="POST" action="/ajustes/google/disconnect"
+                  onsubmit="return confirm('¿Desconectar Google Calendar?');">
+                <button type="submit"
+                        class="px-4 py-2 bg-white text-red-500 text-sm rounded-lg border border-red-200 hover:bg-red-50 transition font-medium">
+                    <i class="fas fa-unlink mr-1"></i>Desconectar
+                </button>
+            </form>
+        </div>
+    </div>
+    {% else %}
+    <div class="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-200">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-white border border-gray-200 flex items-center justify-center">
+                <i class="fab fa-google text-gray-400"></i>
+            </div>
+            <div>
+                <p class="font-semibold text-[#1E293B] text-sm">Google Calendar</p>
+                <p class="text-xs text-[#94A3B8]">No conectado — sincronizá tus eventos automáticamente</p>
+            </div>
+        </div>
+        <a href="/ajustes/google/connect"
+           class="px-4 py-2 bg-[#7C3AED] text-white text-sm rounded-lg hover:bg-[#6D28D9] transition font-medium flex items-center gap-2">
+            <i class="fab fa-google"></i>Conectar
+        </a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

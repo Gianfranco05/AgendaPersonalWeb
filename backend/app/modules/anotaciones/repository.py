@@ -1,8 +1,8 @@
 from typing import Sequence, Optional
-from uuid import UUID
 
 from sqlalchemy import select, and_, or_, func
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.modules.anotaciones.models import Note, Tag
 
@@ -13,7 +13,7 @@ class NoteRepository:
 
     async def get_all(
         self,
-        user_id: UUID,
+        user_id: str,
         include_archived: bool = False,
         search: Optional[str] = None,
     ) -> Sequence[Note]:
@@ -32,13 +32,16 @@ class NoteRepository:
             )
 
         query = query.order_by(Note.is_pinned.desc(), Note.updated_at.desc())
+        query = query.options(selectinload(Note.tags))
 
         result = await self.db.execute(query)
         return result.scalars().all()
 
-    async def get_by_id(self, note_id: UUID, user_id: UUID) -> Optional[Note]:
+    async def get_by_id(self, note_id: str, user_id: str) -> Optional[Note]:
         result = await self.db.execute(
-            select(Note).where(and_(Note.id == note_id, Note.user_id == user_id))
+            select(Note)
+            .where(and_(Note.id == note_id, Note.user_id == user_id))
+            .options(selectinload(Note.tags))
         )
         return result.scalar_one_or_none()
 
@@ -62,13 +65,13 @@ class TagRepository:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def get_all(self, user_id: UUID) -> Sequence[Tag]:
+    async def get_all(self, user_id: str) -> Sequence[Tag]:
         result = await self.db.execute(
             select(Tag).where(Tag.user_id == user_id).order_by(Tag.name)
         )
         return result.scalars().all()
 
-    async def get_by_name(self, name: str, user_id: UUID) -> Optional[Tag]:
+    async def get_by_name(self, name: str, user_id: str) -> Optional[Tag]:
         result = await self.db.execute(
             select(Tag).where(and_(Tag.name == name, Tag.user_id == user_id))
         )

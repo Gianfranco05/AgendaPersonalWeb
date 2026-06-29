@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}{{ "Editar Evento" if event else "Nuevo Evento" }} - Vida Personal{% endblock %}
+{% block content %}
+<main class="max-w-2xl mx-auto px-6 py-10">
+    <a href="/finanzas/" class="text-[#64748B] hover:text-[#7C3AED] transition text-sm mb-4 inline-flex items-center gap-1">
+        <i class="fas fa-arrow-left"></i>Volver al Dashboard
+    </a>
+
+    <div class="bg-white rounded-2xl p-8 card-shadow border border-gray-100">
+        <div class="flex items-center gap-3 mb-6">
+            <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-[#7C3AED] to-[#22D3EE] flex items-center justify-center">
+                <i class="fas fa-calendar-plus text-white"></i>
+            </div>
+            <h1 class="text-2xl font-bold text-[#1E293B]">{{ "Editar Evento" if event else "Nuevo Evento" }}</h1>
+        </div>
+
+        {% if note %}
+        <div class="mb-4 p-3 rounded-xl bg-[#DBEAFE] border border-[#3B82F6]/30 text-sm text-[#1E40AF]"><i class="fas fa-info-circle mr-2"></i>Creando evento desde una nota con fecha</div>
+        {% endif %}
+
+        <form method="POST" action="{{ "/eventos/editar/" ~ event.id if event else "/eventos/nuevo" }}" class="space-y-6" onsubmit="return confirm('¿Estás seguro de guardar este evento?');">
+            {% if note %}
+            <input type="hidden" name="from_note_id" value="{{ note.id }}">
+            {% endif %}
+            <input type="hidden" name="action" value="save">
+
+            <div>
+                <label class="block text-sm font-medium text-[#374151] mb-2">Título del Evento</label>
+                <input type="text" name="title" required value="{{ event.title if event else (note.title if note else "") }}"
+                    class="w-full px-4 py-3 rounded-xl border border-gray-200 input-focus transition outline-none"
+                    placeholder="Nombre del evento">
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-[#374151] mb-2">Descripción</label>
+                <textarea name="description" rows="3"
+                    class="w-full px-4 py-3 rounded-xl border border-gray-200 input-focus transition outline-none resize-none"
+                    placeholder="Agrega una descripción...">{{ event.description if event else (note.content if note else "") }}</textarea>
+            </div>
+
+            <div class="grid grid-cols-2 gap-6">
+                <div>
+                    <label class="block text-sm font-medium text-[#374151] mb-2">Fecha</label>
+                    <input type="date" name="start_date" required value="{{ start_date_val }}"
+                        class="w-full px-4 py-3 rounded-xl border border-gray-200 input-focus transition outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-[#374151] mb-2">Hora</label>
+                    <input type="time" name="start_time" value="{{ start_time_val }}"
+                        class="w-full px-4 py-3 rounded-xl border border-gray-200 input-focus transition outline-none">
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-[#374151] mb-2">Ubicación</label>
+                <div class="relative">
+                    <i class="fas fa-map-marker-alt absolute left-4 top-1/2 -translate-y-1/2 text-[#94A3B8]"></i>
+                    <input type="text" name="location" value="{{ event.location if event else "" }}"
+                        class="w-full pl-11 pr-4 py-3 rounded-xl border border-gray-200 input-focus transition outline-none"
+                        placeholder="Lugar del evento">
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-[#374151] mb-3">Color del Evento</label>
+                <div class="flex gap-3">
+                    {% set colors = [("#7C3AED", "Violeta"), ("#3B82F6", "Azul"), ("#10B981", "Verde"), ("#F59E0B", "Amarillo"), ("#EF4444", "Rojo"), ("#EC4899", "Rosa")] %}
+                    {% set color_val = event.color if event else "#7C3AED" %}
+                    {% for c, name in colors %}
+                    <label class="cursor-pointer" title="{{ name }}">
+                        <input type="radio" name="color" value="{{ c }}" {{ "checked" if color_val == c else "" }} class="sr-only peer">
+                        <div class="w-10 h-10 rounded-xl {{ "ring-2 ring-offset-2 ring-[#7C3AED]" if color_val == c else "" }} transition-all" style="background-color: {{ c }};"></div>
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="flex gap-4 pt-4 border-t border-gray-100">
+                <button type="submit" class="btn-primary text-white px-6 py-3 rounded-xl font-medium flex items-center gap-2">
+                    <i class="fas fa-check"></i>Guardar
+                </button>
+                {% if event %}
+                <button type="submit" name="action" value="delete" class="px-6 py-3 rounded-xl font-medium bg-red-50 text-red-600 hover:bg-red-100 transition flex items-center gap-2">
+                    <i class="fas fa-trash"></i>Eliminar
+                </button>
+                {% endif %}
+                <a href="/finanzas/" class="px-6 py-3 rounded-xl font-medium bg-gray-100 text-[#64748B] hover:bg-gray-200 transition ml-auto">
+                    Cancelar
+                </a>
+            </div>
+        </form>
+    </div>
+</main>
+{% endblock %}

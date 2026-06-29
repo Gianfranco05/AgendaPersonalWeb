@@ -1,6 +1,5 @@
 from datetime import date, datetime
 from decimal import Decimal
-from uuid import UUID
 from typing import Optional, Sequence
 
 from sqlalchemy import select, func, and_, or_
@@ -24,13 +23,13 @@ class TransactionRepository:
 
     async def get_all(
         self,
-        user_id: UUID,
+        user_id: str,
         skip: int = 0,
         limit: int = 50,
         date_from: Optional[date] = None,
         date_to: Optional[date] = None,
         transaction_type: Optional[str] = None,
-        category_id: Optional[UUID] = None,
+        category_id: Optional[str] = None,
     ) -> Sequence[Transaction]:
         query = select(Transaction).where(
             and_(
@@ -55,7 +54,7 @@ class TransactionRepository:
         return result.scalars().all()
 
     async def get_by_id(
-        self, transaction_id: UUID, user_id: UUID
+        self, transaction_id: str, user_id: str
     ) -> Optional[Transaction]:
         result = await self.db.execute(
             select(Transaction).where(
@@ -83,7 +82,7 @@ class TransactionRepository:
         transaction.deleted_at = datetime.utcnow()
         await self.db.commit()
 
-    async def get_balance(self, user_id: UUID) -> dict:
+    async def get_balance(self, user_id: str) -> dict:
         income_result = await self.db.execute(
             select(func.coalesce(func.sum(Transaction.amount), 0)).where(
                 and_(
@@ -112,7 +111,7 @@ class TransactionRepository:
             "balance": total_income - total_expenses,
         }
 
-    async def get_by_category(self, user_id: UUID) -> dict:
+    async def get_by_category(self, user_id: str) -> dict:
         result = await self.db.execute(
             select(
                 Transaction.category_id,
@@ -145,13 +144,13 @@ class CategoryRepository:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def get_all(self, user_id: UUID) -> Sequence[Category]:
+    async def get_all(self, user_id: str) -> Sequence[Category]:
         result = await self.db.execute(
             select(Category).where(Category.user_id == user_id).order_by(Category.name)
         )
         return result.scalars().all()
 
-    async def get_by_id(self, category_id: UUID, user_id: UUID) -> Optional[Category]:
+    async def get_by_id(self, category_id: str, user_id: str) -> Optional[Category]:
         result = await self.db.execute(
             select(Category).where(
                 and_(Category.id == category_id, Category.user_id == user_id)
@@ -179,7 +178,7 @@ class BankAccountRepository:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def get_all(self, user_id: UUID) -> Sequence[BankAccount]:
+    async def get_all(self, user_id: str) -> Sequence[BankAccount]:
         result = await self.db.execute(
             select(BankAccount)
             .where(BankAccount.user_id == user_id)
@@ -187,7 +186,7 @@ class BankAccountRepository:
         )
         return result.scalars().all()
 
-    async def get_by_id(self, account_id: UUID, user_id: UUID) -> Optional[BankAccount]:
+    async def get_by_id(self, account_id: str, user_id: str) -> Optional[BankAccount]:
         result = await self.db.execute(
             select(BankAccount).where(
                 and_(BankAccount.id == account_id, BankAccount.user_id == user_id)

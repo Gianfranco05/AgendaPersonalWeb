@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Cuentas Bancarias - Vida Personal{% endblock %}
+{% block content %}
+<div class="flex justify-between items-center mb-8">
+    <div>
+        <a href="/finanzas/" class="text-[#64748B] hover:text-[#7C3AED] transition text-sm mb-2 inline-flex items-center gap-1">
+            <i class="fas fa-arrow-left"></i> Volver al Dashboard
+        </a>
+        <h1 class="text-3xl font-bold text-[#1E293B]">Cuentas Bancarias</h1>
+        <p class="text-[#64748B] mt-1">Balance total: <span class="font-semibold text-[#1E293B]">ARS {{ "{:,.2f}".format(total_balance) }}</span></p>
+    </div>
+    <a href="/finanzas/cuentas/nueva" class="bg-[#7C3AED] text-white px-5 py-2.5 rounded-xl hover:bg-[#6D28D9] transition font-medium flex items-center gap-2">
+        <i class="fas fa-plus"></i>Nueva Cuenta
+    </a>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    {% if not accounts %}
+    <div class="col-span-full text-center py-16 text-[#94A3B8]">
+        <i class="fas fa-building-columns text-5xl mb-4 opacity-50"></i>
+        <p class="text-lg font-medium">No hay cuentas registradas</p>
+        <p class="text-sm mb-6">Agrega tu primera cuenta bancaria</p>
+        <a href="/finanzas/cuentas/nueva" class="bg-[#7C3AED] text-white px-5 py-2.5 rounded-xl hover:bg-[#6D28D9] transition font-medium inline-block">
+            <i class="fas fa-plus mr-2"></i>Nueva Cuenta
+        </a>
+    </div>
+    {% else %}
+    {% for a in accounts %}
+    {% set acc_type_label = ACCOUNT_TYPE_LABELS.get(a.account_type, a.account_type) %}
+    {% set icon = ACCOUNT_TYPE_ICONS.get(a.account_type, "fa-wallet") %}
+    {% set color = ACCOUNT_TYPE_COLORS.get(a.account_type, "#7C3AED") %}
+    {% set balance_val = a.balance | float %}
+    {% set balance_class = "text-green-600" if balance_val >= 0 else "text-red-600" %}
+    {% set last4_display = "•••• " ~ a.last4 if a.last4 else "" %}
+    <div class="bg-white rounded-2xl p-6 card-shadow border border-gray-100 flex flex-col gap-4">
+        <div class="flex items-start justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-12 h-12 rounded-xl flex items-center justify-center" style="background-color: {{ color }}20;">
+                    <i class="fas {{ icon }} text-xl" style="color: {{ color }};"></i>
+                </div>
+                <div>
+                    <p class="font-semibold text-[#1E293B]">{{ a.name }}</p>
+                    <p class="text-xs text-[#94A3B8]">{{ a.bank_name or acc_type_label }}</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-1">
+                <a href="/finanzas/cuentas/editar/{{ a.id }}" class="p-2 rounded-lg text-[#94A3B8] hover:text-[#7C3AED] hover:bg-[#EDE9FE] transition">
+                    <i class="fas fa-pen text-xs"></i>
+                </a>
+                <form action="/finanzas/cuentas/eliminar/{{ a.id }}" method="POST"
+                      onsubmit="return confirm('¿Eliminar esta cuenta?');">
+                    <button type="submit" class="p-2 rounded-lg text-[#94A3B8] hover:text-red-500 hover:bg-red-50 transition">
+                        <i class="fas fa-trash-alt text-xs"></i>
+                    </button>
+                </form>
+            </div>
+        </div>
+        <div>
+            <p class="text-xs text-[#94A3B8] uppercase tracking-wider mb-1">Saldo</p>
+            <p class="text-2xl font-bold {{ balance_class }}">{{ a.currency }} {{ "{:,.2f}".format(balance_val) }}</p>
+            {% if last4_display %}<p class="text-xs text-[#94A3B8] mt-1">{{ last4_display }}</p>{% endif %}
+        </div>
+        <div class="pt-2 border-t border-gray-50">
+            <span class="px-2.5 py-1 rounded-full text-xs font-medium bg-[#F1F5F9] text-[#64748B]">{{ acc_type_label }}</span>
+        </div>
+    </div>
+    {% endfor %}
+    {% endif %}
+</div>
+{% endblock %}

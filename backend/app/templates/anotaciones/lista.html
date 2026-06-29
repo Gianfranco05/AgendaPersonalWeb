@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}Anotaciones - Vida Personal{% endblock %}
+{% block head_extra %}
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+{% endblock %}
+{% block content %}
+<div class="flex justify-between items-center mb-8">
+    <div>
+        <a href="/finanzas/" class="text-[#64748B] hover:text-[#7C3AED] transition text-sm mb-2 inline-flex items-center gap-1">
+            <i class="fas fa-arrow-left"></i>Volver al Dashboard
+        </a>
+        <h1 class="text-3xl font-bold text-[#1E293B]">Mis Notas</h1>
+        <p class="text-[#64748B] mt-1">{{ notes|length }} nota{{ "s" if notes|length != 1 else "" }} guardada{{ "s" if notes|length != 1 else "" }}</p>
+    </div>
+    <div class="flex gap-3">
+        <a href="/anotaciones/etiquetas" class="px-5 py-3 rounded-xl font-medium bg-[#EDE9FE] text-[#7C3AED] hover:bg-[#DDD6FE] transition flex items-center gap-2">
+            <i class="fas fa-tags"></i>Etiquetas
+        </a>
+        <a href="/anotaciones/nueva" class="btn-primary text-white px-6 py-3 rounded-xl font-medium flex items-center gap-2">
+            <i class="fas fa-plus"></i>Nueva Nota
+        </a>
+    </div>
+</div>
+
+{% if not notes %}
+<div class="text-center py-20">
+    <div class="w-20 h-20 rounded-2xl bg-[#F1F5F9] flex items-center justify-center mx-auto mb-4">
+        <i class="fas fa-sticky-note text-3xl text-[#CBD5E1]"></i>
+    </div>
+    <p class="text-lg font-medium text-[#64748B]">No hay notas todavía</p>
+    <p class="text-sm text-[#94A3B8] mt-1">Crea tu primera nota para comenzar</p>
+</div>
+{% else %}
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+    {% for note in notes %}
+    {% set color_soft = note.color ~ "20" %}
+    {% set note_tag_list = note.tags if note.tags else [] %}
+    <div class="bg-white rounded-2xl overflow-hidden card-shadow card-hover border border-gray-100 group" style="border-top: 4px solid {{ note.color }};">
+        <div class="p-5">
+            <div class="flex justify-between items-start mb-3">
+                <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background-color: {{ color_soft }};">
+                    <i class="fas fa-sticky-note" style="color: {{ note.color }};"></i>
+                </div>
+                <div class="flex items-center gap-2">
+                    <a href="/eventos/nuevo?from_note={{ note.id }}" class="w-8 h-8 rounded-lg flex items-center justify-center bg-[#DBEAFE] text-[#2563EB] hover:bg-[#BFDBFE] transition" title="Crear evento">
+                        <i class="fas fa-calendar-plus text-sm"></i>
+                    </a>
+                    <a href="/anotaciones/editar/{{ note.id }}" class="w-8 h-8 rounded-lg flex items-center justify-center bg-[#F1F5F9] text-[#64748B] hover:bg-[#7C3AED] hover:text-white transition">
+                        <i class="fas fa-pen text-sm"></i>
+                    </a>
+                </div>
+            </div>
+            <h3 class="font-semibold text-[#1E293B] mb-2 line-clamp-1">{{ note.title }}</h3>
+            <div class="prose text-sm text-[#64748B] line-clamp-2" id="preview-{{ note.id }}"></div>
+            <script>
+            (function() {
+                var raw = {{ (note.content or "") | tojson }};
+                var el = document.getElementById('preview-{{ note.id }}');
+                if (raw && raw.trim()) {
+                    el.innerHTML = marked.parse(raw);
+                } else {
+                    el.innerHTML = '<span class="text-[#CBD5E1] italic">Sin contenido</span>';
+                }
+            })();
+            </script>
+            {% if note_tag_list %}
+            <div class="flex flex-wrap gap-1 mt-3">
+                {% for tag in note_tag_list %}
+                <span class="px-2 py-0.5 rounded text-xs" style="background-color: {{ tag.color }}20; color: {{ tag.color }};">{{ tag.name }}</span>
+                {% endfor %}
+            </div>
+            {% endif %}
+            <div class="flex justify-between items-center mt-4">
+                <p class="text-xs text-[#94A3B8]">{{ note.updated_at.strftime("%d %b %Y, %H:%M") }}</p>
+                {% if note.event_date %}
+                <span class="text-xs text-[#7C3AED]"><i class="fas fa-calendar mr-1"></i>{{ note.event_date.strftime("%d %b") }}</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+{% endblock %}
