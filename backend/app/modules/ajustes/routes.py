@@ -14,9 +14,9 @@ from app.core.security import (
 )
 from app.core.templates import templates
 from app.database import get_db
-from app.modules.ajustes.models import UserPreference
 from app.modules.ajustes.service import SettingsService
-from app.modules.ajustes.schemas import UserPreferenceOut
+from app.modules.ajustes.models import UserPreference
+from app.modules.ajustes.schemas import UserPreferenceOut, UserPreferenceUpdate
 
 router = APIRouter(prefix="/ajustes", tags=["ajustes"])
 
@@ -32,19 +32,6 @@ THEME_COLORS = {
 CURRENCIES = ["ARS", "USD", "EUR", "BRL", "CLP", "UYU"]
 
 DATE_FORMATS = [("DD/MM/YYYY", "31/12/2024"), ("MM/DD/YYYY", "12/31/2024"), ("YYYY-MM-DD", "2024-12-31")]
-
-
-async def get_or_create_prefs(user_id: str, db: AsyncSession) -> UserPreference:
-    result = await db.execute(
-        select(UserPreference).where(UserPreference.user_id == user_id)
-    )
-    prefs = result.scalar_one_or_none()
-    if prefs is None:
-        prefs = UserPreference(user_id=user_id)
-        db.add(prefs)
-        await db.commit()
-        await db.refresh(prefs)
-    return prefs
 
 
 def _make_auth_response(url: str, user_id: str, theme_color: str) -> RedirectResponse:
@@ -78,7 +65,8 @@ async def ajustes_page(
     user_result = await db.execute(select(User).where(User.id == user_id))
     user = user_result.scalar_one_or_none()
 
-    prefs = await get_or_create_prefs(user_id, db)
+    service = SettingsService(db)
+    prefs = await service.get_preferences(user_id)
     google_configured = bool(settings.GOOGLE_CLIENT_ID and settings.GOOGLE_CLIENT_SECRET)
     google_connected = bool(prefs.google_refresh_token)
 
@@ -171,12 +159,13 @@ async def save_ajustes(
     if currency not in CURRENCIES:
         currency = "ARS"
 
-    prefs = await get_or_create_prefs(user_id, db)
-    prefs.currency = currency
-    prefs.theme_color = theme_color
-    prefs.date_format = date_format
-    db.add(prefs)
-    await db.commit()
+    service = SettingsService(db)
+    data = UserPreferenceUpdate(
+        currency=currency,
+        theme_color=theme_color,
+        date_format=date_format,
+    )
+    await service.update_preferences(user_id, data)
 
     return _make_auth_response("/ajustes/?success=saved", user_id, theme_color)
 
@@ -242,7 +231,8 @@ async def google_callback(
         await asyncio.to_thread(flow.fetch_token, code=code)
         credentials = flow.credentials
 
-        prefs = await get_or_create_prefs(user_id, db)
+        service = SettingsService(db)
+        prefs = await service.get_preferences(user_id)
         prefs.google_access_token = credentials.token
         prefs.google_refresh_token = credentials.refresh_token or prefs.google_refresh_token
         prefs.google_token_expiry = credentials.expiry
@@ -262,7 +252,8 @@ async def google_disconnect(request: Request, db: AsyncSession = Depends(get_db)
     if not user_id:
         return RedirectResponse(url="/auth/login", status_code=303)
 
-    prefs = await get_or_create_prefs(user_id, db)
+    service = SettingsService(db)
+    prefs = await service.get_preferences(user_id)
     prefs.google_access_token = None
     prefs.google_refresh_token = None
     prefs.google_token_expiry = None
@@ -278,7 +269,8 @@ async def google_sync(request: Request, db: AsyncSession = Depends(get_db)):
     if not user_id:
         return RedirectResponse(url="/auth/login", status_code=303)
 
-    prefs = await get_or_create_prefs(user_id, db)
+    service = SettingsService(db)
+    prefs = await service.get_preferences(user_id)
     if not prefs.google_refresh_token:
         return RedirectResponse(url="/ajustes/?error=not_connected", status_code=303)
 
@@ -309,7 +301,7 @@ def _build_google_flow():
 
 
 async def _sync_events_to_google(
-    user_id: str, prefs: UserPreference, db: AsyncSession
+    user_id: str, prefs, db: AsyncSession
 ) -> int:
     from google.oauth2.credentials import Credentials
     from google.auth.transport.requests import Request as GRequest

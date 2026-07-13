@@ -34,14 +34,14 @@ export default function NotesSidebar({
   onNew,
 }: NotesSidebarProps) {
   return (
-    <div className="flex w-[300px] flex-shrink-0 flex-col border-r border-gray-100">
+    <div className="flex w-[300px] flex-shrink-0 flex-col border-r border-gray-100 dark:border-slate-800">
       {/* Header */}
-      <div className="border-b border-gray-100 p-4">
+      <div className="border-b border-gray-100 dark:border-slate-800 p-4">
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-gray-800">Notas</h2>
+          <h2 className="text-lg font-semibold text-gray-800 dark:text-slate-100">Notas</h2>
           <button
             onClick={onNew}
-            className="rounded-lg p-1.5 text-[#7C3AED] transition-colors hover:bg-purple-50"
+            className="rounded-lg p-1.5 text-brand-charcoal dark:text-slate-100 transition-colors hover:bg-brand-surface-container"
             title="Nueva nota"
           >
             <Plus size={18} />
@@ -52,19 +52,19 @@ export default function NotesSidebar({
         <div className="relative">
           <Search
             size={14}
-            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500"
           />
           <input
             type="text"
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
             placeholder="Buscar notas..."
-            className="w-full rounded-lg border border-gray-200 py-2 pl-9 pr-8 text-xs focus:border-[#7C3AED] focus:outline-none focus:ring-1 focus:ring-[#7C3AED]"
+            className="w-full rounded-lg border border-gray-200 dark:border-slate-700 py-2 pl-9 pr-8 text-xs focus:border-brand-indigo focus:outline-none focus:ring-1 focus:ring-brand-indigo"
           />
           {search && (
             <button
               onClick={() => onSearchChange('')}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-200"
             >
               <X size={14} />
             </button>
@@ -93,13 +93,13 @@ export default function NotesSidebar({
           </div>
         ) : notes.length === 0 ? (
           <div className="flex flex-col items-center gap-2 p-8 text-center">
-            <p className="text-sm text-gray-400">
+            <p className="text-sm text-gray-400 dark:text-slate-500">
               {search || activeTag ? 'Sin resultados' : 'No hay notas aún'}
             </p>
             {!search && !activeTag && (
               <button
                 onClick={onNew}
-                className="text-xs font-medium text-[#7C3AED] hover:underline"
+                className="text-xs font-medium text-brand-indigo hover:underline"
               >
                 Crear la primera nota
               </button>

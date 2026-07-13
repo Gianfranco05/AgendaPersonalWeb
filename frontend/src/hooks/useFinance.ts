@@ -1,4 +1,5 @@
-import useSWR, { mutate as globalMutate } from 'swr';
+import { mutate as globalMutate } from 'swr';
+import { useApiSWR } from './useApiSWR';
 import {
   fetchFinanceSummary,
   fetchTransactions,
@@ -17,15 +18,15 @@ function txKey(params: Parameters<typeof fetchTransactions>[0]) {
 }
 
 export function useFinanceSummary() {
-  return useSWR(SUMMARY_KEY, fetchFinanceSummary);
+  return useApiSWR(SUMMARY_KEY, fetchFinanceSummary);
 }
 
 export function useTransactions(params: Parameters<typeof fetchTransactions>[0]) {
-  return useSWR(txKey(params), () => fetchTransactions(params));
+  return useApiSWR(txKey(params), () => fetchTransactions(params));
 }
 
 export function useCategories() {
-  return useSWR(CATEGORIES_KEY, fetchCategories);
+  return useApiSWR(CATEGORIES_KEY, fetchCategories);
 }
 
 async function invalidateFinance(params: Parameters<typeof fetchTransactions>[0]) {

@@ -1,11 +1,11 @@
 interface LoadingSkeletonProps {
-  type?: 'card' | 'table' | 'widget';
+  type?: 'card' | 'table' | 'widget' | 'page';
   rows?: number;
 }
 
 function SkeletonBar({ className = '' }: { className?: string }) {
   return (
-    <div className={`animate-pulse rounded bg-gray-200 ${className}`} />
+    <div className={`skeleton-shimmer rounded ${className}`} />
   );
 }
 
@@ -29,9 +29,30 @@ export function LoadingSkeleton({ type = 'card', rows = 3 }: LoadingSkeletonProp
     );
   }
 
+  if (type === 'page') {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <SkeletonBar className="h-8 w-48" />
+          <SkeletonBar className="h-10 w-36" />
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <SkeletonBar className="h-28 rounded-xl" />
+          <SkeletonBar className="h-28 rounded-xl" />
+          <SkeletonBar className="h-28 rounded-xl" />
+        </div>
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <SkeletonBar className="h-80 rounded-xl" />
+          <SkeletonBar className="h-80 rounded-xl" />
+        </div>
+        <SkeletonBar className="h-64 rounded-xl" />
+      </div>
+    );
+  }
+
   if (type === 'widget') {
     return (
-      <div className="space-y-3 rounded-xl bg-white p-6 shadow-sm">
+      <div className="space-y-3 rounded-xl bg-white dark:bg-slate-800 p-6 shadow-sm">
         <SkeletonBar className="h-5 w-1/3" />
         <SkeletonBar className="h-8 w-1/2" />
         <SkeletonBar className="h-4 w-full" />
@@ -42,7 +63,7 @@ export function LoadingSkeleton({ type = 'card', rows = 3 }: LoadingSkeletonProp
 
   // card
   return (
-    <div className="space-y-3 rounded-xl bg-white p-6 shadow-sm">
+    <div className="space-y-3 rounded-xl bg-white dark:bg-slate-800 p-6 shadow-sm">
       <SkeletonBar className="h-5 w-2/3" />
       <SkeletonBar className="h-4 w-full" />
       <SkeletonBar className="h-4 w-3/4" />

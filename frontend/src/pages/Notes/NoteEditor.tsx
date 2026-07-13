@@ -1,7 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
-import MDEditor from '@uiw/react-md-editor';
+import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { Pin, PinOff, Trash2, Palette } from 'lucide-react';
+import { LoadingSkeleton } from '../../components/LoadingSkeleton';
 import type { Note } from '../../types';
+
+const MDEditor = lazy(() => import('@uiw/react-md-editor'));
 
 const NOTE_COLORS = [
   '#7C3AED', '#3B82F6', '#10B981', '#F59E0B', '#EF4444',
@@ -49,7 +51,7 @@ export default function NoteEditor({ note, onSave, onDelete, onColorChange }: No
       >
         <button
           onClick={() => onSave({ ...note, is_pinned: !note.is_pinned })}
-          className="rounded p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-[#7C3AED]"
+          className="rounded p-1 text-gray-400 dark:text-slate-500 transition-colors hover:bg-gray-100 dark:hover:bg-slate-700 hover:text-brand-indigo"
           title={note.is_pinned ? 'Desfijar' : 'Fijar'}
         >
           {note.is_pinned ? <PinOff size={16} /> : <Pin size={16} />}
@@ -59,13 +61,13 @@ export default function NoteEditor({ note, onSave, onDelete, onColorChange }: No
         <div className="relative">
           <button
             onClick={() => setShowColors(!showColors)}
-            className="rounded p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+            className="rounded p-1 text-gray-400 dark:text-slate-500 transition-colors hover:bg-gray-100 dark:hover:bg-slate-700 hover:text-gray-600 dark:hover:text-slate-200"
             title="Color"
           >
             <Palette size={16} />
           </button>
           {showColors && (
-            <div className="absolute left-0 top-full z-10 mt-1 flex gap-1 rounded-lg border border-gray-200 bg-white p-2 shadow-lg">
+            <div className="absolute left-0 top-full z-10 mt-1 flex gap-1 rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-2 shadow-lg">
               {NOTE_COLORS.map((color) => (
                 <button
                   key={color}
@@ -88,7 +90,7 @@ export default function NoteEditor({ note, onSave, onDelete, onColorChange }: No
 
         <button
           onClick={handleDelete}
-          className="rounded p-1 text-gray-400 transition-colors hover:bg-rose-50 hover:text-rose-500"
+          className="rounded p-1 text-gray-400 dark:text-slate-500 transition-colors hover:bg-rose-50 hover:text-rose-500"
           title="Eliminar"
         >
           <Trash2 size={16} />
@@ -101,22 +103,24 @@ export default function NoteEditor({ note, onSave, onDelete, onColorChange }: No
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         placeholder="Título de la nota"
-        className="border-b border-gray-100 px-4 py-3 text-lg font-semibold text-gray-800 outline-none placeholder:text-gray-300"
+        className="border-b border-gray-100 dark:border-slate-800 px-4 py-3 text-lg font-semibold text-gray-800 dark:text-slate-100 outline-none placeholder:text-gray-300"
       />
 
       {/* Editor */}
       <div className="flex-1 overflow-hidden" data-color-mode="light">
-        <MDEditor
-          value={content}
-          onChange={(val) => setContent(val || '')}
-          height="100%"
-          preview="live"
-          visibleDragbar={false}
-        />
+        <Suspense fallback={<LoadingSkeleton type="card" />}>
+          <MDEditor
+            value={content}
+            onChange={(val) => setContent(val || '')}
+            height="100%"
+            preview="live"
+            visibleDragbar={false}
+          />
+        </Suspense>
       </div>
 
-      <div className="border-t border-gray-100 px-4 py-2">
-        <span className="text-xs text-gray-400">
+      <div className="border-t border-gray-100 dark:border-slate-800 px-4 py-2">
+        <span className="text-xs text-gray-400 dark:text-slate-500">
           Última edición: {new Date(note.updated_at).toLocaleString('es-AR')}
         </span>
       </div>

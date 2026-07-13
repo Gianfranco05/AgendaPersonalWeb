@@ -84,3 +84,36 @@ async def test_api_update_nonexistent_event(api_auth_client):
 async def test_api_delete_nonexistent_event(api_auth_client):
     response = await api_auth_client.delete("/api/v1/events/nonexistent-id")
     assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_api_events_crud_full(api_auth_client):
+    create_resp = await api_auth_client.post("/api/v1/events", json={
+        "title": "CRUD Event",
+        "description": "CRUD desc",
+        "start_datetime": "2025-07-10T09:00:00",
+        "end_datetime": "2025-07-10T10:00:00",
+        "color": "#ff0000",
+    })
+    assert create_resp.status_code == 201
+    event = create_resp.json()
+    event_id = event["id"]
+    assert event["title"] == "CRUD Event"
+
+    list_resp = await api_auth_client.get(
+        "/api/v1/events?date_from=2025-07-01&date_to=2025-07-31"
+    )
+    assert list_resp.status_code == 200
+    assert any(e["id"] == event_id for e in list_resp.json())
+
+    update_resp = await api_auth_client.put(f"/api/v1/events/{event_id}", json={
+        "title": "Updated Event",
+    })
+    assert update_resp.status_code == 200
+    assert update_resp.json()["title"] == "Updated Event"
+
+    delete_resp = await api_auth_client.delete(f"/api/v1/events/{event_id}")
+    assert delete_resp.status_code == 204
+
+    list_after = await api_auth_client.get("/api/v1/events")
+    assert all(e["id"] != event_id for e in list_after.json())

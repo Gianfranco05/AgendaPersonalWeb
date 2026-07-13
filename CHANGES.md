@@ -91,7 +91,7 @@ Paso │ Agente A (Backend Core) │ Agente B (Backend Aux) │ Agente C (Fronte
 > Cerrar el change `project-foundation` existente. Verificar que Docker funciona y que todo el stack está operativo.
 
 ### [C-01] `complete-foundation`
-- **Estado**: `[ ]` pendiente
+- **Estado**: `[x]` completado — archivado el 28/06/2026
 - **Scope**: Terminar las tareas pendientes del change `project-foundation` (5 tasks) y archivarlo
   - Verificar `docker compose up --build` — backend healthy en `:8000/health`, frontend en `:5173`
   - Verificar Dashboard carga widgets con datos del backend
@@ -114,7 +114,7 @@ Paso │ Agente A (Backend Core) │ Agente B (Backend Aux) │ Agente C (Fronte
 > Tres changes que pueden ejecutarse en paralelo. Todos dependen de que C-01 esté archivado. No dependen entre sí.
 
 ### [C-02] `rest-api-endpoints`
-- **Estado**: `[ ]` pendiente
+- **Estado**: `[x]` completado — archivado el 29/06/2026
 - **Scope**: Crear endpoints REST JSON unificados bajo `/api/v1/` para todos los módulos
   - Crear `backend/app/api/v1/` con routers: `finance.py`, `notes.py`, `events.py`, `goals.py`, `settings.py`
   - `GET /api/v1/finance/summary` — resumen financiero (balance, ingresos, egresos, periodo)
@@ -152,7 +152,7 @@ Paso │ Agente A (Backend Core) │ Agente B (Backend Aux) │ Agente C (Fronte
 ---
 
 ### [C-03] `metas-and-ajustes`
-- **Estado**: `[ ]` pendiente
+- **Estado**: `[x]` completado — archivado el 29/06/2026
 - **Scope**: Completar los módulos `metas` y `ajustes` con capa de servicio, repositorio, schemas Pydantic y tests
   - **Metas**:
     - Crear `backend/app/modules/metas/schemas.py` — GoalCreate, GoalUpdate, GoalOut, HabitRecordCreate, GoalProgress
@@ -180,24 +180,18 @@ Paso │ Agente A (Backend Core) │ Agente B (Backend Aux) │ Agente C (Fronte
 ---
 
 ### [C-04] `backend-cleanup`
-- **Estado**: `[ ]` pendiente
-- **Scope**: Limpiar deuda técnica del backend, eliminar archivos basura, remover dependencias sin uso
-  - Migrar HTML inline de las rutas a Jinja2 templates:
-    - Crear `backend/app/templates/finanzas/` con `dashboard.html`, `transacciones.html`, `categorias.html`, `reportes.html`
-    - Crear `backend/app/templates/anotaciones/` con `lista.html`, `formulario.html`, `etiquetas.html`
-    - Crear `backend/app/templates/eventos/` con `calendario.html`, `formulario.html`
-    - Crear `backend/app/templates/metas/` con `lista.html`, `formulario.html`
-    - Crear `backend/app/templates/ajustes/` con `preferencias.html`
-    - Crear `backend/app/templates/auth/` con `login.html`, `register.html`
-    - Crear `backend/app/templates/base.html` con layout común (navbar, sidebar, footer)
-    - Refactorizar cada `routes.py` para usar `Jinja2Templates` + `TemplateResponse`
-    - El archivo `finanzas/routes.py` (~1708 líneas) se reduce drásticamente
-  - Eliminar archivos basura en raíz del backend: `=1.2.0`, `=2.116.0`, `=2.28.0`
-  - Remover `slowapi` de `requirements.txt` si no se usa
-  - Revisar si `render_utils.py` tiene código huérfano; limpiarlo
-  - Configurar Jinja2Templates en `main.py` con directorio `templates/`
-  - Verificar que todas las rutas HTML siguen funcionando después del refactor
-  - Tests: verificar que las rutas HTML siguen respondiendo 200
+- **Estado**: `[x]` completado — archivado el 30/06/2026
+- **Scope**: Verificar que la migración a Jinja2 templates está completa y agregar tests de humo
+  - Verificar que no existe HTML inline residual en ningún módulo (confirmado — 0 archivos)
+  - Verificar que no existen archivos basura en raíz del backend (confirmado — 0 archivos)
+  - Verificar que `slowapi` no está en `requirements.txt` (confirmado)
+  - Verificar que `render_utils.py` no existe (confirmado)
+  - Verificar que `Jinja2Templates` está configurado en `core/templates.py` (confirmado)
+  - Verificar que todos los templates HTML existen en sus directorios (confirmado — 18 templates)
+  - **Bug encontrado y corregido**: `formulario.html` tenía una list comprehension Python (`[t.id for t in ...]`) inválida en Jinja2 — reemplazada por `map(attribute='id') | list`
+  - **Import faltante**: `routes.py` de ajustes ya tenía `from app.modules.ajustes.models import UserPreference` (confirmado existente)
+  - Tests de humo: 26 tests en `test_html_routes.py` cubriendo auth, finanzas, anotaciones, eventos, metas, ajustes
+  - Tests pasando: 26/26
 - **Dependencias**: C-01
 - **Governance**: MEDIO
 - **Leer antes**:
@@ -213,7 +207,7 @@ Paso │ Agente A (Backend Core) │ Agente B (Backend Aux) │ Agente C (Fronte
 > El frontend actual funciona con mock data. Estos changes lo conectan al backend real y agregan las pantallas que faltan.
 
 ### [C-05] `frontend-real-api`
-- **Estado**: `[ ]` pendiente
+- **Estado**: `[x]` completado — archivado el 30/06/2026
 - **Scope**: Conectar el frontend al backend real deshabilitando el modo mock, arreglando auth y corrigiendo bugs
   - Cambiar `MOCK_ENABLED = true` a variable de entorno `VITE_MOCK_ENABLED` (default `false`)
   - Verificar que todos los endpoints de `endpoints.ts` coinciden con las rutas `/api/v1/` reales
@@ -241,7 +235,7 @@ Paso │ Agente A (Backend Core) │ Agente B (Backend Aux) │ Agente C (Fronte
 ---
 
 ### [C-06] `frontend-pages-extra`
-- **Estado**: `[ ]` pendiente
+- **Estado**: `[x]` completado — archivado el 30/06/2026
 - **Scope**: Agregar páginas faltantes en el frontend para cubrir todos los módulos del backend
   - **Página Eventos/Calendario**:
     - Crear `frontend/src/pages/Events/EventsPage.tsx` — vista de calendario mensual
@@ -278,7 +272,7 @@ Paso │ Agente A (Backend Core) │ Agente B (Backend Aux) │ Agente C (Fronte
 > Una vez que el frontend está conectado al backend real y los módulos están completos, agregar tests en ambos lados.
 
 ### [C-07] `frontend-testing`
-- **Estado**: `[ ]` pendiente
+- **Estado**: `[x]` completado — archivado el 30/06/2026 (39 tests, 83% coverage)
 - **Scope**: Configurar y escribir tests unitarios y de componentes para el frontend
   - Instalar y configurar Vitest + React Testing Library + jsdom
   - Configurar `vitest.config.ts` con alias `@/` → `src/` como en `vite.config.ts`
@@ -311,7 +305,7 @@ Paso │ Agente A (Backend Core) │ Agente B (Backend Aux) │ Agente C (Fronte
 ---
 
 ### [C-08] `backend-more-tests`
-- **Estado**: `[ ]` pendiente
+- **Estado**: `[x]` completado — archivado el 30/06/2026
 - **Scope**: Agregar tests faltantes para metas, ajustes, y tests de integración para la API REST
   - Tests de integración para endpoints `/api/v1/` (C-02):
     - `test_api_finance.py`: CRUD transacciones, summary, categories, paginación, filtros
@@ -339,7 +333,7 @@ Paso │ Agente A (Backend Core) │ Agente B (Backend Aux) │ Agente C (Fronte
 ## FASE 4 — Optimización y Producción
 
 ### [C-09] `frontend-optimize`
-- **Estado**: `[ ]` pendiente
+- **Estado**: `[x]` completado — archivado el 30/06/2026
 - **Scope**: Optimizar el bundle, agregar lazy loading, mejorar performance
   - Code-splitting con `React.lazy()` + `Suspense` para páginas pesadas:
     - `FinancePage` (lazy — pesa por recharts)
@@ -366,7 +360,7 @@ Paso │ Agente A (Backend Core) │ Agente B (Backend Aux) │ Agente C (Fronte
 ---
 
 ### [C-10] `production-deploy`
-- **Estado**: `[ ]` pendiente
+- **Estado**: `[x]` completado — archivado el 30/06/2026
 - **Scope**: Preparar el proyecto para producción con Docker multi-stage, nginx, CI/CD y documentación
   - **Frontend Docker multi-stage**:
     - Stage 1: `node:20-alpine` → `npm ci && npm run build`

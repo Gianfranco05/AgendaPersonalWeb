@@ -111,7 +111,7 @@ export default function NotesPage() {
     });
 
   return (
-    <div className="flex h-[calc(100vh-5rem)] gap-0 overflow-hidden rounded-xl bg-white shadow-sm">
+    <div className="flex h-[calc(100vh-5rem)] gap-0 overflow-hidden rounded-xl bg-white dark:bg-slate-800 shadow-sm">
       {/* Sidebar */}
       <NotesSidebar
         notes={filteredNotes}
@@ -144,10 +144,10 @@ export default function NotesPage() {
         ) : (
           <div className="flex flex-1 items-center justify-center">
             <div className="text-center">
-              <p className="text-gray-400">Seleccioná una nota o creá una nueva</p>
+              <p className="text-gray-400 dark:text-slate-500">Seleccioná una nota o creá una nueva</p>
               <button
                 onClick={handleNew}
-                className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-[#7C3AED] hover:underline"
+                className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-brand-indigo hover:underline"
               >
                 <Plus size={14} />
                 Crear nota

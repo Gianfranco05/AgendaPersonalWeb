@@ -40,25 +40,25 @@ export default function TransactionTable({ transactions, onEdit, onDelete }: Tra
   ];
 
   return (
-    <div className="overflow-x-auto rounded-xl bg-white shadow-sm">
+    <div className="overflow-x-auto rounded-xl bg-white dark:bg-slate-800 shadow-sm">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-gray-100 bg-gray-50">
+          <tr className="border-b border-gray-100 dark:border-slate-800 bg-gray-50 dark:bg-slate-800/60">
             {headers.map(({ key, label }) => (
               <th
                 key={key}
                 onClick={() => handleSort(key)}
-                className="cursor-pointer px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 transition-colors hover:text-gray-700"
+                className="cursor-pointer px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-slate-400 transition-colors hover:text-gray-700 dark:hover:text-slate-100"
               >
                 <span className="flex items-center gap-1">
                   {label}
                   {sortKey === key && (
-                    <span className="text-[#7C3AED]">{sortDir === 'asc' ? '↑' : '↓'}</span>
+                    <span className="text-brand-indigo">{sortDir === 'asc' ? '↑' : '↓'}</span>
                   )}
                 </span>
               </th>
             ))}
-            <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
+            <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-slate-400">
               Acciones
             </th>
           </tr>
@@ -66,7 +66,7 @@ export default function TransactionTable({ transactions, onEdit, onDelete }: Tra
         <tbody>
           {sorted.length === 0 ? (
             <tr>
-              <td colSpan={6} className="px-4 py-12 text-center text-gray-400">
+              <td colSpan={6} className="px-4 py-12 text-center text-gray-400 dark:text-slate-500">
                 No se encontraron transacciones
               </td>
             </tr>
@@ -74,10 +74,10 @@ export default function TransactionTable({ transactions, onEdit, onDelete }: Tra
             sorted.map((tx) => (
               <tr
                 key={tx.id}
-                className="border-b border-gray-50 transition-colors hover:bg-gray-50"
+                className="border-b border-gray-50 transition-colors hover:bg-gray-50 dark:hover:bg-slate-700/50"
               >
-                <td className="px-4 py-3 text-gray-600">{tx.transaction_date}</td>
-                <td className="max-w-[200px] truncate px-4 py-3 font-medium text-gray-800">
+                <td className="px-4 py-3 text-gray-600 dark:text-slate-300">{tx.transaction_date}</td>
+                <td className="max-w-[200px] truncate px-4 py-3 font-medium text-gray-800 dark:text-slate-100">
                   {tx.product_name}
                 </td>
                 <td className="px-4 py-3">
@@ -88,7 +88,7 @@ export default function TransactionTable({ transactions, onEdit, onDelete }: Tra
                         style={{ backgroundColor: tx.category_color }}
                       />
                     )}
-                    <span className="text-gray-600">{tx.category_name || '-'}</span>
+                    <span className="text-gray-600 dark:text-slate-300">{tx.category_name || '-'}</span>
                   </span>
                 </td>
                 <td className={`px-4 py-3 font-semibold ${tx.type === 'income' ? 'text-emerald-500' : 'text-rose-500'}`}>
@@ -109,14 +109,14 @@ export default function TransactionTable({ transactions, onEdit, onDelete }: Tra
                   <div className="flex justify-end gap-1">
                     <button
                       onClick={() => onEdit(tx)}
-                      className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-[#7C3AED]"
+                      className="rounded-lg p-1.5 text-gray-400 dark:text-slate-500 transition-colors hover:bg-gray-100 dark:hover:bg-slate-700 hover:text-brand-indigo"
                       title="Editar"
                     >
                       <Pencil size={14} />
                     </button>
                     <button
                       onClick={() => onDelete(tx.id)}
-                      className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-rose-50 hover:text-rose-500"
+                      className="rounded-lg p-1.5 text-gray-400 dark:text-slate-500 transition-colors hover:bg-rose-50 hover:text-rose-500"
                       title="Eliminar"
                     >
                       <Trash2 size={14} />

@@ -1,1 +1,178 @@
 @import "tailwindcss";
+
+/* Modo oscuro dirigido por el atributo data-theme (ThemeContext) */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* Tokens de marca themeables: vars planas que cascadean con data-theme.
+   Se referencian desde @theme inline (abajo) para que las utilidades
+   bg-brand-*/border-brand-* usen el valor vivo y cambien con el tema. */
+:root {
+  --c-brand-charcoal: #0f172a;
+  --c-brand-charcoal-hover: #1e293b;
+  --c-brand-indigo: #6366f1;
+  --c-brand-indigo-hover: #4f46e5;
+  --c-brand-surface: #f7f9fb;
+  --c-brand-surface-container: #eceef0;
+  --c-brand-border: #e2e8f0;
+}
+
+[data-theme='dark'] {
+  color-scheme: dark;
+  /* Superficies Stitch (charcoal frío: #0f1418 / #1b2024 / #2c3135) */
+  --c-brand-surface: #0f1518;
+  --c-brand-surface-container: #1b2126;
+  --c-brand-border: #2c3237;
+  /* Sidebar aún más profundo en oscuro */
+  --c-brand-charcoal: #0b1013;
+  --c-brand-charcoal-hover: #171d22;
+  /* Índigo un punto más brillante para contraste sobre fondo oscuro */
+  --c-brand-indigo: #818cf8;
+  --c-brand-indigo-hover: #6366f1;
+}
+
+/* Los valores light van como FALLBACK del var() (literal, no se poda).
+   En oscuro, [data-theme='dark'] define --c-brand-* y gana. Esto evita
+   que lightningcss elimine el bloque :root y deje los tokens sin valor
+   (bug: en modo claro quedaba todo transparente/blanco). */
+@theme inline {
+  --color-brand-charcoal: var(--c-brand-charcoal, #0f172a);
+  --color-brand-charcoal-hover: var(--c-brand-charcoal-hover, #1e293b);
+  --color-brand-indigo: var(--c-brand-indigo, #6366f1);
+  --color-brand-indigo-hover: var(--c-brand-indigo-hover, #4f46e5);
+  --color-brand-surface: var(--c-brand-surface, #f7f9fb);
+  --color-brand-surface-container: var(--c-brand-surface-container, #eceef0);
+  --color-brand-border: var(--c-brand-border, #e2e8f0);
+}
+
+@theme {
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+
+  /* Acentos funcionales por sección */
+  --color-brand-fitness: #f97316;
+  --color-brand-habits: #22c55e;
+  --color-brand-nutrition: #14b8a6;
+  --color-brand-goals: #a855f7;
+
+  --animate-fade-in: fade-in 0.4s ease-out both;
+  --animate-fade-in-up: fade-in-up 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-scale-in: scale-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-shimmer: shimmer 1.6s linear infinite;
+
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes fade-in-up {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes scale-in {
+    from { opacity: 0; transform: scale(0.96); }
+    to { opacity: 1; transform: scale(1); }
+  }
+
+  @keyframes shimmer {
+    from { background-position: 200% 0; }
+    to { background-position: -200% 0; }
+  }
+}
+
+@layer utilities {
+  /* Entrada escalonada para grillas de widgets/cards */
+  .stagger-children > * {
+    animation: fade-in-up 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  .stagger-children > *:nth-child(1) { animation-delay: 0ms; }
+  .stagger-children > *:nth-child(2) { animation-delay: 60ms; }
+  .stagger-children > *:nth-child(3) { animation-delay: 120ms; }
+  .stagger-children > *:nth-child(4) { animation-delay: 180ms; }
+  .stagger-children > *:nth-child(5) { animation-delay: 240ms; }
+  .stagger-children > *:nth-child(6) { animation-delay: 300ms; }
+  .stagger-children > *:nth-child(n + 7) { animation-delay: 360ms; }
+
+  /* Cards interactivas: elevación sutil al hover */
+  .card-interactive {
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+  }
+  .card-interactive:hover {
+    box-shadow: 0 8px 24px -8px rgb(0 0 0 / 0.15);
+    transform: translateY(-2px);
+  }
+
+  /* Feedback táctil en botones */
+  .press-effect {
+    transition: transform 0.1s ease;
+  }
+  .press-effect:active {
+    transform: scale(0.97);
+  }
+
+  /* Skeleton con shimmer (más pulido que animate-pulse) */
+  .skeleton-shimmer {
+    background: linear-gradient(
+      90deg,
+      var(--color-gray-200) 25%,
+      var(--color-gray-100) 50%,
+      var(--color-gray-200) 75%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.6s linear infinite;
+  }
+}
+
+/* Accesibilidad: sin movimiento para quien lo pide */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Scrollbar discreta y consistente */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(0 0 0 / 0.2) transparent;
+}
+
+/* Fondo/color base del documento según el tema */
+html,
+body {
+  background: var(--color-brand-surface);
+  color: #0f172a;
+}
+[data-theme='dark'] body {
+  color: #e2e8f0;
+}
+
+/* Skeleton shimmer adaptado al modo oscuro */
+[data-theme='dark'] .skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--color-slate-800) 25%,
+    var(--color-slate-700) 50%,
+    var(--color-slate-800) 75%
+  );
+  background-size: 200% 100%;
+}
+
+/* Scrollbar clara sobre fondo oscuro */
+[data-theme='dark'] * {
+  scrollbar-color: rgb(255 255 255 / 0.18) transparent;
+}
+
+/* Elevación de cards: sombra más marcada en oscuro */
+[data-theme='dark'] .card-interactive:hover {
+  box-shadow: 0 8px 24px -8px rgb(0 0 0 / 0.6);
+}
+
+/* Inputs nativos (date/select) legibles en oscuro */
+[data-theme='dark'] input[type='date'],
+[data-theme='dark'] input[type='datetime-local'],
+[data-theme='dark'] input[type='time'] {
+  color-scheme: dark;
+}

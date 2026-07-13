@@ -37,13 +37,13 @@ export default function EventsWidget() {
   }
 
   return (
-    <div className="rounded-xl bg-white p-6 shadow-sm">
-      <h3 className="mb-4 text-lg font-semibold text-gray-800">Próximos eventos</h3>
+    <div className="card-interactive rounded-xl bg-white dark:bg-slate-800 p-6 shadow-sm">
+      <h3 className="mb-4 text-lg font-semibold text-gray-800 dark:text-slate-100">Próximos eventos</h3>
 
       {events.length === 0 ? (
         <div className="flex flex-col items-center gap-2 py-6 text-center">
-          <Calendar size={28} className="text-gray-300" />
-          <p className="text-sm text-gray-400">Sin eventos próximos</p>
+          <Calendar size={28} className="text-gray-300 dark:text-slate-600" />
+          <p className="text-sm text-gray-400 dark:text-slate-500">Sin eventos próximos</p>
         </div>
       ) : (
         <ul className="space-y-3">
@@ -59,12 +59,12 @@ export default function EventsWidget() {
                   style={{ backgroundColor: ev.color }}
                 />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-gray-700">{ev.title}</p>
-                  <p className="text-xs text-gray-400">
+                  <p className="truncate text-sm font-medium text-gray-700 dark:text-slate-200">{ev.title}</p>
+                  <p className="text-xs text-gray-400 dark:text-slate-500">
                     {day} {!ev.is_all_day && `· ${time}`}
                   </p>
                   {ev.location && (
-                    <p className="flex items-center gap-1 text-xs text-gray-400">
+                    <p className="flex items-center gap-1 text-xs text-gray-400 dark:text-slate-500">
                       <MapPin size={10} />
                       {ev.location}
                     </p>

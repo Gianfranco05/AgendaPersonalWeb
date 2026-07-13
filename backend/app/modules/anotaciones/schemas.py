@@ -13,7 +13,7 @@ class NoteBase(BaseModel):
 
 
 class NoteCreate(NoteBase):
-    pass
+    tag_names: list[str] = []
 
 
 class NoteUpdate(BaseModel):

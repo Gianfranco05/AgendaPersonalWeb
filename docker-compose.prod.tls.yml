@@ -1,0 +1,30 @@
+# Override para HABILITAR HTTPS/TLS en producción (deploy real con dominio).
+#
+# Uso:
+#   1. Tener certificados Let's Encrypt en el host (ver docs/ssl-setup.md):
+#        sudo certbot certonly --standalone -d tu.dominio.com
+#   2. Definir DOMAIN en .env (o exportarlo):
+#        DOMAIN=tu.dominio.com
+#   3. Levantar combinando ambos compose:
+#        docker compose -f docker-compose.prod.yml -f docker-compose.prod.tls.yml up --build -d
+#
+# El frontend renderiza frontend/nginx.tls.conf sustituyendo ${DOMAIN} con envsubst
+# (la imagen de nginx procesa /etc/nginx/templates/*.template al arrancar).
+
+services:
+  frontend:
+    ports:
+      - "443:443"
+    environment:
+      # Solo sustituir ${DOMAIN}; dejar intactas las variables propias de nginx ($host, $uri, ...)
+      - "DOMAIN=${DOMAIN:?DOMAIN es requerido para TLS - definir DOMAIN=vida.tudominio.com}"
+      - "NGINX_ENVSUBST_FILTER=DOMAIN"
+    volumes:
+      - ./frontend/nginx.tls.conf:/etc/nginx/templates/default.conf.template:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+    healthcheck:
+      test: ["CMD", "wget", "--no-check-certificate", "-qO-", "https://127.0.0.1:443/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s

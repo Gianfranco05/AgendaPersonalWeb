@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.config import settings
 from app.core.security import hash_password, verify_password, create_access_token
+from app.core.http_security import rate_limit_auth
 from app.core.templates import templates
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -38,7 +39,7 @@ async def login_page(request: Request):
     return templates.TemplateResponse(request, "auth/login.html", {"error": None})
 
 
-@router.post("/login")
+@router.post("/login", dependencies=[Depends(rate_limit_auth)])
 async def login(
     request: Request,
     email: str = Form(...),
@@ -70,7 +71,7 @@ async def register_page(request: Request):
     return templates.TemplateResponse(request, "auth/register.html", {"error": None})
 
 
-@router.post("/register")
+@router.post("/register", dependencies=[Depends(rate_limit_auth)])
 async def register(
     request: Request,
     email: str = Form(...),

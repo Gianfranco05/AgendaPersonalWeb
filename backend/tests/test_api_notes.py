@@ -110,3 +110,37 @@ async def test_api_update_nonexistent_note(api_auth_client):
 async def test_api_delete_nonexistent_note(api_auth_client):
     response = await api_auth_client.delete("/api/v1/notes/nonexistent-id")
     assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_api_notes_crud_full(api_auth_client):
+    create_resp = await api_auth_client.post("/api/v1/notes", json={
+        "title": "CRUD test",
+        "content": "CRUD content",
+        "color": "#ff0000",
+        "tag_names": ["test-tag"],
+    })
+    assert create_resp.status_code == 201
+    note = create_resp.json()
+    note_id = note["id"]
+    assert note["title"] == "CRUD test"
+    assert note["content"] == "CRUD content"
+    assert len(note["tags"]) == 1
+
+    get_resp = await api_auth_client.get("/api/v1/notes")
+    assert get_resp.status_code == 200
+    assert any(n["id"] == note_id for n in get_resp.json())
+
+    update_resp = await api_auth_client.put(f"/api/v1/notes/{note_id}", json={
+        "title": "Updated CRUD",
+        "is_pinned": True,
+    })
+    assert update_resp.status_code == 200
+    assert update_resp.json()["title"] == "Updated CRUD"
+    assert update_resp.json()["is_pinned"] is True
+
+    delete_resp = await api_auth_client.delete(f"/api/v1/notes/{note_id}")
+    assert delete_resp.status_code == 204
+
+    get_after = await api_auth_client.get("/api/v1/notes")
+    assert all(n["id"] != note_id for n in get_after.json())

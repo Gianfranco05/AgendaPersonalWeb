@@ -72,7 +72,7 @@
             </div>
 
             {% if tags %}
-            {% set note_tag_ids = [t.id for t in (note.tags if note and note.tags else [])] %}
+            {% set note_tag_ids = (note.tags if note and note.tags else []) | map(attribute='id') | list %}
             <div>
                 <label class="block text-sm font-medium text-[#374151] mb-3">Etiquetas</label>
                 <div class="flex flex-wrap gap-2">

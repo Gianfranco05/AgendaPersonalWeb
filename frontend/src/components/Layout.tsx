@@ -1,19 +1,28 @@
 import { useState } from 'react';
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, PiggyBank, StickyNote, ListTodo, Menu, X, LogOut } from 'lucide-react';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { LayoutDashboard, PiggyBank, StickyNote, ListTodo, Calendar, Target, Settings, Menu, X, LogOut, Dumbbell, Apple, Repeat, Sun, Moon } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
+import { useTheme } from '../context/ThemeContext';
 
 const navItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/finances', label: 'Finanzas', icon: PiggyBank },
+  { to: '/events', label: 'Eventos', icon: Calendar },
+  { to: '/goals', label: 'Metas', icon: Target },
+  { to: '/fitness', label: 'Fitness', icon: Dumbbell },
+  { to: '/nutrition', label: 'Nutrición', icon: Apple },
+  { to: '/habits', label: 'Hábitos', icon: Repeat },
   { to: '/notes', label: 'Notas', icon: StickyNote },
   { to: '/tasks', label: 'Tareas', icon: ListTodo },
+  { to: '/settings', label: 'Configuración', icon: Settings },
 ];
 
 export default function Layout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { user, logout } = useAuthStore();
+  const { theme, toggle } = useTheme();
   const navigate = useNavigate();
+  const location = useLocation();
 
   async function handleLogout() {
     await logout();
@@ -30,7 +39,7 @@ export default function Layout() {
     : 'U';
 
   return (
-    <div className="flex h-screen bg-gray-50 text-gray-900">
+    <div className="flex h-screen bg-brand-surface text-gray-900 dark:text-slate-100">
       {mobileOpen && (
         <div
           className="fixed inset-0 z-40 bg-black/50 lg:hidden"
@@ -40,7 +49,7 @@ export default function Layout() {
 
       <aside
         className={`
-          fixed inset-y-0 left-0 z-50 w-64 transform bg-[#7C3AED] text-white transition-transform duration-200 ease-in-out
+          fixed inset-y-0 left-0 z-50 w-64 transform bg-brand-charcoal text-white transition-transform duration-200 ease-in-out
           lg:static lg:translate-x-0
           ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}
         `}
@@ -64,10 +73,10 @@ export default function Layout() {
               end={to === '/'}
               onClick={() => setMobileOpen(false)}
               className={({ isActive }) =>
-                `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+                `relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${
                   isActive
-                    ? 'bg-white text-[#7C3AED]'
-                    : 'text-white/80 hover:bg-white/10 hover:text-white'
+                    ? 'bg-white/10 font-semibold text-white before:absolute before:left-0 before:top-1/2 before:h-5 before:w-[3px] before:-translate-y-1/2 before:rounded-full before:bg-brand-indigo'
+                    : 'font-medium text-white/80 hover:bg-white/10 hover:text-white'
                 }`
               }
             >
@@ -88,31 +97,46 @@ export default function Layout() {
                 <p className="truncate text-xs text-white/60">{user?.email ?? ''}</p>
               </div>
             </div>
-            <button
-              onClick={handleLogout}
-              className="ml-2 shrink-0 rounded-lg p-1.5 text-white/70 hover:bg-white/20 hover:text-white"
-              title="Cerrar sesión"
-            >
-              <LogOut size={16} />
-            </button>
+            <div className="ml-2 flex shrink-0 items-center gap-1">
+              <button
+                onClick={toggle}
+                className="rounded-lg p-1.5 text-white/70 hover:bg-white/20 hover:text-white"
+                title={theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}
+                aria-label="Cambiar tema"
+              >
+                {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+              </button>
+              <button
+                onClick={handleLogout}
+                className="rounded-lg p-1.5 text-white/70 hover:bg-white/20 hover:text-white"
+                title="Cerrar sesión"
+              >
+                <LogOut size={16} />
+              </button>
+            </div>
           </div>
         </div>
       </aside>
 
       <div className="flex flex-1 flex-col overflow-hidden">
-        <header className="flex h-16 items-center gap-4 border-b border-gray-200 bg-white px-4 lg:hidden">
+        <header className="flex h-16 items-center gap-4 border-b border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 lg:hidden">
           <button
             onClick={() => setMobileOpen(true)}
-            className="rounded-lg p-1 text-gray-600 hover:bg-gray-100"
+            className="rounded-lg p-1 text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700"
             aria-label="Abrir menú"
           >
             <Menu size={20} />
           </button>
-          <h1 className="text-lg font-bold text-[#7C3AED]">Vida Personal</h1>
+          <h1 className="text-lg font-bold text-brand-charcoal dark:text-slate-100">Vida Personal</h1>
         </header>
 
         <main className="flex-1 overflow-y-auto p-4 lg:p-6">
-          <Outlet />
+          {/* key por ruta: re-monta el wrapper y dispara la animación de entrada.
+              Solo opacidad: un transform aquí crearía un containing block y los
+              modales `fixed` quedarían atrapados dentro del área scrolleable. */}
+          <div key={location.pathname} className="animate-fade-in">
+            <Outlet />
+          </div>
         </main>
       </div>
     </div>

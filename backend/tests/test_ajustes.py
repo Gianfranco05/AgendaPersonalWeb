@@ -71,3 +71,28 @@ async def test_update_preferences_invalid_theme(auth_client, db_session):
     prefs = result.scalar_one_or_none()
     assert prefs is not None
     assert prefs.theme_color == "violet"
+
+
+@pytest.mark.asyncio
+async def test_api_v1_settings_get_and_update(api_auth_client):
+    get_resp = await api_auth_client.get("/api/v1/settings")
+    assert get_resp.status_code == 200
+    data = get_resp.json()
+    assert "currency" in data
+    assert "theme_color" in data
+    assert "date_format" in data
+    assert "google_calendar_id" in data
+
+    update_resp = await api_auth_client.put("/api/v1/settings", json={
+        "currency": "USD",
+        "theme_color": "blue",
+        "date_format": "MM/DD/YYYY",
+    })
+    assert update_resp.status_code == 200
+    updated = update_resp.json()
+    assert updated["currency"] == "USD"
+    assert updated["theme_color"] == "blue"
+    assert updated["date_format"] == "MM/DD/YYYY"
+
+    get_updated = await api_auth_client.get("/api/v1/settings")
+    assert get_updated.json()["currency"] == "USD"

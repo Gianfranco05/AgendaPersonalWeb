@@ -3,20 +3,23 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
-from sqlalchemy import text
+from prometheus_client import generate_latest
 
 from app.config import settings
-from app.database import engine, AsyncSessionLocal
+from app.database import engine
 from app.core.security import decode_access_token
 from app.core.error_handlers import register_error_handlers
+from app.core.sentry import init_sentry
+from app.core.correlation import CorrelationMiddleware
+from app.core.request_logging import RequestLoggingMiddleware
+from app.core.metrics import PrometheusMiddleware
+from app.core.http_security import SecurityHeadersMiddleware
+from app.core.logging_config import setup_logging
+from app.core.health import health_router
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-)
 logger = logging.getLogger(__name__)
 
 # Primary accent color used in all existing render functions
@@ -33,6 +36,9 @@ _THEME_COLORS = {
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    setup_logging()
+    init_sentry()
+    logger.info("Sentry initialized")
     yield
     await engine.dispose()
 
@@ -44,6 +50,19 @@ app = FastAPI(
 )
 
 register_error_handlers(app)
+
+app.add_middleware(CorrelationMiddleware)
+app.add_middleware(RequestLoggingMiddleware)
+app.add_middleware(PrometheusMiddleware)
+app.add_middleware(SecurityHeadersMiddleware)
+# Added last so it runs outermost — preflights get answered before anything else
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.allowed_origins_list,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR.parent / "static"
@@ -86,6 +105,11 @@ async def theme_middleware(request: Request, call_next):
     return Response(content=html, media_type="text/html", status_code=response.status_code, headers=headers)
 
 
+@app.get("/metrics")
+async def metrics():
+    return Response(content=generate_latest(), media_type="text/plain; version=0.0.4")
+
+
 @app.get("/")
 async def root(request: Request):
     if request.cookies.get(settings.JWT_COOKIE_NAME):
@@ -93,15 +117,7 @@ async def root(request: Request):
     return RedirectResponse(url="/auth/login", status_code=303)
 
 
-@app.get("/health")
-async def health():
-    try:
-        async with AsyncSessionLocal() as session:
-            await session.execute(text("SELECT 1"))
-        return {"status": "healthy", "database": "connected"}
-    except Exception as e:
-        return {"status": "unhealthy", "database": str(e)}
-
+app.include_router(health_router)
 
 from app.modules.auth.routes import router as auth_router
 from app.modules.auth.api_routes import router as auth_api_router

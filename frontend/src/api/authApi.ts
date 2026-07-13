@@ -14,3 +14,12 @@ export async function getMe(): Promise<AuthUser> {
   const { data } = await apiClient.get<AuthUser>('/auth/api/me');
   return data;
 }
+
+export async function register(name: string, email: string, password: string): Promise<void> {
+  await apiClient.post('/auth/api/register', { full_name: name, email, password });
+}
+
+export async function updateProfile(fullName: string): Promise<AuthUser> {
+  const { data } = await apiClient.patch<AuthUser>('/auth/api/me', { full_name: fullName });
+  return data;
+}

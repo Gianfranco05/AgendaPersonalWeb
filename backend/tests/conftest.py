@@ -5,12 +5,21 @@ from httpx import AsyncClient, ASGITransport
 
 from app.main import app
 from app.database import get_db
+from app.core.http_security import auth_rate_limiter
 from app.core.base import Base
 from app.core.security import hash_password
 from app.modules.auth.models import User
-from app.modules.finanzas.models import Category
+from app.modules.finanzas.models import Category, Transaction
+from app.modules.anotaciones.models import Note
 
 TEST_DATABASE_URL = "sqlite+aiosqlite://"
+
+
+@pytest_asyncio.fixture(autouse=True)
+async def _reset_rate_limiter():
+    # The limiter is process-global; without this, logins accumulate across tests
+    auth_rate_limiter.reset()
+    yield
 
 
 @pytest_asyncio.fixture(scope="function")
@@ -94,3 +103,54 @@ async def test_category(db_session, test_user):
     db_session.add(category)
     await db_session.commit()
     return category
+
+
+@pytest_asyncio.fixture
+async def seed_transactions(request, db_session, test_user):
+    count = getattr(request, "param", 5)
+    types = ["income", "expense"]
+    amounts = [1000, 2500, 500, 15000, 750, 3200, 180, 9990, 450, 12000]
+    dates = ["2025-01-15", "2025-02-20", "2025-03-10", "2025-04-05", "2025-05-25",
+             "2025-06-01", "2025-06-15", "2025-07-04", "2025-08-30", "2025-09-12"]
+    merchants = ["", "Jumbo", "Disco", "Coto", "MercadoLibre", "Netflix", "Spotify", ""]
+    methods = ["cash", "debit_card", "credit_card", "transfer"]
+    accounts = ["cash", "checking", "savings"]
+    txn_ids = []
+    for i in range(count):
+        t = Transaction(
+            user_id=test_user.id,
+            amount=amounts[i % len(amounts)],
+            type=types[i % 2],
+            transaction_date=dates[i % len(dates)],
+            product_name=f"Producto {i + 1}",
+            merchant_name=merchants[i % len(merchants)],
+            payment_method=methods[i % len(methods)],
+            account_type=accounts[i % 3],
+            notes=f"Nota de transacción {i + 1}" if i % 3 == 0 else None,
+        )
+        db_session.add(t)
+        txn_ids.append(t.id)
+    await db_session.commit()
+    return txn_ids
+
+
+@pytest_asyncio.fixture
+async def seed_notes(request, db_session, test_user):
+    count = getattr(request, "param", 5)
+    titles = ["Idea", "Lista compras", "Diario", "Recordatorio", "Meta",
+              "Libro", "Pelicula", "Proyecto", "Receta", "Idea viaje"]
+    colors = ["#ffffff", "#ff0000", "#00ff00", "#0000ff", "#ffff00"]
+    note_ids = []
+    for i in range(count):
+        n = Note(
+            user_id=test_user.id,
+            title=f"{titles[i % len(titles)]} {i + 1}",
+            content=f"Contenido de la nota número {i + 1}. " * 3,
+            is_pinned=i == 0,
+            is_archived=i > count - 3,
+            color=colors[i % len(colors)],
+        )
+        db_session.add(n)
+        note_ids.append(n.id)
+    await db_session.commit()
+    return note_ids

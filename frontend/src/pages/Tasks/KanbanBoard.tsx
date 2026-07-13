@@ -28,7 +28,7 @@ export default function KanbanBoard() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-gray-800">Tareas</h2>
+        <h2 className="text-2xl font-bold text-gray-800 dark:text-slate-100">Tareas</h2>
         <AddTaskForm onAdd={addTask} />
       </div>
 

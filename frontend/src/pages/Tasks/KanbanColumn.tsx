@@ -67,8 +67,8 @@ export default function KanbanColumn({ column, onUpdate, onDelete }: KanbanColum
             {provided.placeholder}
 
             {column.tasks.length === 0 && (
-              <div className="flex h-24 items-center justify-center rounded-lg border-2 border-dashed border-gray-200">
-                <span className="text-xs text-gray-400">Sin tareas</span>
+              <div className="flex h-24 items-center justify-center rounded-lg border-2 border-dashed border-gray-200 dark:border-slate-700">
+                <span className="text-xs text-gray-400 dark:text-slate-500">Sin tareas</span>
               </div>
             )}
           </div>

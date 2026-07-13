@@ -169,3 +169,40 @@ async def test_api_goals(auth_client, db_session):
     data = response.json()
     assert len(data) >= 1
     assert any(g["title"] == "API Goal" for g in data)
+
+
+@pytest.mark.asyncio
+async def test_api_v1_goals_create_and_list(api_auth_client):
+    create_resp = await api_auth_client.post("/api/v1/goals", json={
+        "title": "V1 API Goal",
+        "goal_type": "binary",
+        "description": "Test via v1 API",
+    })
+    assert create_resp.status_code == 201
+    goal = create_resp.json()
+    assert goal["title"] == "V1 API Goal"
+    assert goal["progress"] == 0.0
+
+    list_resp = await api_auth_client.get("/api/v1/goals")
+    assert list_resp.status_code == 200
+    assert any(g["title"] == "V1 API Goal" for g in list_resp.json())
+
+
+@pytest.mark.asyncio
+async def test_api_v1_goals_habit_checkin(api_auth_client):
+    create_resp = await api_auth_client.post("/api/v1/goals", json={
+        "title": "Habit Goal",
+        "goal_type": "progress",
+        "target_value": 10,
+        "unit": "veces",
+    })
+    goal_id = create_resp.json()["id"]
+
+    checkin = await api_auth_client.put(f"/api/v1/goals/{goal_id}/checkin", json={
+        "record_date": "2025-07-01",
+        "value": 1,
+    })
+    assert checkin.status_code == 200
+    updated = checkin.json()
+    assert updated["current_value"] == 1.0
+    assert updated["progress"] == 10.0

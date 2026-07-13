@@ -1,0 +1,54 @@
+# Producción — HTTP en http://localhost (sin certificados, funciona out-of-the-box).
+# Requiere un .env con SECRET_KEY fuerte (ver .env.prod.example).
+#   docker compose -f docker-compose.prod.yml up --build -d
+#
+# Para HTTPS con dominio real, sumar el override TLS:
+#   docker compose -f docker-compose.prod.yml -f docker-compose.prod.tls.yml up --build -d
+services:
+  backend:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL=sqlite+aiosqlite:///./data/vida_personal.db
+      - ENVIRONMENT=production
+      - SECRET_KEY=${SECRET_KEY:?SECRET_KEY is required}
+      - DEBUG=false
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-}
+    volumes:
+      - data:/app/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/livez')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    networks:
+      - lifeos-net
+
+  frontend:
+    build:
+      context: ./frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:80/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    networks:
+      - lifeos-net
+
+networks:
+  lifeos-net:
+    driver: bridge
+
+volumes:
+  data:

@@ -70,6 +70,24 @@ class FinanzasService:
             user_id, skip, limit, date_from, date_to, transaction_type, category_id
         )
 
+    async def get_transactions_paginated(
+        self,
+        user_id: UUID,
+        skip: int = 0,
+        limit: int = 50,
+        date_from: Optional[date] = None,
+        date_to: Optional[date] = None,
+        transaction_type: Optional[str] = None,
+        category_id: Optional[UUID] = None,
+    ) -> tuple:
+        items = await self.transaction_repo.get_all(
+            user_id, skip, limit, date_from, date_to, transaction_type, category_id
+        )
+        total = await self.transaction_repo.count(
+            user_id, date_from, date_to, transaction_type, category_id
+        )
+        return items, total
+
     async def get_transaction(self, transaction_id: UUID, user_id: UUID):
         return await self.transaction_repo.get_by_id(transaction_id, user_id)
 

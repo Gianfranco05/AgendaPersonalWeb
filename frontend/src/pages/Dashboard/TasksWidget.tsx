@@ -50,12 +50,12 @@ export default function TasksWidget() {
   ];
 
   return (
-    <div className="rounded-xl bg-white p-6 shadow-sm">
+    <div className="card-interactive rounded-xl bg-white dark:bg-slate-800 p-6 shadow-sm">
       <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-gray-800">Tareas</h3>
+        <h3 className="text-lg font-semibold text-gray-800 dark:text-slate-100">Tareas</h3>
         <Link
           to="/tasks"
-          className="flex items-center gap-1 text-xs font-medium text-[#7C3AED] hover:underline"
+          className="flex items-center gap-1 text-xs font-medium text-brand-indigo hover:underline"
         >
           Ver todas <ArrowRight size={14} />
         </Link>
@@ -66,7 +66,7 @@ export default function TasksWidget() {
           <div key={label} className={`flex items-center justify-between rounded-lg ${bg} p-3`}>
             <div className="flex items-center gap-2">
               <Icon size={16} className={color} />
-              <span className="text-sm font-medium text-gray-700">{label}</span>
+              <span className="text-sm font-medium text-gray-700 dark:text-slate-200">{label}</span>
             </div>
             <span className={`text-lg font-bold ${color}`}>{count}</span>
           </div>

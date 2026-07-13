@@ -2,9 +2,8 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Optional, Sequence
 
-from sqlalchemy import select, func, and_, or_
+from sqlalchemy import select, func, and_
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from app.modules.finanzas.enums import (
     TransactionType,
@@ -52,6 +51,33 @@ class TransactionRepository:
 
         result = await self.db.execute(query)
         return result.scalars().all()
+
+    async def count(
+        self,
+        user_id: str,
+        date_from: Optional[date] = None,
+        date_to: Optional[date] = None,
+        transaction_type: Optional[str] = None,
+        category_id: Optional[str] = None,
+    ) -> int:
+        query = select(func.count()).where(
+            and_(
+                Transaction.user_id == user_id,
+                Transaction.is_deleted == False,
+            )
+        )
+
+        if date_from:
+            query = query.where(Transaction.transaction_date >= date_from)
+        if date_to:
+            query = query.where(Transaction.transaction_date <= date_to)
+        if transaction_type:
+            query = query.where(Transaction.type == transaction_type)
+        if category_id:
+            query = query.where(Transaction.category_id == category_id)
+
+        result = await self.db.execute(query)
+        return result.scalar() or 0
 
     async def get_by_id(
         self, transaction_id: str, user_id: str

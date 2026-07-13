@@ -1,7 +1,6 @@
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel
 from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -19,21 +18,6 @@ from app.modules.anotaciones.schemas import (
 )
 
 router = APIRouter(prefix="/notes", tags=["notes"])
-
-
-class NoteCreateRequest(BaseModel):
-    title: str
-    content: str
-    color: str = "#ffffff"
-    tag_names: list[str] = []
-
-
-class NoteUpdateRequest(BaseModel):
-    title: Optional[str] = None
-    content: Optional[str] = None
-    color: Optional[str] = None
-    is_pinned: Optional[bool] = None
-    is_archived: Optional[bool] = None
 
 
 class NoteDetailResponse(NoteResponse):
@@ -58,7 +42,7 @@ async def list_notes(
 
 @router.post("", response_model=NoteDetailResponse, status_code=status.HTTP_201_CREATED)
 async def create_note(
-    data: NoteCreateRequest,
+    data: NoteCreate,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -94,7 +78,7 @@ async def create_note(
 @router.put("/{note_id}", response_model=NoteDetailResponse)
 async def update_note(
     note_id: str,
-    data: NoteUpdateRequest,
+    data: NoteUpdate,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -103,8 +87,7 @@ async def update_note(
     if not note:
         raise HTTPException(status_code=404, detail="Nota no encontrada")
 
-    note_update = NoteUpdate(**data.model_dump(exclude_unset=True))
-    updated = await service.update_note(note, note_update)
+    updated = await service.update_note(note, data)
     return updated
 
 

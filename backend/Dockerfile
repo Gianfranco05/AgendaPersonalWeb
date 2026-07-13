@@ -1,18 +1,33 @@
-FROM python:3.11-slim
+# Build stage
+FROM python:3.11-slim AS builder
 
 WORKDIR /app
 
-# Install system deps for psycopg2/asyncpg
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --user --no-cache-dir -r requirements.txt
 
-COPY . .
+# Runtime stage
+FROM python:3.11-slim AS runtime
 
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq5 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /root/.local /root/.local
+ENV PATH=/root/.local/bin:$PATH
+
+COPY alembic.ini .
+COPY migrations/ migrations/
+COPY app/ app/
+COPY gunicorn.conf.py .
+COPY entrypoint.sh .
 RUN chmod +x entrypoint.sh
 
 EXPOSE 8000

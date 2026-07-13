@@ -15,6 +15,7 @@ from app.modules.finanzas.schemas import (
     TransactionResponse,
     CategoryResponse,
 )
+from app.api.v1.schemas import PaginatedResponse
 
 router = APIRouter(prefix="/finance", tags=["finance"])
 
@@ -51,7 +52,7 @@ async def get_summary(
     )
 
 
-@router.get("/transactions", response_model=list[TransactionResponse])
+@router.get("/transactions", response_model=PaginatedResponse[TransactionResponse])
 async def list_transactions(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
@@ -63,7 +64,7 @@ async def list_transactions(
     db: AsyncSession = Depends(get_db),
 ):
     service = FinanzasService(db)
-    transactions = await service.get_transactions(
+    items, total = await service.get_transactions_paginated(
         user_id=current_user.id,
         skip=skip,
         limit=limit,
@@ -72,7 +73,13 @@ async def list_transactions(
         transaction_type=transaction_type,
         category_id=category_id,
     )
-    return transactions
+    page = (skip // limit) + 1
+    return PaginatedResponse(
+        items=items,
+        total=total,
+        page=page,
+        page_size=limit,
+    )
 
 
 @router.post("/transactions", response_model=TransactionResponse, status_code=status.HTTP_201_CREATED)

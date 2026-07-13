@@ -1,0 +1,9 @@
+node_modules/
+.git/
+.env
+.env.local
+dist/
+.vscode/
+tests/
+__tests__/
+*.md

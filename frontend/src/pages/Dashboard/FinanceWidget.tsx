@@ -21,7 +21,7 @@ export default function FinanceWidget() {
       ]);
       if (!cancelled) {
         setSummary(summaryData);
-        setTransactions(txData.transactions.slice(0, 5));
+        setTransactions(txData.items.slice(0, 5));
         setLoading(false);
       }
     }
@@ -35,8 +35,8 @@ export default function FinanceWidget() {
 
   if (!summary) {
     return (
-      <div className="rounded-xl bg-white p-6 shadow-sm">
-        <p className="text-sm text-gray-400">No hay datos financieros aún</p>
+      <div className="card-interactive rounded-xl bg-white dark:bg-slate-800 p-6 shadow-sm">
+        <p className="text-sm text-gray-400 dark:text-slate-500">No hay datos financieros aún</p>
       </div>
     );
   }
@@ -45,12 +45,12 @@ export default function FinanceWidget() {
   const isPositive = balance >= 0;
 
   return (
-    <div className="rounded-xl bg-white p-6 shadow-sm">
+    <div className="card-interactive rounded-xl bg-white dark:bg-slate-800 p-6 shadow-sm">
       <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-gray-800">Finanzas</h3>
+        <h3 className="text-lg font-semibold text-gray-800 dark:text-slate-100">Finanzas</h3>
         <Link
           to="/finances"
-          className="flex items-center gap-1 text-xs font-medium text-[#7C3AED] hover:underline"
+          className="flex items-center gap-1 text-xs font-medium text-brand-indigo hover:underline"
         >
           Ver todo <ArrowRight size={14} />
         </Link>
@@ -58,7 +58,7 @@ export default function FinanceWidget() {
 
       {/* Balance */}
       <div className="mb-4">
-        <span className="text-xs text-gray-500">Balance actual</span>
+        <span className="text-xs text-gray-500 dark:text-slate-400">Balance actual</span>
         <p className={`text-2xl font-bold ${isPositive ? 'text-emerald-500' : 'text-rose-500'}`}>
           {isPositive ? '+' : '-'}${Math.abs(balance).toLocaleString('es-AR')}
         </p>
@@ -81,26 +81,26 @@ export default function FinanceWidget() {
             <span>Egresos</span>
           </div>
           <p className="mt-1 text-lg font-semibold text-rose-600">
-            ${summary.total_expense.toLocaleString('es-AR')}
+            ${(summary.total_expenses ?? 0).toLocaleString('es-AR')}
           </p>
         </div>
       </div>
 
       {/* Last 5 transactions */}
       <div>
-        <h4 className="mb-2 text-xs font-medium text-gray-500">Últimas transacciones</h4>
+        <h4 className="mb-2 text-xs font-medium text-gray-500 dark:text-slate-400">Últimas transacciones</h4>
         {transactions.length === 0 ? (
-          <p className="text-xs text-gray-400">Sin transacciones</p>
+          <p className="text-xs text-gray-400 dark:text-slate-500">Sin transacciones</p>
         ) : (
           <ul className="space-y-1.5">
             {transactions.map((tx) => (
               <li
                 key={tx.id}
-                className="flex items-center justify-between rounded-md bg-gray-50 px-3 py-1.5 text-xs"
+                className="flex items-center justify-between rounded-md bg-gray-50 dark:bg-slate-800/60 px-3 py-1.5 text-xs"
               >
                 <div className="flex flex-col">
-                  <span className="font-medium text-gray-700">{tx.product_name}</span>
-                  <span className="text-gray-400">{tx.transaction_date}</span>
+                  <span className="font-medium text-gray-700 dark:text-slate-200">{tx.product_name}</span>
+                  <span className="text-gray-400 dark:text-slate-500">{tx.transaction_date}</span>
                 </div>
                 <span className={`font-semibold ${tx.type === 'income' ? 'text-emerald-500' : 'text-rose-500'}`}>
                   {tx.type === 'income' ? '+' : '-'}${tx.amount.toLocaleString('es-AR')}

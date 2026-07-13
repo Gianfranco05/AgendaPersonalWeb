@@ -1,4 +1,5 @@
-import useSWR, { mutate as globalMutate } from 'swr';
+import { mutate as globalMutate } from 'swr';
+import { useApiSWR } from './useApiSWR';
 import {
   fetchNotes,
   fetchTags,
@@ -12,11 +13,11 @@ const NOTES_KEY = 'notes';
 const TAGS_KEY = 'notes/tags';
 
 export function useNotes() {
-  return useSWR(NOTES_KEY, fetchNotes);
+  return useApiSWR(NOTES_KEY, fetchNotes);
 }
 
 export function useTags() {
-  return useSWR(TAGS_KEY, fetchTags);
+  return useApiSWR(TAGS_KEY, fetchTags);
 }
 
 async function invalidateNotes() {

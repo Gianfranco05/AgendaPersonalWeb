@@ -13,8 +13,8 @@ export default function TagFilter({ tags, activeTag, onSelect }: TagFilterProps)
         onClick={() => onSelect(null)}
         className={`flex-shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${
           activeTag === null
-            ? 'bg-gray-200 text-gray-700'
-            : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+            ? 'bg-gray-200 text-gray-700 dark:text-slate-200'
+            : 'bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-slate-400 hover:bg-gray-200 dark:hover:bg-slate-600'
         }`}
       >
         Todas

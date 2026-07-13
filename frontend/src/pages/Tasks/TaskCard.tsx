@@ -53,8 +53,8 @@ export default function TaskCard({ task, index, onUpdate, onDelete }: TaskCardPr
           ref={provided.innerRef}
           {...provided.draggableProps}
           {...provided.dragHandleProps}
-          className={`group rounded-lg border border-gray-200 bg-white p-3 shadow-sm transition-shadow ${
-            snapshot.isDragging ? 'shadow-lg ring-1 ring-[#7C3AED]/30' : 'hover:shadow-md'
+          className={`group rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3 shadow-sm transition-shadow ${
+            snapshot.isDragging ? 'shadow-lg ring-1 ring-brand-indigo/30' : 'hover:shadow-md'
           }`}
         >
           {/* Title */}
@@ -72,19 +72,19 @@ export default function TaskCard({ task, index, onUpdate, onDelete }: TaskCardPr
                       setEditingTitle(false);
                     }
                   }}
-                  className="flex-1 rounded border border-[#7C3AED] px-2 py-0.5 text-sm outline-none"
+                  className="flex-1 rounded border border-brand-indigo px-2 py-0.5 text-sm outline-none"
                 />
                 <button onClick={saveTitle} className="rounded p-0.5 text-emerald-500 hover:bg-emerald-50">
                   <Check size={14} />
                 </button>
-                <button onClick={() => { setTitleDraft(task.title); setEditingTitle(false); }} className="rounded p-0.5 text-gray-400 hover:bg-gray-100">
+                <button onClick={() => { setTitleDraft(task.title); setEditingTitle(false); }} className="rounded p-0.5 text-gray-400 dark:text-slate-500 hover:bg-gray-100 dark:hover:bg-slate-700">
                   <X size={14} />
                 </button>
               </div>
             ) : (
               <span
                 onClick={() => { setTitleDraft(task.title); setEditingTitle(true); }}
-                className="flex-1 cursor-text text-sm font-medium text-gray-700"
+                className="flex-1 cursor-text text-sm font-medium text-gray-700 dark:text-slate-200"
               >
                 {task.title}
               </span>
@@ -94,7 +94,7 @@ export default function TaskCard({ task, index, onUpdate, onDelete }: TaskCardPr
               {!editingTitle && (
                 <button
                   onClick={() => { setTitleDraft(task.title); setEditingTitle(true); }}
-                  className="rounded p-0.5 text-gray-400 hover:bg-gray-100 hover:text-[#7C3AED]"
+                  className="rounded p-0.5 text-gray-400 dark:text-slate-500 hover:bg-gray-100 dark:hover:bg-slate-700 hover:text-brand-indigo"
                   title="Editar título"
                 >
                   <Pencil size={12} />
@@ -102,7 +102,7 @@ export default function TaskCard({ task, index, onUpdate, onDelete }: TaskCardPr
               )}
               <button
                 onClick={handleDelete}
-                className="rounded p-0.5 text-gray-400 hover:bg-rose-50 hover:text-rose-500"
+                className="rounded p-0.5 text-gray-400 dark:text-slate-500 hover:bg-rose-50 hover:text-rose-500"
                 title="Eliminar"
               >
                 <Trash2 size={12} />
@@ -117,14 +117,14 @@ export default function TaskCard({ task, index, onUpdate, onDelete }: TaskCardPr
                 ref={descRef}
                 value={descDraft}
                 onChange={(e) => setDescDraft(e.target.value)}
-                className="w-full resize-none rounded border border-[#7C3AED] px-2 py-1 text-xs outline-none"
+                className="w-full resize-none rounded border border-brand-indigo px-2 py-1 text-xs outline-none"
                 rows={3}
               />
               <div className="mt-1 flex justify-end gap-1">
                 <button onClick={saveDesc} className="rounded px-2 py-0.5 text-xs font-medium text-emerald-600 hover:bg-emerald-50">
                   Guardar
                 </button>
-                <button onClick={() => { setDescDraft(task.description); setEditingDesc(false); }} className="rounded px-2 py-0.5 text-xs text-gray-500 hover:bg-gray-100">
+                <button onClick={() => { setDescDraft(task.description); setEditingDesc(false); }} className="rounded px-2 py-0.5 text-xs text-gray-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-700">
                   Cancelar
                 </button>
               </div>
@@ -132,14 +132,14 @@ export default function TaskCard({ task, index, onUpdate, onDelete }: TaskCardPr
           ) : task.description ? (
             <p
               onClick={() => { setDescDraft(task.description); setEditingDesc(true); }}
-              className="mt-1.5 cursor-text text-xs leading-relaxed text-gray-500"
+              className="mt-1.5 cursor-text text-xs leading-relaxed text-gray-500 dark:text-slate-400"
             >
               {task.description}
             </p>
           ) : (
             <button
               onClick={() => { setDescDraft(''); setEditingDesc(true); }}
-              className="mt-1.5 text-xs text-gray-400 hover:text-[#7C3AED]"
+              className="mt-1.5 text-xs text-gray-400 dark:text-slate-500 hover:text-brand-indigo"
             >
               + Agregar descripción
             </button>

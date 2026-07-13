@@ -27,7 +27,7 @@ interface Props {
 }
 
 const inputCls =
-  'w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-[#7C3AED] focus:outline-none focus:ring-1 focus:ring-[#7C3AED]';
+  'w-full rounded-lg border border-gray-200 dark:border-slate-700 px-3 py-2 text-sm focus:border-brand-indigo focus:outline-none focus:ring-1 focus:ring-brand-indigo';
 const errorCls = 'mt-1 text-xs text-red-500';
 
 export default function TransactionModal({ transaction, txParams, onClose, onSaved }: Props) {
@@ -61,7 +61,7 @@ export default function TransactionModal({ transaction, txParams, onClose, onSav
       reset({
         type: transaction.type,
         amount: transaction.amount,
-        currency: transaction.currency,
+        currency: transaction.currency === 'USD' ? 'USD' : 'ARS',
         transaction_date: transaction.transaction_date,
         product_name: transaction.product_name,
         merchant_name: transaction.merchant_name ?? '',
@@ -77,16 +77,16 @@ export default function TransactionModal({ transaction, txParams, onClose, onSav
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-lg rounded-xl bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
-          <h3 className="text-lg font-semibold text-gray-800">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 px-4 py-8 sm:py-12">
+      <div className="w-full max-w-lg rounded-xl bg-white dark:bg-slate-800 shadow-xl">
+        <div className="flex items-center justify-between border-b border-gray-100 dark:border-slate-800 px-6 py-4">
+          <h3 className="text-lg font-semibold text-gray-800 dark:text-slate-100">
             {transaction ? 'Editar transacción' : 'Nueva transacción'}
           </h3>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+            className="rounded-lg p-1 text-gray-400 dark:text-slate-500 hover:bg-gray-100 dark:hover:bg-slate-700 hover:text-gray-600 dark:hover:text-slate-200"
           >
             <X size={20} />
           </button>
@@ -95,19 +95,19 @@ export default function TransactionModal({ transaction, txParams, onClose, onSav
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 px-6 py-4">
           {/* Type toggle */}
           <div>
-            <label className="mb-1 block text-xs font-medium text-gray-500">Tipo</label>
+            <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-slate-400">Tipo</label>
             <Controller
               name="type"
               control={control}
               render={({ field }) => (
-                <div className="flex rounded-lg border border-gray-200 p-0.5">
+                <div className="flex rounded-lg border border-gray-200 dark:border-slate-700 p-0.5">
                   <button
                     type="button"
                     onClick={() => field.onChange('income')}
                     className={`flex-1 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
                       txType === 'income'
                         ? 'bg-emerald-500 text-white'
-                        : 'text-gray-500 hover:text-gray-700'
+                        : 'text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-100'
                     }`}
                   >
                     Ingreso
@@ -118,7 +118,7 @@ export default function TransactionModal({ transaction, txParams, onClose, onSav
                     className={`flex-1 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
                       txType === 'expense'
                         ? 'bg-rose-500 text-white'
-                        : 'text-gray-500 hover:text-gray-700'
+                        : 'text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-100'
                     }`}
                   >
                     Egreso
@@ -130,7 +130,7 @@ export default function TransactionModal({ transaction, txParams, onClose, onSav
 
           {/* Amount */}
           <div>
-            <label className="mb-1 block text-xs font-medium text-gray-500">Monto</label>
+            <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-slate-400">Monto</label>
             <input
               {...register('amount', { valueAsNumber: true })}
               type="number"
@@ -143,7 +143,7 @@ export default function TransactionModal({ transaction, txParams, onClose, onSav
 
           {/* Date */}
           <div>
-            <label className="mb-1 block text-xs font-medium text-gray-500">Fecha</label>
+            <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-slate-400">Fecha</label>
             <input
               {...register('transaction_date')}
               type="date"
@@ -156,7 +156,7 @@ export default function TransactionModal({ transaction, txParams, onClose, onSav
 
           {/* Description */}
           <div>
-            <label className="mb-1 block text-xs font-medium text-gray-500">Descripción</label>
+            <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-slate-400">Descripción</label>
             <input
               {...register('product_name')}
               type="text"
@@ -168,7 +168,7 @@ export default function TransactionModal({ transaction, txParams, onClose, onSav
 
           {/* Merchant */}
           <div>
-            <label className="mb-1 block text-xs font-medium text-gray-500">Comercio</label>
+            <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-slate-400">Comercio</label>
             <input
               {...register('merchant_name')}
               type="text"
@@ -179,7 +179,7 @@ export default function TransactionModal({ transaction, txParams, onClose, onSav
 
           {/* Category */}
           <div>
-            <label className="mb-1 block text-xs font-medium text-gray-500">Categoría</label>
+            <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-slate-400">Categoría</label>
             <select {...register('category_name')} className={inputCls}>
               <option value="">Sin categoría</option>
               {categories.map((cat) => (
@@ -192,7 +192,7 @@ export default function TransactionModal({ transaction, txParams, onClose, onSav
 
           {/* Payment method */}
           <div>
-            <label className="mb-1 block text-xs font-medium text-gray-500">Método de pago</label>
+            <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-slate-400">Método de pago</label>
             <select {...register('payment_method')} className={inputCls}>
               <option value="Efectivo">Efectivo</option>
               <option value="Tarjeta">Tarjeta</option>
@@ -209,14 +209,14 @@ export default function TransactionModal({ transaction, txParams, onClose, onSav
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50"
+              className="rounded-lg border border-gray-200 dark:border-slate-700 px-4 py-2 text-sm font-medium text-gray-600 dark:text-slate-300 transition-colors hover:bg-gray-50 dark:hover:bg-slate-700/50"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="rounded-lg bg-[#7C3AED] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#6D28D9] disabled:opacity-50"
+              className="rounded-lg bg-brand-charcoal px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-charcoal-hover disabled:opacity-50"
             >
               {isSubmitting ? 'Guardando…' : transaction ? 'Actualizar' : 'Crear'}
             </button>

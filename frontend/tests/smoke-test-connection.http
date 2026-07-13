@@ -1,0 +1,22 @@
+### Smoke Test: Conexión al backend
+### Requisito: Backend corriendo en http://localhost:8000
+
+### GET /api/v1/finance/summary
+GET http://localhost:8000/api/v1/finance/summary
+Accept: application/json
+
+### GET /api/v1/finance/transactions
+GET http://localhost:8000/api/v1/finance/transactions?page=1&per_page=5
+Accept: application/json
+
+### GET /api/v1/notes
+GET http://localhost:8000/api/v1/notes
+Accept: application/json
+
+### GET /api/v1/tags
+GET http://localhost:8000/api/v1/tags
+Accept: application/json
+
+### GET /api/v1/events
+GET http://localhost:8000/api/v1/events
+Accept: application/json

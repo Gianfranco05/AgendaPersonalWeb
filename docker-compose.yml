@@ -13,7 +13,7 @@ services:
       - SECRET_KEY=dev-secret-key-change-in-production
       - DEBUG=true
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/livez')"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -26,10 +26,9 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     ports:
-      - "5173:5173"
+      - "5173:80"
     volumes:
-      - ./frontend/src:/app/src
-      - ./frontend/public:/app/public
+      - ./frontend/nginx.dev.conf:/etc/nginx/conf.d/default.conf
     environment:
       - VITE_PROXY_TARGET=http://backend:8000
     depends_on:
