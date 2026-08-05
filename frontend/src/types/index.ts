@@ -44,10 +44,15 @@ export interface CalendarEvent {
   location?: string;
 }
 
+export type TaskPriority = 'alta' | 'media' | 'baja';
+
 export interface Task {
   id: string;
   title: string;
   description: string;
+  area: string;
+  priority: TaskPriority;
+  due_date: string | null;
   status: 'pending' | 'in_progress' | 'completed';
   order: number;
 }
@@ -72,6 +77,29 @@ export interface TransactionsResponse {
   page_size: number;
 }
 
+export interface Budget {
+  id: string;
+  category_id: string;
+  amount: number;
+  period: string;
+  alert_threshold: number;
+}
+
+export interface BudgetProgress extends Budget {
+  category_name: string;
+  spent: number;
+  remaining: number;
+  percentage: number;
+}
+
+export interface Settings {
+  currency: string;
+  theme_color: string;
+  date_format: string;
+  google_calendar_id: string;
+  google_connected: boolean;
+}
+
 export type TaskStatus = 'pending' | 'in_progress' | 'completed';
 
 export interface KanbanColumn {
@@ -84,7 +112,7 @@ export interface Goal {
   id: string;
   title: string;
   description: string | null;
-  goal_type: 'binary' | 'progress';
+  goal_type: 'binary' | 'progress' | 'metric' | 'savings';
   target_value: number;
   current_value: number;
   unit: string | null;
@@ -92,6 +120,22 @@ export interface Goal {
   color: string;
   icon: string;
   is_completed: boolean;
+}
+
+export interface HabitRecord {
+  id: string;
+  goal_id: string;
+  record_date: string;
+  value: number;
+  notes: string | null;
+}
+
+export interface MonthlySummaryItem {
+  goal_id: string;
+  title: string;
+  unit: string | null;
+  total: number;
+  average: number;
 }
 
 // ── Fitness ──

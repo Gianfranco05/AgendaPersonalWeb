@@ -13,7 +13,13 @@ from app.modules.finanzas.schemas import (
     TransactionCreate,
     TransactionUpdate,
     TransactionResponse,
+    CategoryCreate,
+    CategoryUpdate,
     CategoryResponse,
+    BudgetCreate,
+    BudgetUpdate,
+    BudgetResponse,
+    BudgetProgress,
 )
 from app.api.v1.schemas import PaginatedResponse
 
@@ -132,3 +138,94 @@ async def list_categories(
     service = FinanzasService(db)
     categories = await service.get_categories(current_user.id)
     return categories
+
+
+@router.post("/categories", response_model=CategoryResponse, status_code=status.HTTP_201_CREATED)
+async def create_category(
+    data: CategoryCreate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    service = FinanzasService(db)
+    return await service.create_category(current_user.id, data)
+
+
+@router.put("/categories/{category_id}", response_model=CategoryResponse)
+async def update_category(
+    category_id: str,
+    data: CategoryUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    service = FinanzasService(db)
+    category = await service.get_category(category_id, current_user.id)
+    if not category:
+        raise HTTPException(status_code=404, detail="Categoría no encontrada")
+
+    update_data = data.model_dump(exclude_unset=True)
+    return await service.update_category(category, update_data)
+
+
+@router.delete("/categories/{category_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_category(
+    category_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    service = FinanzasService(db)
+    category = await service.get_category(category_id, current_user.id)
+    if not category:
+        raise HTTPException(status_code=404, detail="Categoría no encontrada")
+
+    await service.delete_category(category)
+
+
+@router.get("/budgets", response_model=list[BudgetProgress])
+async def list_budgets(
+    year: int,
+    month: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    service = FinanzasService(db)
+    return await service.get_budgets_with_progress(current_user.id, year, month)
+
+
+@router.post("/budgets", response_model=BudgetResponse, status_code=status.HTTP_201_CREATED)
+async def create_budget(
+    data: BudgetCreate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    service = FinanzasService(db)
+    return await service.create_budget(current_user.id, data)
+
+
+@router.put("/budgets/{budget_id}", response_model=BudgetResponse)
+async def update_budget(
+    budget_id: str,
+    data: BudgetUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    service = FinanzasService(db)
+    budget = await service.get_budget(budget_id, current_user.id)
+    if not budget:
+        raise HTTPException(status_code=404, detail="Presupuesto no encontrado")
+
+    update_data = data.model_dump(exclude_unset=True)
+    return await service.update_budget(budget, update_data)
+
+
+@router.delete("/budgets/{budget_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_budget(
+    budget_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    service = FinanzasService(db)
+    budget = await service.get_budget(budget_id, current_user.id)
+    if not budget:
+        raise HTTPException(status_code=404, detail="Presupuesto no encontrado")
+
+    await service.delete_budget(budget)

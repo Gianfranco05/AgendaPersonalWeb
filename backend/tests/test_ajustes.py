@@ -96,3 +96,29 @@ async def test_api_v1_settings_get_and_update(api_auth_client):
 
     get_updated = await api_auth_client.get("/api/v1/settings")
     assert get_updated.json()["currency"] == "USD"
+
+
+@pytest.mark.asyncio
+async def test_api_v1_settings_google_not_connected_by_default(api_auth_client):
+    response = await api_auth_client.get("/api/v1/settings")
+    assert response.status_code == 200
+    assert response.json()["google_connected"] is False
+
+
+@pytest.mark.asyncio
+async def test_api_v1_google_sync_requires_connection(api_auth_client):
+    response = await api_auth_client.post("/api/v1/settings/google/sync")
+    assert response.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_api_v1_google_disconnect_is_idempotent(api_auth_client):
+    response = await api_auth_client.post("/api/v1/settings/google/disconnect")
+    assert response.status_code == 200
+    assert response.json()["google_connected"] is False
+
+
+@pytest.mark.asyncio
+async def test_api_v1_settings_requires_auth(client):
+    response = await client.get("/api/v1/settings")
+    assert response.status_code == 401

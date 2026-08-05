@@ -10,6 +10,8 @@ from app.database import get_db
 from app.core.dependencies import get_current_user
 from app.modules.auth.models import User
 from app.modules.metas.models import Goal, HabitRecord
+from app.modules.metas.service import GoalsService
+from app.modules.metas.schemas import GoalUpdate
 
 router = APIRouter(prefix="/goals", tags=["goals"])
 
@@ -44,10 +46,40 @@ class GoalCreate(BaseModel):
     end_date: Optional[date] = None
 
 
+class GoalUpdateRequest(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    goal_type: Optional[str] = None
+    target_value: Optional[float] = None
+    unit: Optional[str] = None
+    color: Optional[str] = None
+    icon: Optional[str] = None
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
+
+
 class HabitCheckIn(BaseModel):
     record_date: date
     value: float = 1.0
     notes: Optional[str] = None
+
+
+class HabitRecordResponse(BaseModel):
+    id: str
+    goal_id: str
+    record_date: date
+    value: float
+    notes: Optional[str] = None
+
+    model_config = {"from_attributes": True}
+
+
+class MonthlySummaryResponse(BaseModel):
+    goal_id: str
+    title: str
+    unit: Optional[str] = None
+    total: float
+    average: float
 
 
 def _calc_progress(goal: Goal) -> float:
@@ -126,6 +158,95 @@ async def create_goal(
         is_completed=goal.is_completed,
         progress=_calc_progress(goal),
     )
+
+
+@router.put("/{goal_id}", response_model=GoalResponse)
+async def update_goal(
+    goal_id: str,
+    data: GoalUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    service = GoalsService(db)
+    goal = await service.get_goal(current_user.id, goal_id)
+    if not goal:
+        raise HTTPException(status_code=404, detail="Meta no encontrada")
+    updated = await service.update_goal(
+        goal, GoalUpdate(**data.model_dump(exclude_unset=True))
+    )
+    return GoalResponse(
+        id=updated.id,
+        title=updated.title,
+        description=updated.description,
+        goal_type=updated.goal_type,
+        target_value=updated.target_value,
+        current_value=updated.current_value,
+        unit=updated.unit,
+        color=updated.color,
+        icon=updated.icon,
+        start_date=updated.start_date,
+        end_date=updated.end_date,
+        is_completed=updated.is_completed,
+        progress=_calc_progress(updated),
+    )
+
+
+@router.delete("/{goal_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_goal(
+    goal_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    service = GoalsService(db)
+    goal = await service.get_goal(current_user.id, goal_id)
+    if not goal:
+        raise HTTPException(status_code=404, detail="Meta no encontrada")
+    await service.delete_goal(goal)
+
+
+@router.get("/summary/monthly", response_model=list[MonthlySummaryResponse])
+async def monthly_summary(
+    year: int,
+    month: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    service = GoalsService(db)
+    summary = await service.get_monthly_summary(current_user.id, year, month)
+    return [MonthlySummaryResponse(**item.model_dump()) for item in summary]
+
+
+@router.get("/{goal_id}/records", response_model=list[HabitRecordResponse])
+async def list_habit_records(
+    goal_id: str,
+    year: int,
+    month: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    service = GoalsService(db)
+    goal = await service.get_goal(current_user.id, goal_id)
+    if not goal:
+        raise HTTPException(status_code=404, detail="Meta no encontrada")
+    records = await service.get_month_records(goal_id, year, month)
+    return records
+
+
+@router.post("/{goal_id}/records", response_model=HabitRecordResponse, status_code=status.HTTP_201_CREATED)
+async def upsert_habit_record(
+    goal_id: str,
+    data: HabitCheckIn,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    service = GoalsService(db)
+    goal = await service.get_goal(current_user.id, goal_id)
+    if not goal:
+        raise HTTPException(status_code=404, detail="Meta no encontrada")
+    record = await service.set_habit_value(
+        current_user.id, goal_id, data.record_date, data.value, data.notes
+    )
+    return record
 
 
 @router.put("/{goal_id}/checkin", response_model=GoalResponse)

@@ -7,6 +7,7 @@ vi.mock('../NotesWidget', () => ({ default: () => <div>NotesWidget</div> }))
 vi.mock('../TasksWidget', () => ({ default: () => <div>TasksWidget</div> }))
 vi.mock('../EventsWidget', () => ({ default: () => <div>EventsWidget</div> }))
 vi.mock('../InfraWidget', () => ({ default: () => <div>InfraWidget</div> }))
+vi.mock('../HabitsWidget', () => ({ default: () => <div>HabitsWidget</div> }))
 
 import DashboardPage from '../DashboardPage'
 

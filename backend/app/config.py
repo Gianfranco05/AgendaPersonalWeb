@@ -52,6 +52,12 @@ class Settings(BaseSettings):
     GOOGLE_CLIENT_SECRET: str = ""
     GOOGLE_REDIRECT_URI: str = "http://localhost:8000/ajustes/google/callback"
 
+    # A donde redirigir tras el callback de Google OAuth. Vacio = ruta relativa
+    # (correcto en prod, donde nginx sirve frontend y backend desde el mismo origen).
+    # En dev local (frontend y backend en puertos distintos) hay que setear esto a
+    # http://localhost:5173 para volver a la SPA en vez de quedarse en el backend.
+    FRONTEND_URL: str = ""
+
     @property
     def is_production(self) -> bool:
         return self.ENVIRONMENT.lower() == "production"

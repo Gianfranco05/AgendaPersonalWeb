@@ -59,3 +59,21 @@ class GoalProgress(BaseModel):
     target_value: Optional[float]
     percentage: float
     streak: int
+
+
+class HabitRecordOut(BaseModel):
+    id: str
+    goal_id: str
+    record_date: date
+    value: float
+    notes: Optional[str] = None
+
+    model_config = {"from_attributes": True}
+
+
+class MonthlySummaryItem(BaseModel):
+    goal_id: str
+    title: str
+    unit: Optional[str] = None
+    total: float
+    average: float

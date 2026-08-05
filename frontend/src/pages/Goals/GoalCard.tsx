@@ -113,13 +113,23 @@ export default function GoalCard({ goal, onEdit, onDelete, onCheckIn }: Props) {
         </div>
       </div>
 
-      <button
-        onClick={() => onCheckIn(goal)}
-        className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg border border-gray-200 dark:border-slate-700 px-3 py-2 text-sm font-medium text-gray-600 dark:text-slate-300 transition-colors hover:border-brand-indigo hover:text-brand-indigo"
-      >
-        <CheckCircle size={16} />
-        Check-in
-      </button>
+      {goal.goal_type === 'metric' ? (
+        <p className="mt-4 text-center text-xs text-gray-400 dark:text-slate-500">
+          Se registra desde Hábitos → Registro mensual
+        </p>
+      ) : goal.goal_type === 'savings' ? (
+        <p className="mt-4 text-center text-xs text-gray-400 dark:text-slate-500">
+          Se gestiona desde Finanzas → Ahorro
+        </p>
+      ) : (
+        <button
+          onClick={() => onCheckIn(goal)}
+          className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg border border-gray-200 dark:border-slate-700 px-3 py-2 text-sm font-medium text-gray-600 dark:text-slate-300 transition-colors hover:border-brand-indigo hover:text-brand-indigo"
+        >
+          <CheckCircle size={16} />
+          Check-in
+        </button>
+      )}
     </div>
   );
 }

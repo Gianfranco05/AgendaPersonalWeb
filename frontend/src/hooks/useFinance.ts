@@ -7,11 +7,22 @@ import {
   createTransaction,
   updateTransaction,
   deleteTransaction,
+  fetchBudgets,
+  createBudget,
+  updateBudget,
+  deleteBudget,
+  createCategory,
+  updateCategory,
+  deleteCategory,
 } from '../api/endpoints';
-import type { Transaction } from '../types';
+import type { Transaction, Budget, Category } from '../types';
 
 const SUMMARY_KEY = 'finance/summary';
 const CATEGORIES_KEY = 'finance/categories';
+
+function budgetsKey(year: number, month: number) {
+  return ['finance/budgets', year, month] as const;
+}
 
 function txKey(params: Parameters<typeof fetchTransactions>[0]) {
   return ['finance/transactions', JSON.stringify(params)] as const;
@@ -55,4 +66,41 @@ export async function removeTransaction(
 ) {
   await deleteTransaction(id);
   await invalidateFinance(txParams);
+}
+
+export function useBudgets(year: number, month: number) {
+  return useApiSWR(budgetsKey(year, month), () => fetchBudgets(year, month));
+}
+
+export async function saveBudget(
+  existing: Budget | null,
+  data: Omit<Budget, 'id'>,
+  year: number,
+  month: number,
+) {
+  if (existing) {
+    await updateBudget(existing.id, data);
+  } else {
+    await createBudget(data);
+  }
+  await globalMutate(budgetsKey(year, month));
+}
+
+export async function removeBudget(id: string, year: number, month: number) {
+  await deleteBudget(id);
+  await globalMutate(budgetsKey(year, month));
+}
+
+export async function saveCategory(existing: Category | null, data: Omit<Category, 'id'>) {
+  if (existing) {
+    await updateCategory(existing.id, data);
+  } else {
+    await createCategory(data);
+  }
+  await globalMutate(CATEGORIES_KEY);
+}
+
+export async function removeCategory(id: string) {
+  await deleteCategory(id);
+  await globalMutate(CATEGORIES_KEY);
 }

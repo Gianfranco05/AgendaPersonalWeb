@@ -137,6 +137,28 @@ class TransactionRepository:
             "balance": total_income - total_expenses,
         }
 
+    async def get_expenses_by_category_in_range(
+        self, user_id: str, date_from: date, date_to: date
+    ) -> dict:
+        result = await self.db.execute(
+            select(
+                Transaction.category_id,
+                func.coalesce(func.sum(Transaction.amount), 0).label("total"),
+            )
+            .where(
+                and_(
+                    Transaction.user_id == user_id,
+                    Transaction.is_deleted == False,
+                    Transaction.type == TransactionType.EXPENSE,
+                    Transaction.category_id.is_not(None),
+                    Transaction.transaction_date >= str(date_from),
+                    Transaction.transaction_date <= str(date_to),
+                )
+            )
+            .group_by(Transaction.category_id)
+        )
+        return {row.category_id: row.total for row in result.all()}
+
     async def get_by_category(self, user_id: str) -> dict:
         result = await self.db.execute(
             select(
@@ -161,7 +183,7 @@ class TransactionRepository:
                         "income": Decimal("0"),
                         "expense": Decimal("0"),
                     }
-                data[str(row.category_id)][row.type.value] = row.total
+                data[str(row.category_id)][row.type] = row.total
 
         return data
 
@@ -197,6 +219,40 @@ class CategoryRepository:
 
     async def delete(self, category: Category) -> None:
         await self.db.delete(category)
+        await self.db.commit()
+
+
+class BudgetRepository:
+    def __init__(self, db: AsyncSession):
+        self.db = db
+
+    async def get_all(self, user_id: str) -> Sequence[Budget]:
+        result = await self.db.execute(
+            select(Budget).where(Budget.user_id == user_id).order_by(Budget.created_at.desc())
+        )
+        return result.scalars().all()
+
+    async def get_by_id(self, budget_id: str, user_id: str) -> Optional[Budget]:
+        result = await self.db.execute(
+            select(Budget).where(
+                and_(Budget.id == budget_id, Budget.user_id == user_id)
+            )
+        )
+        return result.scalar_one_or_none()
+
+    async def create(self, budget: Budget) -> Budget:
+        self.db.add(budget)
+        await self.db.commit()
+        await self.db.refresh(budget)
+        return budget
+
+    async def update(self, budget: Budget) -> Budget:
+        await self.db.commit()
+        await self.db.refresh(budget)
+        return budget
+
+    async def delete(self, budget: Budget) -> None:
+        await self.db.delete(budget)
         await self.db.commit()
 
 

@@ -1,35 +1,13 @@
-import { useEffect, useState } from 'react';
 import { TrendingUp, TrendingDown, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { LoadingSkeleton } from '../../components/LoadingSkeleton';
-import { fetchFinanceSummary, fetchTransactions } from '../../api/endpoints';
-import type { Transaction } from '../../types';
-import type { FinanceSummary } from '../../types';
+import { useFinanceSummary, useTransactions } from '../../hooks/useFinance';
 
 export default function FinanceWidget() {
-  const [summary, setSummary] = useState<FinanceSummary | null>(null);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: summary, isLoading: loadingSummary } = useFinanceSummary();
+  const { data: txResponse, isLoading: loadingTx } = useTransactions({ per_page: 5 });
 
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      setLoading(true);
-      const [summaryData, txData] = await Promise.all([
-        fetchFinanceSummary(),
-        fetchTransactions({ per_page: 5 }),
-      ]);
-      if (!cancelled) {
-        setSummary(summaryData);
-        setTransactions(txData.items.slice(0, 5));
-        setLoading(false);
-      }
-    }
-    load();
-    return () => { cancelled = true; };
-  }, []);
-
-  if (loading) {
+  if (loadingSummary || loadingTx) {
     return <LoadingSkeleton type="widget" />;
   }
 
@@ -41,6 +19,7 @@ export default function FinanceWidget() {
     );
   }
 
+  const transactions = (txResponse?.items ?? []).slice(0, 5);
   const balance = summary.balance;
   const isPositive = balance >= 0;
 

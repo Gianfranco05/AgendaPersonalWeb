@@ -1,6 +1,5 @@
 import asyncio
 import secrets
-from datetime import timedelta
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import RedirectResponse
@@ -188,7 +187,7 @@ async def google_connect(request: Request, db: AsyncSession = Depends(get_db)):
         return RedirectResponse(url="/auth/login", status_code=303)
 
     if not settings.GOOGLE_CLIENT_ID or not settings.GOOGLE_CLIENT_SECRET:
-        return RedirectResponse(url="/ajustes/?error=google_not_configured", status_code=303)
+        return RedirectResponse(url=_frontend_redirect("/settings?google_error=google_not_configured"), status_code=303)
 
     from google_auth_oauthlib.flow import Flow
 
@@ -204,6 +203,10 @@ async def google_connect(request: Request, db: AsyncSession = Depends(get_db)):
     return response
 
 
+def _frontend_redirect(path: str) -> str:
+    return f"{settings.FRONTEND_URL}{path}"
+
+
 @router.get("/google/callback")
 async def google_callback(
     request: Request,
@@ -217,14 +220,14 @@ async def google_callback(
         return RedirectResponse(url="/auth/login", status_code=303)
 
     if error:
-        return RedirectResponse(url="/ajustes/?error=google_denied", status_code=303)
+        return RedirectResponse(url=_frontend_redirect("/settings?google_error=google_denied"), status_code=303)
 
     stored_state = request.cookies.get("oauth_state")
     if not state or state != stored_state:
-        return RedirectResponse(url="/ajustes/?error=invalid_state", status_code=303)
+        return RedirectResponse(url=_frontend_redirect("/settings?google_error=invalid_state"), status_code=303)
 
     if not code:
-        return RedirectResponse(url="/ajustes/?error=no_code", status_code=303)
+        return RedirectResponse(url=_frontend_redirect("/settings?google_error=no_code"), status_code=303)
 
     try:
         flow = _build_google_flow()
@@ -239,9 +242,9 @@ async def google_callback(
         db.add(prefs)
         await db.commit()
     except Exception:
-        return RedirectResponse(url="/ajustes/?error=google_exchange_failed", status_code=303)
+        return RedirectResponse(url=_frontend_redirect("/settings?google_error=google_exchange_failed"), status_code=303)
 
-    response = RedirectResponse(url="/ajustes/?success=google_connected", status_code=303)
+    response = RedirectResponse(url=_frontend_redirect("/settings?google=connected"), status_code=303)
     response.delete_cookie("oauth_state")
     return response
 
@@ -253,12 +256,7 @@ async def google_disconnect(request: Request, db: AsyncSession = Depends(get_db)
         return RedirectResponse(url="/auth/login", status_code=303)
 
     service = SettingsService(db)
-    prefs = await service.get_preferences(user_id)
-    prefs.google_access_token = None
-    prefs.google_refresh_token = None
-    prefs.google_token_expiry = None
-    db.add(prefs)
-    await db.commit()
+    await service.disconnect_google(user_id)
 
     return RedirectResponse(url="/ajustes/?success=google_disconnected", status_code=303)
 
@@ -275,9 +273,9 @@ async def google_sync(request: Request, db: AsyncSession = Depends(get_db)):
         return RedirectResponse(url="/ajustes/?error=not_connected", status_code=303)
 
     try:
-        count = await _sync_events_to_google(user_id, prefs, db)
-    except Exception as e:
-        return RedirectResponse(url=f"/ajustes/?error=sync_failed", status_code=303)
+        count = await service.sync_events_to_google(user_id, prefs)
+    except Exception:
+        return RedirectResponse(url="/ajustes/?error=sync_failed", status_code=303)
 
     return RedirectResponse(url=f"/ajustes/?synced={count}", status_code=303)
 
@@ -298,61 +296,3 @@ def _build_google_flow():
         scopes=["https://www.googleapis.com/auth/calendar.events"],
         redirect_uri=settings.GOOGLE_REDIRECT_URI,
     )
-
-
-async def _sync_events_to_google(
-    user_id: str, prefs, db: AsyncSession
-) -> int:
-    from google.oauth2.credentials import Credentials
-    from google.auth.transport.requests import Request as GRequest
-    from googleapiclient.discovery import build
-    from app.modules.eventos.models import Event
-
-    creds = Credentials(
-        token=prefs.google_access_token,
-        refresh_token=prefs.google_refresh_token,
-        token_uri="https://oauth2.googleapis.com/token",
-        client_id=settings.GOOGLE_CLIENT_ID,
-        client_secret=settings.GOOGLE_CLIENT_SECRET,
-    )
-
-    if creds.expired and creds.refresh_token:
-        await asyncio.to_thread(creds.refresh, GRequest())
-        prefs.google_access_token = creds.token
-        prefs.google_token_expiry = creds.expiry
-        db.add(prefs)
-        await db.commit()
-
-    service = await asyncio.to_thread(build, "calendar", "v3", credentials=creds)
-
-    events_result = await db.execute(select(Event).where(Event.user_id == user_id))
-    events = events_result.scalars().all()
-
-    synced = 0
-    for event in events:
-        end_dt = event.end_datetime or (event.start_datetime + timedelta(hours=1))
-        g_event = {
-            "summary": event.title,
-            "description": event.description or "",
-            "start": {
-                "dateTime": event.start_datetime.isoformat(),
-                "timeZone": "America/Argentina/Buenos_Aires",
-            },
-            "end": {
-                "dateTime": end_dt.isoformat(),
-                "timeZone": "America/Argentina/Buenos_Aires",
-            },
-        }
-        if event.location:
-            g_event["location"] = event.location
-        if event.is_all_day:
-            date_str = event.start_datetime.strftime("%Y-%m-%d")
-            g_event["start"] = {"date": date_str}
-            g_event["end"] = {"date": date_str}
-
-        await asyncio.to_thread(
-            service.events().insert(calendarId=prefs.google_calendar_id, body=g_event).execute
-        )
-        synced += 1
-
-    return synced

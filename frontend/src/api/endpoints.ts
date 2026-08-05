@@ -12,6 +12,12 @@ import type {
   FitnessSummary,
   Meal,
   NutritionSummary,
+  Task,
+  HabitRecord,
+  MonthlySummaryItem,
+  Budget,
+  BudgetProgress,
+  Settings,
 } from '../types';
 
 const MOCK_ENABLED = import.meta.env.VITE_MOCK_ENABLED === 'true';
@@ -360,6 +366,99 @@ export async function updateGoalProgress(id: string, delta: number): Promise<Goa
   return data;
 }
 
+// ── Habit records (registro diario de habitos tipo 'metric') ──
+
+export async function fetchHabitRecords(
+  goalId: string,
+  year: number,
+  month: number,
+): Promise<HabitRecord[]> {
+  if (MOCK_ENABLED) {
+    return mockDelay([]);
+  }
+  const { data } = await apiClient.get<HabitRecord[]>(`/api/v1/goals/${goalId}/records`, {
+    params: { year, month },
+  });
+  return data;
+}
+
+export async function upsertHabitRecord(
+  goalId: string,
+  recordDate: string,
+  value: number,
+  notes?: string | null,
+): Promise<HabitRecord> {
+  if (MOCK_ENABLED) {
+    return mockDelay({ id: generateId(), goal_id: goalId, record_date: recordDate, value, notes: notes ?? null });
+  }
+  const { data } = await apiClient.post<HabitRecord>(`/api/v1/goals/${goalId}/records`, {
+    record_date: recordDate,
+    value,
+    notes: notes ?? null,
+  });
+  return data;
+}
+
+export async function fetchMonthlySummary(year: number, month: number): Promise<MonthlySummaryItem[]> {
+  if (MOCK_ENABLED) {
+    return mockDelay([]);
+  }
+  const { data } = await apiClient.get<MonthlySummaryItem[]>('/api/v1/goals/summary/monthly', {
+    params: { year, month },
+  });
+  return data;
+}
+
+// ── Tasks ──
+
+export async function fetchTasks(params?: { area?: string; status?: string }): Promise<Task[]> {
+  if (MOCK_ENABLED) {
+    const mockTasks: Task[] = [
+      { id: 'tk1', title: 'Enviar propuesta a cliente X', description: '', area: 'Trabajo', priority: 'alta', due_date: '2026-07-20', status: 'pending', order: 0 },
+      { id: 'tk2', title: 'Revisar PR de backend', description: '', area: 'Trabajo', priority: 'media', due_date: null, status: 'in_progress', order: 0 },
+      { id: 'tk3', title: 'Renovar DNI', description: '', area: 'Otras Tareas', priority: 'media', due_date: '2026-07-31', status: 'pending', order: 1 },
+      { id: 'tk4', title: 'Comprar regalo cumpleaños', description: '', area: 'Otras Tareas', priority: 'baja', due_date: null, status: 'completed', order: 0 },
+    ];
+    let items = mockTasks;
+    if (params?.area) items = items.filter((t) => t.area === params.area);
+    if (params?.status) items = items.filter((t) => t.status === params.status);
+    return mockDelay(items);
+  }
+  const { data } = await apiClient.get<Task[]>('/api/v1/tasks', { params });
+  return data;
+}
+
+export async function createTask(task: Omit<Task, 'id'>): Promise<Task> {
+  if (MOCK_ENABLED) {
+    return mockDelay({ ...task, id: generateId() });
+  }
+  const { data } = await apiClient.post<Task>('/api/v1/tasks', task);
+  return data;
+}
+
+export async function updateTask(id: string, task: Partial<Task>): Promise<Task> {
+  if (MOCK_ENABLED) {
+    return mockDelay({ ...task, id } as Task);
+  }
+  const { data } = await apiClient.patch<Task>(`/api/v1/tasks/${id}`, task);
+  return data;
+}
+
+export async function deleteTask(id: string): Promise<void> {
+  if (MOCK_ENABLED) {
+    return mockDelay(undefined);
+  }
+  await apiClient.delete(`/api/v1/tasks/${id}`);
+}
+
+export async function moveTask(id: string, status: Task['status'], order: number): Promise<Task> {
+  if (MOCK_ENABLED) {
+    return mockDelay({ id, status, order } as Task);
+  }
+  const { data } = await apiClient.post<Task>(`/api/v1/tasks/${id}/move`, { status, order });
+  return data;
+}
+
 // ── Tags ──
 
 export async function fetchTags(): Promise<Tag[]> {
@@ -590,5 +689,109 @@ export async function fetchCategories(): Promise<Category[]> {
     return mockDelay(categories);
   }
   const { data } = await apiClient.get<Category[]>('/api/v1/finance/categories');
+  return data;
+}
+
+export async function createCategory(category: Omit<Category, 'id'>): Promise<Category> {
+  if (MOCK_ENABLED) {
+    return mockDelay({ ...category, id: generateId() });
+  }
+  const { data } = await apiClient.post<Category>('/api/v1/finance/categories', category);
+  return data;
+}
+
+export async function updateCategory(id: string, category: Partial<Category>): Promise<Category> {
+  if (MOCK_ENABLED) {
+    return mockDelay({ ...category, id } as Category);
+  }
+  const { data } = await apiClient.put<Category>(`/api/v1/finance/categories/${id}`, category);
+  return data;
+}
+
+export async function deleteCategory(id: string): Promise<void> {
+  if (MOCK_ENABLED) {
+    return mockDelay(undefined);
+  }
+  await apiClient.delete(`/api/v1/finance/categories/${id}`);
+}
+
+// ── Budgets ──
+
+export async function fetchBudgets(year: number, month: number): Promise<BudgetProgress[]> {
+  if (MOCK_ENABLED) {
+    return mockDelay([]);
+  }
+  const { data } = await apiClient.get<BudgetProgress[]>('/api/v1/finance/budgets', {
+    params: { year, month },
+  });
+  return data;
+}
+
+export async function createBudget(budget: Omit<Budget, 'id'>): Promise<Budget> {
+  if (MOCK_ENABLED) {
+    return mockDelay({ ...budget, id: generateId() });
+  }
+  const { data } = await apiClient.post<Budget>('/api/v1/finance/budgets', budget);
+  return data;
+}
+
+export async function updateBudget(id: string, budget: Partial<Budget>): Promise<Budget> {
+  if (MOCK_ENABLED) {
+    return mockDelay({ ...budget, id } as Budget);
+  }
+  const { data } = await apiClient.put<Budget>(`/api/v1/finance/budgets/${id}`, budget);
+  return data;
+}
+
+export async function deleteBudget(id: string): Promise<void> {
+  if (MOCK_ENABLED) {
+    return mockDelay(undefined);
+  }
+  await apiClient.delete(`/api/v1/finance/budgets/${id}`);
+}
+
+// ── Settings ──
+
+export async function fetchSettings(): Promise<Settings> {
+  if (MOCK_ENABLED) {
+    return mockDelay({
+      currency: 'ARS',
+      theme_color: 'violet',
+      date_format: 'DD/MM/YYYY',
+      google_calendar_id: 'primary',
+      google_connected: false,
+    });
+  }
+  const { data } = await apiClient.get<Settings>('/api/v1/settings');
+  return data;
+}
+
+export async function updateSettings(settings: Partial<Settings>): Promise<Settings> {
+  if (MOCK_ENABLED) {
+    return mockDelay(settings as Settings);
+  }
+  const { data } = await apiClient.put<Settings>('/api/v1/settings', settings);
+  return data;
+}
+
+export async function syncGoogleCalendar(): Promise<{ synced: number }> {
+  if (MOCK_ENABLED) {
+    return mockDelay({ synced: 0 });
+  }
+  const { data } = await apiClient.post<{ synced: number }>('/api/v1/settings/google/sync');
+  return data;
+}
+
+export async function disconnectGoogleCalendar(): Promise<Settings> {
+  if (MOCK_ENABLED) {
+    return mockDelay({
+      currency: 'ARS',
+      theme_color: 'violet',
+      date_format: 'DD/MM/YYYY',
+      google_calendar_id: 'primary',
+      google_connected: false,
+    });
+  }
+  const { data } = await apiClient.post<Settings>('/api/v1/settings/google/disconnect');
   return data;
 }

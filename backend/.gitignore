@@ -24,10 +24,6 @@ env/
 # Uploads
 uploads/
 
-# Alembic
-migrations/versions/*.py
-!migrations/versions/.gitkeep
-
 # OS
 .DS_Store
 Thumbs.db

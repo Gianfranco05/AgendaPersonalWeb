@@ -4,7 +4,7 @@ import TaskCard from './TaskCard';
 
 interface KanbanColumnProps {
   column: KanbanColumnType;
-  onUpdate: (id: string, updates: Partial<Pick<Task, 'title' | 'description'>>) => void;
+  onUpdate: (id: string, updates: Partial<Pick<Task, 'title' | 'description' | 'priority' | 'due_date' | 'area'>>) => void;
   onDelete: (id: string) => void;
 }
 

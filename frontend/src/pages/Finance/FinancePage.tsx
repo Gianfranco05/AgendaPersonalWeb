@@ -6,6 +6,9 @@ import type { Transaction } from '../../types';
 import TransactionTable from './TransactionTable';
 import TransactionModal from './TransactionModal';
 import TransactionFilters from './TransactionFilters';
+import BudgetsSection from './BudgetsSection';
+import SavingsGoalsSection from './SavingsGoalsSection';
+import CategoriesSection from './CategoriesSection';
 
 const FinanceCharts = lazy(() => import('./FinanceCharts'));
 
@@ -18,7 +21,10 @@ interface Filters {
 
 const PER_PAGE = 20;
 
+type Tab = 'transacciones' | 'presupuestos' | 'ahorro' | 'categorias';
+
 export default function FinancePage() {
+  const [tab, setTab] = useState<Tab>('transacciones');
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState<Filters>({
     date_from: '',
@@ -73,15 +79,44 @@ export default function FinancePage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-gray-800 dark:text-slate-100">Finanzas</h2>
-        <button
-          onClick={handleNew}
-          className="flex items-center gap-2 rounded-lg bg-brand-charcoal px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-charcoal-hover"
-        >
-          <Plus size={16} />
-          Nueva transacción
-        </button>
+        {tab === 'transacciones' && (
+          <button
+            onClick={handleNew}
+            className="flex items-center gap-2 rounded-lg bg-brand-charcoal px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-charcoal-hover"
+          >
+            <Plus size={16} />
+            Nueva transacción
+          </button>
+        )}
       </div>
 
+      <div className="flex rounded-lg border border-gray-200 dark:border-slate-700 p-0.5 w-fit">
+        {([
+          ['transacciones', 'Transacciones'],
+          ['presupuestos', 'Presupuestos'],
+          ['ahorro', 'Ahorro'],
+          ['categorias', 'Categorías'],
+        ] as const).map(([value, label]) => (
+          <button
+            key={value}
+            onClick={() => setTab(value)}
+            className={`rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${
+              tab === value
+                ? 'bg-brand-charcoal text-white'
+                : 'text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-100'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'presupuestos' && <BudgetsSection />}
+      {tab === 'ahorro' && <SavingsGoalsSection />}
+      {tab === 'categorias' && <CategoriesSection />}
+
+      {tab === 'transacciones' && (
+      <>
       {/* Summary Cards */}
       {summaryLoading && !summary ? (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -165,6 +200,8 @@ export default function FinancePage() {
             </div>
           )}
         </>
+      )}
+      </>
       )}
 
       {showModal && (

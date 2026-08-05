@@ -94,7 +94,7 @@ async def api_auth_client(client, test_user):
 @pytest_asyncio.fixture(scope="function")
 async def test_category(db_session, test_user):
     category = Category(
-        id="cat-test-id",
+        id="c1c2c3c4-c5c6-c7c8-c9ca-cbcccdcecfd0",
         user_id=test_user.id,
         name="Alimentacion",
         color="#10B981",

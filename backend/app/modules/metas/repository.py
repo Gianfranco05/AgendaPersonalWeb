@@ -1,7 +1,7 @@
 from datetime import date, timedelta
 from typing import Optional
 
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, func, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.metas.models import Goal, HabitRecord
@@ -77,3 +77,49 @@ class GoalRepository:
             .where(HabitRecord.record_date == today)
         )
         return result.scalar_one_or_none()
+
+    async def get_record_by_date(
+        self, goal_id: str, record_date: date
+    ) -> Optional[HabitRecord]:
+        result = await self.db.execute(
+            select(HabitRecord)
+            .where(HabitRecord.goal_id == goal_id)
+            .where(HabitRecord.record_date == record_date)
+        )
+        return result.scalar_one_or_none()
+
+    async def get_records_in_range(
+        self, goal_id: str, start: date, end: date
+    ) -> list[HabitRecord]:
+        result = await self.db.execute(
+            select(HabitRecord)
+            .where(HabitRecord.goal_id == goal_id)
+            .where(HabitRecord.record_date >= start, HabitRecord.record_date <= end)
+            .order_by(HabitRecord.record_date.asc())
+        )
+        return list(result.scalars().all())
+
+    async def get_monthly_summary(self, user_id: str, start: date, end: date) -> list:
+        # Nota: "average" acá es sum/dias_del_mes (estilo Excel), no AVG(value) —
+        # un día sin registro cuenta como 0, no se lo ignora del promedio.
+        result = await self.db.execute(
+            select(
+                Goal.id,
+                Goal.title,
+                Goal.unit,
+                func.coalesce(func.sum(HabitRecord.value), 0.0).label("total"),
+            )
+            .select_from(Goal)
+            .outerjoin(
+                HabitRecord,
+                and_(
+                    HabitRecord.goal_id == Goal.id,
+                    HabitRecord.record_date >= start,
+                    HabitRecord.record_date <= end,
+                ),
+            )
+            .where(Goal.user_id == user_id, Goal.goal_type == "metric")
+            .group_by(Goal.id, Goal.title, Goal.unit)
+            .order_by(Goal.title.asc())
+        )
+        return result.all()

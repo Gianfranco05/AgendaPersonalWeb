@@ -1,53 +1,32 @@
-import { useEffect, useState } from 'react';
 import { Clock, Loader2, CheckCircle2, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { LoadingSkeleton } from '../../components/LoadingSkeleton';
-
-interface TaskCounts {
-  pending: number;
-  in_progress: number;
-  completed: number;
-}
-
-function loadTaskCounts(): TaskCounts {
-  const stored = localStorage.getItem('kanban-tasks');
-  if (!stored) return { pending: 0, in_progress: 0, completed: 0 };
-  try {
-    const tasks = JSON.parse(stored);
-    return {
-      pending: tasks.filter((t: { status: string }) => t.status === 'pending').length,
-      in_progress: tasks.filter((t: { status: string }) => t.status === 'in_progress').length,
-      completed: tasks.filter((t: { status: string }) => t.status === 'completed').length,
-    };
-  } catch {
-    return { pending: 0, in_progress: 0, completed: 0 };
-  }
-}
+import { useKanban } from '../../hooks/useKanban';
 
 export default function TasksWidget() {
-  const [counts, setCounts] = useState<TaskCounts>({ pending: 0, in_progress: 0, completed: 0 });
-  const [loading, setLoading] = useState(true);
+  const { tasks, areas, isLoading } = useKanban();
 
-  useEffect(() => {
-    setCounts(loadTaskCounts());
-    setLoading(false);
-
-    const handleStorage = () => {
-      setCounts(loadTaskCounts());
-    };
-    window.addEventListener('storage', handleStorage);
-    return () => window.removeEventListener('storage', handleStorage);
-  }, []);
-
-  if (loading) {
+  if (isLoading) {
     return <LoadingSkeleton type="widget" />;
   }
 
+  const counts = {
+    pending: tasks.filter((t) => t.status === 'pending').length,
+    in_progress: tasks.filter((t) => t.status === 'in_progress').length,
+    completed: tasks.filter((t) => t.status === 'completed').length,
+  };
+
   const items = [
-    { label: 'Pendiente', count: counts.pending, icon: Clock, color: 'text-amber-500', bg: 'bg-amber-50' },
-    { label: 'En Proceso', count: counts.in_progress, icon: Loader2, color: 'text-blue-500', bg: 'bg-blue-50' },
-    { label: 'Completado', count: counts.completed, icon: CheckCircle2, color: 'text-emerald-500', bg: 'bg-emerald-50' },
+    { label: 'Pendiente', count: counts.pending, icon: Clock, color: 'text-amber-500', bg: 'bg-amber-50 dark:bg-amber-500/10' },
+    { label: 'En Proceso', count: counts.in_progress, icon: Loader2, color: 'text-blue-500', bg: 'bg-blue-50 dark:bg-blue-500/10' },
+    { label: 'Completado', count: counts.completed, icon: CheckCircle2, color: 'text-emerald-500', bg: 'bg-emerald-50 dark:bg-emerald-500/10' },
   ];
+
+  const byArea = areas.map((area) => ({
+    area,
+    pending: tasks.filter((t) => t.area === area && t.status !== 'completed').length,
+    done: tasks.filter((t) => t.area === area && t.status === 'completed').length,
+  }));
 
   return (
     <div className="card-interactive rounded-xl bg-white dark:bg-slate-800 p-6 shadow-sm">
@@ -72,6 +51,29 @@ export default function TasksWidget() {
           </div>
         ))}
       </div>
+
+      {byArea.length > 0 && (
+        <div className="mt-4 border-t border-gray-100 dark:border-slate-700 pt-3">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="text-gray-400 dark:text-slate-500">
+                <th className="pb-1 text-left font-medium">Área</th>
+                <th className="pb-1 text-right font-medium">Pendientes</th>
+                <th className="pb-1 text-right font-medium">Hechas</th>
+              </tr>
+            </thead>
+            <tbody>
+              {byArea.map(({ area, pending, done }) => (
+                <tr key={area} className="text-gray-600 dark:text-slate-300">
+                  <td className="py-0.5">{area}</td>
+                  <td className="py-0.5 text-right">{pending}</td>
+                  <td className="py-0.5 text-right">{done}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

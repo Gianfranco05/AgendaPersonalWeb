@@ -1,13 +1,24 @@
 import { useState, useRef, useEffect } from 'react';
 import { Draggable } from '@hello-pangea/dnd';
 import { Pencil, Trash2, Check, X } from 'lucide-react';
-import type { Task } from '../../types';
+import type { Task, TaskPriority } from '../../types';
 
 interface TaskCardProps {
   task: Task;
   index: number;
-  onUpdate: (id: string, updates: Partial<Pick<Task, 'title' | 'description'>>) => void;
+  onUpdate: (id: string, updates: Partial<Pick<Task, 'title' | 'description' | 'priority' | 'due_date' | 'area'>>) => void;
   onDelete: (id: string) => void;
+}
+
+const priorityStyles: Record<TaskPriority, string> = {
+  alta: 'bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300',
+  media: 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300',
+  baja: 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300',
+};
+
+function isOverdue(dueDate: string | null): boolean {
+  if (!dueDate) return false;
+  return new Date(dueDate) < new Date(new Date().toDateString());
 }
 
 export default function TaskCard({ task, index, onUpdate, onDelete }: TaskCardProps) {
@@ -144,6 +155,30 @@ export default function TaskCard({ task, index, onUpdate, onDelete }: TaskCardPr
               + Agregar descripción
             </button>
           )}
+
+          {/* Área, prioridad y fecha límite */}
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            <span className="rounded-full bg-gray-100 dark:bg-slate-700 px-2 py-0.5 text-[10px] font-medium text-gray-500 dark:text-slate-400">
+              {task.area}
+            </span>
+            <select
+              value={task.priority}
+              onChange={(e) => onUpdate(task.id, { priority: e.target.value as TaskPriority })}
+              className={`rounded-full border-0 px-2 py-0.5 text-[10px] font-medium ${priorityStyles[task.priority]}`}
+            >
+              <option value="alta">Alta</option>
+              <option value="media">Media</option>
+              <option value="baja">Baja</option>
+            </select>
+            <input
+              type="date"
+              value={task.due_date ?? ''}
+              onChange={(e) => onUpdate(task.id, { due_date: e.target.value || null })}
+              className={`rounded-full border-0 bg-gray-100 dark:bg-slate-700 px-2 py-0.5 text-[10px] font-medium ${
+                isOverdue(task.due_date) ? 'text-rose-500' : 'text-gray-500 dark:text-slate-400'
+              }`}
+            />
+          </div>
         </div>
       )}
     </Draggable>

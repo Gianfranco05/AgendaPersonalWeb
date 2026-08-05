@@ -1,3 +1,4 @@
+import calendar
 from datetime import date, datetime
 from decimal import Decimal
 from uuid import UUID
@@ -15,13 +16,21 @@ from app.modules.finanzas.models import (
     Transaction,
     Category,
     BankAccount,
+    Budget,
 )
 from app.modules.finanzas.repository import (
     TransactionRepository,
     CategoryRepository,
     BankAccountRepository,
+    BudgetRepository,
 )
-from app.modules.finanzas.schemas import TransactionCreate, DashboardStats
+from app.modules.finanzas.schemas import (
+    TransactionCreate,
+    DashboardStats,
+    BudgetCreate,
+    BudgetProgress,
+    CategoryCreate,
+)
 
 
 class FinanzasService:
@@ -30,6 +39,7 @@ class FinanzasService:
         self.transaction_repo = TransactionRepository(db)
         self.category_repo = CategoryRepository(db)
         self.bank_account_repo = BankAccountRepository(db)
+        self.budget_repo = BudgetRepository(db)
 
     async def create_transaction(
         self, user_id: UUID, data: TransactionCreate
@@ -52,7 +62,7 @@ class FinanzasService:
             merchant_name=data.merchant_name,
             merchant_category=MerchantCategory(data.merchant_category),
             notes=data.notes,
-            category_id=data.category_id,
+            category_id=str(data.category_id) if data.category_id else None,
         )
         return await self.transaction_repo.create(transaction)
 
@@ -94,6 +104,8 @@ class FinanzasService:
     async def update_transaction(self, transaction: Transaction, data: dict):
         for key, value in data.items():
             if value is not None and hasattr(transaction, key):
+                if key == "category_id":
+                    value = str(value)
                 setattr(transaction, key, value)
         return await self.transaction_repo.update(transaction)
 
@@ -131,16 +143,28 @@ class FinanzasService:
     async def get_categories(self, user_id: UUID):
         return await self.category_repo.get_all(user_id)
 
-    async def create_category(
-        self, user_id: UUID, name: str, color: str = "#6366f1", icon: str = "fa-folder"
-    ) -> Category:
+    async def get_category(self, category_id: UUID, user_id: UUID):
+        return await self.category_repo.get_by_id(category_id, user_id)
+
+    async def create_category(self, user_id: UUID, data: CategoryCreate) -> Category:
         category = Category(
             user_id=user_id,
-            name=name,
-            color=color,
-            icon=icon,
+            name=data.name,
+            color=data.color,
+            icon=data.icon,
+            parent_id=str(data.parent_id) if data.parent_id else None,
         )
         return await self.category_repo.create(category)
+
+    async def update_category(self, category: Category, data: dict) -> Category:
+        for key, value in data.items():
+            if key == "parent_id" and value is not None:
+                value = str(value)
+            setattr(category, key, value)
+        return await self.category_repo.update(category)
+
+    async def delete_category(self, category: Category) -> None:
+        await self.category_repo.delete(category)
 
     async def get_bank_accounts(self, user_id: UUID):
         return await self.bank_account_repo.get_all(user_id)
@@ -164,3 +188,61 @@ class FinanzasService:
             currency=currency,
         )
         return await self.bank_account_repo.create(account)
+
+    async def create_budget(self, user_id: UUID, data: BudgetCreate) -> Budget:
+        budget = Budget(
+            user_id=user_id,
+            category_id=str(data.category_id),
+            amount=data.amount,
+            period=data.period,
+            alert_threshold=data.alert_threshold,
+        )
+        return await self.budget_repo.create(budget)
+
+    async def get_budgets(self, user_id: UUID):
+        return await self.budget_repo.get_all(user_id)
+
+    async def get_budget(self, budget_id: UUID, user_id: UUID):
+        return await self.budget_repo.get_by_id(budget_id, user_id)
+
+    async def update_budget(self, budget: Budget, data: dict) -> Budget:
+        for key, value in data.items():
+            if key == "category_id" and value is not None:
+                value = str(value)
+            setattr(budget, key, value)
+        return await self.budget_repo.update(budget)
+
+    async def delete_budget(self, budget: Budget) -> None:
+        await self.budget_repo.delete(budget)
+
+    async def get_budgets_with_progress(
+        self, user_id: UUID, year: int, month: int
+    ) -> list[BudgetProgress]:
+        start = date(year, month, 1)
+        end = date(year, month, calendar.monthrange(year, month)[1])
+
+        budgets = await self.budget_repo.get_all(user_id)
+        spent_by_category = await self.transaction_repo.get_expenses_by_category_in_range(
+            user_id, start, end
+        )
+        categories = {str(c.id): c for c in await self.category_repo.get_all(user_id)}
+
+        result = []
+        for budget in budgets:
+            spent = Decimal(str(spent_by_category.get(str(budget.category_id), 0)))
+            category = categories.get(str(budget.category_id))
+            percentage = float(spent / budget.amount * 100) if budget.amount else 0.0
+            result.append(
+                BudgetProgress(
+                    id=budget.id,
+                    category_id=budget.category_id,
+                    category_name=category.name if category else "Sin categoría",
+                    amount=budget.amount,
+                    period=budget.period,
+                    alert_threshold=budget.alert_threshold,
+                    spent=spent,
+                    remaining=budget.amount - spent,
+                    percentage=percentage,
+                )
+            )
+        return result

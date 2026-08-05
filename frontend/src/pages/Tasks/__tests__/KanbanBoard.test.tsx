@@ -10,8 +10,8 @@ vi.mock('../../../hooks/useKanban', () => ({
 import { useKanban } from '../../../hooks/useKanban'
 
 const mockColumns = [
-  { id: 'pending', title: 'Pendiente', tasks: [{ id: 't1', title: 'Task 1', description: '', status: 'pending', order: 0 }] },
-  { id: 'in_progress', title: 'En Proceso', tasks: [{ id: 't2', title: 'Task 2', description: '', status: 'in_progress', order: 0 }] },
+  { id: 'pending', title: 'Pendiente', tasks: [{ id: 't1', title: 'Task 1', description: '', area: 'Trabajo', priority: 'media', due_date: null, status: 'pending', order: 0 }] },
+  { id: 'in_progress', title: 'En Proceso', tasks: [{ id: 't2', title: 'Task 2', description: '', area: 'Trabajo', priority: 'alta', due_date: null, status: 'in_progress', order: 0 }] },
   { id: 'completed', title: 'Completado', tasks: [] },
 ]
 
@@ -22,7 +22,10 @@ beforeEach(() => {
 describe('KanbanBoard', () => {
   it('renders tasks grouped by status', () => {
     vi.mocked(useKanban).mockReturnValue({
+      tasks: [...mockColumns[0].tasks, ...mockColumns[1].tasks],
+      areas: ['Trabajo'],
       columns: mockColumns,
+      isLoading: false,
       addTask: vi.fn(),
       updateTask: vi.fn(),
       deleteTask: vi.fn(),

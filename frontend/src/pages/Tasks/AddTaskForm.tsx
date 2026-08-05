@@ -1,20 +1,44 @@
 import { useState } from 'react';
 import { Plus, X } from 'lucide-react';
+import type { TaskPriority } from '../../types';
+import type { NewTaskInput } from '../../hooks/useKanban';
 
 interface AddTaskFormProps {
-  onAdd: (title: string, description: string) => void;
+  onAdd: (data: NewTaskInput) => void;
+  areas: string[];
 }
 
-export default function AddTaskForm({ onAdd }: AddTaskFormProps) {
+const PRIORITIES: { value: TaskPriority; label: string }[] = [
+  { value: 'alta', label: 'Alta' },
+  { value: 'media', label: 'Media' },
+  { value: 'baja', label: 'Baja' },
+];
+
+const inputCls =
+  'w-full rounded-lg border border-gray-200 dark:border-slate-700 px-3 py-2 text-sm focus:border-brand-indigo focus:outline-none focus:ring-1 focus:ring-brand-indigo';
+
+export default function AddTaskForm({ onAdd, areas }: AddTaskFormProps) {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [area, setArea] = useState('');
+  const [priority, setPriority] = useState<TaskPriority>('media');
+  const [dueDate, setDueDate] = useState('');
 
   function handleSubmit() {
     if (!title.trim()) return;
-    onAdd(title.trim(), description.trim());
+    onAdd({
+      title: title.trim(),
+      description: description.trim(),
+      area: area.trim() || 'General',
+      priority,
+      due_date: dueDate || null,
+    });
     setTitle('');
     setDescription('');
+    setArea('');
+    setPriority('media');
+    setDueDate('');
     setOpen(false);
   }
 
@@ -49,7 +73,7 @@ export default function AddTaskForm({ onAdd }: AddTaskFormProps) {
               onChange={(e) => setTitle(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(); }}
               autoFocus
-              className="w-full rounded-lg border border-gray-200 dark:border-slate-700 px-3 py-2 text-sm focus:border-brand-indigo focus:outline-none focus:ring-1 focus:ring-brand-indigo"
+              className={inputCls}
               placeholder="¿Qué hay que hacer?"
             />
           </div>
@@ -59,8 +83,49 @@ export default function AddTaskForm({ onAdd }: AddTaskFormProps) {
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
-              className="w-full resize-none rounded-lg border border-gray-200 dark:border-slate-700 px-3 py-2 text-sm focus:border-brand-indigo focus:outline-none focus:ring-1 focus:ring-brand-indigo"
+              className={`${inputCls} resize-none`}
               placeholder="Detalles de la tarea..."
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-slate-400">Área</label>
+              <input
+                type="text"
+                list="task-areas"
+                value={area}
+                onChange={(e) => setArea(e.target.value)}
+                className={inputCls}
+                placeholder="Trabajo, Otras Tareas..."
+              />
+              <datalist id="task-areas">
+                {areas.map((a) => (
+                  <option key={a} value={a} />
+                ))}
+                <option value="Trabajo" />
+                <option value="Otras Tareas" />
+              </datalist>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-slate-400">Prioridad</label>
+              <select
+                value={priority}
+                onChange={(e) => setPriority(e.target.value as TaskPriority)}
+                className={inputCls}
+              >
+                {PRIORITIES.map((p) => (
+                  <option key={p.value} value={p.value}>{p.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-slate-400">Fecha límite (opcional)</label>
+            <input
+              type="date"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+              className={inputCls}
             />
           </div>
           <div className="flex justify-end gap-3 pt-2">

@@ -77,6 +77,13 @@ class CategoryCreate(CategoryBase):
     pass
 
 
+class CategoryUpdate(BaseModel):
+    name: Optional[str] = None
+    color: Optional[str] = None
+    icon: Optional[str] = None
+    parent_id: Optional[UUID] = None
+
+
 class CategoryResponse(CategoryBase):
     id: UUID
     user_id: UUID
@@ -124,6 +131,25 @@ class BudgetResponse(BudgetBase):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class BudgetUpdate(BaseModel):
+    category_id: Optional[UUID] = None
+    amount: Optional[Decimal] = None
+    period: Optional[str] = None
+    alert_threshold: Optional[int] = None
+
+
+class BudgetProgress(BaseModel):
+    id: UUID
+    category_id: UUID
+    category_name: str
+    amount: Decimal
+    period: str
+    alert_threshold: int
+    spent: Decimal
+    remaining: Decimal
+    percentage: float
 
 
 class DashboardStats(BaseModel):

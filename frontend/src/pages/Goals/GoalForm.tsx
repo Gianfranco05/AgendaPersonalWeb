@@ -5,15 +5,25 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { X } from 'lucide-react';
 import type { Goal } from '../../types';
 
-const schema = z.object({
-  title: z.string().min(1, 'El título es requerido'),
-  description: z.string().optional(),
-  goal_type: z.enum(['progress', 'binary']),
-  target: z.number().positive('El objetivo debe ser positivo'),
-  unit: z.string().optional(),
-  deadline: z.string().min(1, 'La fecha límite es requerida'),
-  color: z.string().min(1, 'El color es requerido'),
-});
+const schema = z
+  .object({
+    title: z.string().min(1, 'El título es requerido'),
+    description: z.string().optional(),
+    goal_type: z.enum(['progress', 'binary', 'metric', 'savings']),
+    target: z.number(),
+    unit: z.string().optional(),
+    deadline: z.string().min(1, 'La fecha límite es requerida'),
+    color: z.string().min(1, 'El color es requerido'),
+  })
+  .superRefine((data, ctx) => {
+    if ((data.goal_type === 'progress' || data.goal_type === 'savings') && !(data.target > 0)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'El objetivo debe ser positivo',
+        path: ['target'],
+      });
+    }
+  });
 
 type FormData = z.infer<typeof schema>;
 
@@ -28,7 +38,7 @@ interface Props {
   onClose: () => void;
   onSave: (data: Omit<Goal, 'id'>, id?: string) => Promise<void>;
   /** Tipo inicial para una entrada nueva (por defecto 'progress'). */
-  initialType?: 'progress' | 'binary';
+  initialType?: 'progress' | 'binary' | 'metric' | 'savings';
   /** Oculta el selector de tipo (útil para hábitos, siempre binarios). */
   lockType?: boolean;
   titleNew?: string;
@@ -86,9 +96,14 @@ export default function GoalForm({
       title: data.title,
       description: data.description || null,
       goal_type: data.goal_type,
-      target_value: data.goal_type === 'binary' ? 1 : data.target,
+      target_value: data.goal_type === 'binary' ? 1 : data.goal_type === 'metric' ? 0 : data.target,
       current_value: goal?.current_value ?? 0,
-      unit: data.goal_type === 'progress' ? data.unit || 'unidades' : null,
+      unit:
+        data.goal_type === 'progress' || data.goal_type === 'metric'
+          ? data.unit || 'unidades'
+          : data.goal_type === 'savings'
+            ? data.unit || 'ARS'
+            : null,
       end_date: data.deadline,
       color: data.color,
       icon: goal?.icon ?? 'fa-bullseye',
@@ -155,30 +170,68 @@ export default function GoalForm({
                   >
                     Binaria
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => { field.onChange('metric'); setValue('target', 0); }}
+                    className={`flex-1 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+                      goalType === 'metric'
+                        ? 'bg-brand-charcoal text-white'
+                        : 'text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-100'
+                    }`}
+                  >
+                    Métrica diaria
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { field.onChange('savings'); setValue('unit', 'ARS'); }}
+                    className={`flex-1 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+                      goalType === 'savings'
+                        ? 'bg-brand-charcoal text-white'
+                        : 'text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-100'
+                    }`}
+                  >
+                    Ahorro
+                  </button>
                 </div>
               )}
             />
+            {goalType === 'metric' && (
+              <p className="mt-1 text-xs text-gray-400 dark:text-slate-500">
+                Se carga un valor distinto cada día (minutos, páginas, etc.) desde la pestaña "Registro mensual".
+              </p>
+            )}
+            {goalType === 'savings' && (
+              <p className="mt-1 text-xs text-gray-400 dark:text-slate-500">
+                Se gestiona desde Finanzas → Ahorro, donde vas a poder registrar depósitos.
+              </p>
+            )}
           </div>
 
-          {goalType === 'progress' && (
+          {(goalType === 'progress' || goalType === 'metric' || goalType === 'savings') && (
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-slate-400">Objetivo</label>
-                <input
-                  {...register('target', { valueAsNumber: true })}
-                  type="number"
-                  className={inputCls}
-                  placeholder="100"
-                />
-                {errors.target && <p className={errorCls}>{errors.target.message}</p>}
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-slate-400">Unidad</label>
+              {(goalType === 'progress' || goalType === 'savings') && (
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-slate-400">
+                    {goalType === 'savings' ? 'Monto objetivo' : 'Objetivo'}
+                  </label>
+                  <input
+                    {...register('target', { valueAsNumber: true })}
+                    type="number"
+                    className={inputCls}
+                    placeholder="100"
+                  />
+                  {errors.target && <p className={errorCls}>{errors.target.message}</p>}
+                </div>
+              )}
+              <div className={goalType === 'metric' ? 'col-span-2' : ''}>
+                <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-slate-400">
+                  {goalType === 'savings' ? 'Moneda' : 'Unidad'}
+                </label>
                 <input
                   {...register('unit')}
                   type="text"
                   className={inputCls}
-                  placeholder="km, libros, etc"
+                  placeholder={goalType === 'savings' ? 'ARS, USD, etc' : 'minutos, páginas, km, etc'}
                 />
               </div>
             </div>

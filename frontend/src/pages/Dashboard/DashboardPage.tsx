@@ -4,6 +4,7 @@ import NotesWidget from './NotesWidget';
 import TasksWidget from './TasksWidget';
 import EventsWidget from './EventsWidget';
 import InfraWidget from './InfraWidget';
+import HabitsWidget from './HabitsWidget';
 
 export default function DashboardPage() {
   return (
@@ -28,13 +29,18 @@ export default function DashboardPage() {
           </ErrorBoundary>
         </div>
 
-        {/* Row 2: Infra + Notes */}
+        {/* Row 2: Infra + Habits + Notes */}
         <div className="md:col-span-1">
           <ErrorBoundary>
             <InfraWidget />
           </ErrorBoundary>
         </div>
-        <div className="md:col-span-1 xl:col-span-3">
+        <div className="md:col-span-1">
+          <ErrorBoundary>
+            <HabitsWidget />
+          </ErrorBoundary>
+        </div>
+        <div className="md:col-span-2 xl:col-span-2">
           <ErrorBoundary>
             <NotesWidget />
           </ErrorBoundary>

@@ -6,14 +6,20 @@ import { checkInGoal } from '../../hooks/useGoals';
 import type { Goal } from '../../types';
 import CheckInButton from '../Goals/CheckInButton';
 import GoalForm from '../Goals/GoalForm';
+import MonthlyHabitGrid from './MonthlyHabitGrid';
+
+type Tab = 'rachas' | 'mensual';
 
 export default function HabitsPage() {
   const { data: habits, isLoading, mutate } = useHabits();
   const [showForm, setShowForm] = useState(false);
   const [editingHabit, setEditingHabit] = useState<Goal | null>(null);
+  const [formType, setFormType] = useState<'binary' | 'metric'>('binary');
+  const [tab, setTab] = useState<Tab>('rachas');
 
-  function handleNew() {
+  function handleNew(type: 'binary' | 'metric' = 'binary') {
     setEditingHabit(null);
+    setFormType(type);
     setShowForm(true);
   }
 
@@ -38,15 +44,40 @@ export default function HabitsPage() {
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-gray-800 dark:text-slate-100">Hábitos</h2>
         <button
-          onClick={handleNew}
+          onClick={() => handleNew(tab === 'mensual' ? 'metric' : 'binary')}
           className="flex items-center gap-2 rounded-lg bg-brand-charcoal px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-charcoal-hover"
         >
           <Plus size={16} />
-          Nuevo hábito
+          {tab === 'mensual' ? 'Nueva métrica' : 'Nuevo hábito'}
         </button>
       </div>
 
-      {isLoading ? (
+      <div className="flex rounded-lg border border-gray-200 dark:border-slate-700 p-0.5 w-fit">
+        <button
+          onClick={() => setTab('rachas')}
+          className={`rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${
+            tab === 'rachas'
+              ? 'bg-brand-charcoal text-white'
+              : 'text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-100'
+          }`}
+        >
+          Rachas
+        </button>
+        <button
+          onClick={() => setTab('mensual')}
+          className={`rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${
+            tab === 'mensual'
+              ? 'bg-brand-charcoal text-white'
+              : 'text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-100'
+          }`}
+        >
+          Registro mensual
+        </button>
+      </div>
+
+      {tab === 'mensual' ? (
+        <MonthlyHabitGrid />
+      ) : isLoading ? (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {[1, 2, 3].map((i) => (
             <LoadingSkeleton key={i} type="card" />
@@ -95,7 +126,7 @@ export default function HabitsPage() {
           <CheckCircle2 size={48} className="text-gray-300 dark:text-slate-600" />
           <p className="text-sm text-gray-500 dark:text-slate-400">No hay hábitos aún</p>
           <button
-            onClick={handleNew}
+            onClick={() => handleNew('binary')}
             className="flex items-center gap-2 rounded-lg bg-brand-charcoal px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-charcoal-hover"
           >
             <Plus size={16} />
@@ -109,10 +140,10 @@ export default function HabitsPage() {
           goal={editingHabit}
           onClose={() => { setShowForm(false); setEditingHabit(null); }}
           onSave={handleSave}
-          initialType="binary"
+          initialType={formType}
           lockType
-          titleNew="Nuevo hábito"
-          titleEdit="Editar hábito"
+          titleNew={formType === 'metric' ? 'Nueva métrica' : 'Nuevo hábito'}
+          titleEdit={formType === 'metric' ? 'Editar métrica' : 'Editar hábito'}
         />
       )}
     </div>
