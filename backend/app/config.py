@@ -117,6 +117,11 @@ class Settings(BaseSettings):
                 )
             if self.DEBUG:
                 raise ValueError("DEBUG debe ser false en producción (ENVIRONMENT=production).")
+            if self.DATABASE_URL.startswith("sqlite"):
+                raise ValueError(
+                    "DATABASE_URL no puede ser SQLite en producción. Usá Postgres "
+                    "(ver docker-compose.prod.yml, servicio `db`)."
+                )
         return self
 
 

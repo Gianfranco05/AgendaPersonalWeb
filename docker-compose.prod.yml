@@ -5,20 +5,66 @@
 # Para HTTPS con dominio real, sumar el override TLS:
 #   docker compose -f docker-compose.prod.yml -f docker-compose.prod.tls.yml up --build -d
 services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-vida_personal}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      - POSTGRES_DB=${POSTGRES_DB:-vida_personal}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-vida_personal} -d ${POSTGRES_DB:-vida_personal}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - lifeos-net
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - lifeos-net
+
   backend:
     build:
       context: ./backend
     restart: unless-stopped
     environment:
-      - DATABASE_URL=sqlite+aiosqlite:///./data/vida_personal.db
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-vida_personal}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@db:5432/${POSTGRES_DB:-vida_personal}
       - ENVIRONMENT=production
       - SECRET_KEY=${SECRET_KEY:?SECRET_KEY is required}
       - DEBUG=false
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost}
+      - REDIS_URL=redis://redis:6379/0
+      - RESEND_API_KEY=${RESEND_API_KEY:-}
+      - MAIL_FROM=${MAIL_FROM:-no-reply@localhost}
+      - MAIL_FROM_NAME=${MAIL_FROM_NAME:-Vida Personal}
+      - PUBLIC_BASE_URL=${PUBLIC_BASE_URL:-http://localhost}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY:-}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET:-}
+      - STRIPE_PRICE_ID_PRO=${STRIPE_PRICE_ID_PRO:-}
+      - BILLING_SUCCESS_URL=${BILLING_SUCCESS_URL:-}
+      - BILLING_CANCEL_URL=${BILLING_CANCEL_URL:-}
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
       - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-}
     volumes:
       - data:/app/data
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/livez')"]
       interval: 30s
@@ -52,3 +98,4 @@ networks:
 
 volumes:
   data:
+  pgdata:
