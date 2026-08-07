@@ -75,6 +75,19 @@ class Settings(BaseSettings):
     EMAIL_VERIFY_TOKEN_EXPIRE_HOURS: int = 24
     PASSWORD_RESET_TOKEN_EXPIRE_HOURS: int = 1
 
+    # Billing (Stripe). Vacio = billing deshabilitado: todos quedan en plan free
+    # y los endpoints de checkout/portal devuelven 503 en vez de romper.
+    STRIPE_SECRET_KEY: str = ""
+    STRIPE_WEBHOOK_SECRET: str = ""
+    STRIPE_PRICE_ID_PRO: str = ""
+    # A donde vuelve el usuario despues de pagar o de salir del portal.
+    BILLING_SUCCESS_URL: str = ""
+    BILLING_CANCEL_URL: str = ""
+
+    @property
+    def billing_enabled(self) -> bool:
+        return bool(self.STRIPE_SECRET_KEY and self.STRIPE_PRICE_ID_PRO)
+
     # Google OAuth (optional — leave empty to disable Google Calendar integration)
     GOOGLE_CLIENT_ID: str = ""
     GOOGLE_CLIENT_SECRET: str = ""
