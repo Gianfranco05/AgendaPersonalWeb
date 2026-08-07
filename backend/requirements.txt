@@ -16,6 +16,9 @@ bcrypt>=4.0.0
 python-jose[cryptography]>=3.3.0
 itsdangerous>=2.0.0
 
+# Rate limiting compartido entre instancias (opcional: solo si REDIS_URL esta seteado)
+redis>=5.0.0
+
 # Validation & Config
 pydantic>=2.6.0
 pydantic-settings>=2.1.0

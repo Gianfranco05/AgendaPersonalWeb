@@ -39,6 +39,20 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None) -> s
     return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
 
 
+def create_refresh_token() -> str:
+    """Devuelve el token crudo (opaco, no un JWT). Solo lo ve el cliente."""
+    return secrets.token_urlsafe(32)
+
+
+def hash_refresh_token(raw_token: str) -> str:
+    """sha256 del token crudo — es lo unico que se persiste.
+
+    sha256 (y no bcrypt) porque el token ya es aleatorio de 256 bits: no hay
+    nada que forzar por diccionario, y el lookup tiene que ser rapido e indexable.
+    """
+    return hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
+
+
 def get_user_id_from_request(request) -> str | None:
     from app.config import settings
 

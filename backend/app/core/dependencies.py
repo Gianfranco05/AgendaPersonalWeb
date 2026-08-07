@@ -9,11 +9,21 @@ from app.core.security import decode_access_token
 from app.config import settings
 
 
+def _extract_bearer_token(request: Request) -> Optional[str]:
+    auth_header = request.headers.get("Authorization")
+    if not auth_header:
+        return None
+    scheme, _, token = auth_header.partition(" ")
+    if scheme.lower() != "bearer" or not token:
+        return None
+    return token
+
+
 async def get_current_user(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    token = request.cookies.get(settings.JWT_COOKIE_NAME)
+    token = request.cookies.get(settings.JWT_COOKIE_NAME) or _extract_bearer_token(request)
     if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

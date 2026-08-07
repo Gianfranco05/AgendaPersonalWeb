@@ -23,8 +23,20 @@ class Settings(BaseSettings):
 
     # JWT
     JWT_ALGORITHM: str = "HS256"
-    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440  # 24 hours
+    # Access token corto: si se filtra, expira rapido y la revocacion de la
+    # sesion (borrar el refresh token) tarda a lo sumo esto en hacerse efectiva.
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     JWT_COOKIE_NAME: str = "vida_token"
+
+    # Refresh token: vida larga, revocable, rotado en cada uso.
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 30
+    REFRESH_COOKIE_NAME: str = "vida_refresh"
+
+    # Flujo HTML/Jinja2 (legacy): no tiene forma de refrescar el access token
+    # — resuelve el usuario con get_user_id_from_request() en cada ruta, sin
+    # interceptor. Mantiene el TTL largo que ya tenia para no deslogear cada
+    # 15 min. Se elimina cuando la Fase 4 retire las rutas HTML.
+    LEGACY_HTML_SESSION_EXPIRE_MINUTES: int = 1440  # 24 horas
 
     DEBUG: bool = True
     APP_NAME: str = "Vida Personal"
@@ -40,12 +52,28 @@ class Settings(BaseSettings):
     RATE_LIMIT_MAX_ATTEMPTS: int = 20
     RATE_LIMIT_WINDOW_SECONDS: int = 300
 
+    # Vacio = limiter en memoria (alcanza con una sola instancia de backend).
+    # Con mas de una instancia hace falta Redis: si no, cada proceso cuenta por
+    # separado y el limite efectivo se multiplica por la cantidad de replicas.
+    REDIS_URL: str = ""
+
     # Content-Security-Policy for HTML responses. Empty = disabled.
     # Example: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'"
     CONTENT_SECURITY_POLICY: str = ""
 
     UPLOAD_DIR: str = "uploads"
     MAX_UPLOAD_SIZE: int = 10485760
+
+    # Email transaccional (Resend). Sin API key los mails se loguean en vez de
+    # enviarse — asi dev y tests funcionan sin red ni cuenta.
+    RESEND_API_KEY: str = ""
+    MAIL_FROM: str = "no-reply@localhost"
+    MAIL_FROM_NAME: str = "Vida Personal"
+    # Base publica para armar los links de los mails (verificacion, reset).
+    PUBLIC_BASE_URL: str = "http://localhost:5173"
+
+    EMAIL_VERIFY_TOKEN_EXPIRE_HOURS: int = 24
+    PASSWORD_RESET_TOKEN_EXPIRE_HOURS: int = 1
 
     # Google OAuth (optional — leave empty to disable Google Calendar integration)
     GOOGLE_CLIENT_ID: str = ""

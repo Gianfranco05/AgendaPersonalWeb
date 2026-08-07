@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from fastapi import APIRouter, Depends, Request, Form
 from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -23,12 +25,42 @@ async def _get_theme(user_id: str, db) -> str:
 
 
 def _set_auth_cookie(response: RedirectResponse, user_id: str, theme: str = "violet") -> None:
-    token = create_access_token({"sub": str(user_id), "theme": theme})
+    # TTL propio (largo): este flujo no puede refrescar el token, ver
+    # LEGACY_HTML_SESSION_EXPIRE_MINUTES en config.py.
+    ttl_minutes = settings.LEGACY_HTML_SESSION_EXPIRE_MINUTES
+    token = create_access_token(
+        {"sub": str(user_id), "theme": theme},
+        expires_delta=timedelta(minutes=ttl_minutes),
+    )
     response.set_cookie(
         key=settings.JWT_COOKIE_NAME,
         value=token,
         httponly=True,
-        max_age=settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        max_age=ttl_minutes * 60,
+        samesite="lax",
+        secure=not settings.DEBUG,
+    )
+
+
+async def _issue_refresh_cookie(
+    response: RedirectResponse, request: Request, user_id: str, db
+) -> None:
+    """Registra la sesion HTML como refresh token.
+
+    El flujo HTML no lo usa para refrescar (no tiene interceptor), pero asi la
+    sesion aparece en GET /auth/api/sessions y el logout puede revocarla igual
+    que las de la SPA o mobile.
+    """
+    from app.modules.auth.refresh_service import RefreshService
+
+    raw = await RefreshService(db).issue(
+        str(user_id), device_info=request.headers.get("User-Agent")
+    )
+    response.set_cookie(
+        key=settings.REFRESH_COOKIE_NAME,
+        value=raw,
+        httponly=True,
+        max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 3600,
         samesite="lax",
         secure=not settings.DEBUG,
     )
@@ -63,6 +95,7 @@ async def login(
     theme = await _get_theme(user.id, db)
     response = RedirectResponse(url="/finanzas/", status_code=303)
     _set_auth_cookie(response, user.id, theme)
+    await _issue_refresh_cookie(response, request, user.id, db)
     return response
 
 
@@ -107,18 +140,27 @@ async def register(
 
     response = RedirectResponse(url="/finanzas/", status_code=303)
     _set_auth_cookie(response, user.id, "violet")
+    await _issue_refresh_cookie(response, request, user.id, db)
+    return response
+
+
+async def _logout_response(request: Request, db) -> RedirectResponse:
+    from app.modules.auth.refresh_service import RefreshService
+
+    raw = request.cookies.get(settings.REFRESH_COOKIE_NAME)
+    if raw:
+        await RefreshService(db).revoke(raw)
+    response = RedirectResponse(url="/auth/login", status_code=303)
+    response.delete_cookie(settings.JWT_COOKIE_NAME)
+    response.delete_cookie(settings.REFRESH_COOKIE_NAME)
     return response
 
 
 @router.post("/logout")
-async def logout(request: Request):
-    response = RedirectResponse(url="/auth/login", status_code=303)
-    response.delete_cookie(settings.JWT_COOKIE_NAME)
-    return response
+async def logout(request: Request, db: AsyncSession = Depends(get_db)):
+    return await _logout_response(request, db)
 
 
 @router.get("/logout")
-async def logout_get(request: Request):
-    response = RedirectResponse(url="/auth/login", status_code=303)
-    response.delete_cookie(settings.JWT_COOKIE_NAME)
-    return response
+async def logout_get(request: Request, db: AsyncSession = Depends(get_db)):
+    return await _logout_response(request, db)

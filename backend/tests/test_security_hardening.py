@@ -12,15 +12,32 @@ async def test_security_headers_present(client):
     assert "permissions-policy" in {k.lower() for k in response.headers.keys()}
 
 
-def test_rate_limiter_blocks_after_max_attempts():
+@pytest.mark.asyncio
+async def test_rate_limiter_blocks_after_max_attempts():
     limiter = SlidingWindowRateLimiter(max_attempts=3, window_seconds=60)
-    assert limiter.hit("1.2.3.4") == 0
-    assert limiter.hit("1.2.3.4") == 0
-    assert limiter.hit("1.2.3.4") == 0
-    retry_after = limiter.hit("1.2.3.4")
+    assert await limiter.hit("1.2.3.4") == 0
+    assert await limiter.hit("1.2.3.4") == 0
+    assert await limiter.hit("1.2.3.4") == 0
+    retry_after = await limiter.hit("1.2.3.4")
     assert retry_after >= 1
     # Other keys are unaffected
-    assert limiter.hit("5.6.7.8") == 0
+    assert await limiter.hit("5.6.7.8") == 0
+
+
+@pytest.mark.asyncio
+async def test_redis_limiter_falls_back_to_memory_when_redis_is_down():
+    from app.core.http_security import RedisSlidingWindowRateLimiter
+
+    limiter = RedisSlidingWindowRateLimiter(
+        # Puerto cerrado a proposito: simula Redis caido.
+        redis_url="redis://127.0.0.1:1/0",
+        max_attempts=2,
+        window_seconds=60,
+    )
+    # Falla abierto contra el limiter en memoria en vez de tirar la request.
+    assert await limiter.hit("1.2.3.4") == 0
+    assert await limiter.hit("1.2.3.4") == 0
+    assert await limiter.hit("1.2.3.4") >= 1
 
 
 @pytest.mark.asyncio
