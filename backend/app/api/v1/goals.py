@@ -228,7 +228,7 @@ async def list_habit_records(
     goal = await service.get_goal(current_user.id, goal_id)
     if not goal:
         raise HTTPException(status_code=404, detail="Meta no encontrada")
-    records = await service.get_month_records(goal_id, year, month)
+    records = await service.get_month_records(goal_id, current_user.id, year, month)
     return records
 
 

@@ -58,42 +58,42 @@ class GoalRepository:
         return record
 
     async def get_recent_records(
-        self, goal_id: str, days: int = 7
+        self, goal_id: str, user_id: str, days: int = 7
     ) -> list[HabitRecord]:
         result = await self.db.execute(
             select(HabitRecord)
-            .where(HabitRecord.goal_id == goal_id)
+            .where(HabitRecord.goal_id == goal_id, HabitRecord.user_id == user_id)
             .where(HabitRecord.record_date >= date.today() - timedelta(days=days))
             .order_by(HabitRecord.record_date.desc())
         )
         return list(result.scalars().all())
 
     async def get_today_record(
-        self, goal_id: str, today: date
+        self, goal_id: str, user_id: str, today: date
     ) -> Optional[HabitRecord]:
         result = await self.db.execute(
             select(HabitRecord)
-            .where(HabitRecord.goal_id == goal_id)
+            .where(HabitRecord.goal_id == goal_id, HabitRecord.user_id == user_id)
             .where(HabitRecord.record_date == today)
         )
         return result.scalar_one_or_none()
 
     async def get_record_by_date(
-        self, goal_id: str, record_date: date
+        self, goal_id: str, user_id: str, record_date: date
     ) -> Optional[HabitRecord]:
         result = await self.db.execute(
             select(HabitRecord)
-            .where(HabitRecord.goal_id == goal_id)
+            .where(HabitRecord.goal_id == goal_id, HabitRecord.user_id == user_id)
             .where(HabitRecord.record_date == record_date)
         )
         return result.scalar_one_or_none()
 
     async def get_records_in_range(
-        self, goal_id: str, start: date, end: date
+        self, goal_id: str, user_id: str, start: date, end: date
     ) -> list[HabitRecord]:
         result = await self.db.execute(
             select(HabitRecord)
-            .where(HabitRecord.goal_id == goal_id)
+            .where(HabitRecord.goal_id == goal_id, HabitRecord.user_id == user_id)
             .where(HabitRecord.record_date >= start, HabitRecord.record_date <= end)
             .order_by(HabitRecord.record_date.asc())
         )

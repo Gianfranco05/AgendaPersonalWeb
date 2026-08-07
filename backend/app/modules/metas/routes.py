@@ -26,7 +26,7 @@ async def lista_metas(request: Request, db: AsyncSession = Depends(get_db)):
     completed_goals = await service.list_completed_goals(user_id)
 
     for goal in goals:
-        records = await service.repo.get_recent_records(goal.id, days=7)
+        records = await service.repo.get_recent_records(goal.id, user_id, days=7)
         goal.recent_records = records
 
         if goal.goal_type == "binary":

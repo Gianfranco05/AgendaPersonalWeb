@@ -61,7 +61,7 @@ class GoalsService:
         self, user_id: str, goal_id: str, value: float, notes: str | None
     ) -> HabitRecord:
         today = date.today()
-        record = await self.repo.get_today_record(goal_id, today)
+        record = await self.repo.get_today_record(goal_id, user_id, today)
 
         if record:
             record.value = value
@@ -98,7 +98,7 @@ class GoalsService:
             if goal.target_value and goal.target_value > 0
             else 0
         )
-        streak = await self.get_streak(goal.id)
+        streak = await self.get_streak(goal.id, goal.user_id)
         return GoalProgress(
             current_value=goal.current_value,
             target_value=goal.target_value,
@@ -114,7 +114,7 @@ class GoalsService:
         value: float,
         notes: str | None,
     ) -> HabitRecord:
-        existing = await self.repo.get_record_by_date(goal_id, record_date)
+        existing = await self.repo.get_record_by_date(goal_id, user_id, record_date)
         if existing:
             existing.value = value
             existing.notes = notes
@@ -131,11 +131,11 @@ class GoalsService:
         return await self.repo.add_checkin(record)
 
     async def get_month_records(
-        self, goal_id: str, year: int, month: int
+        self, goal_id: str, user_id: str, year: int, month: int
     ) -> list[HabitRecord]:
         start = date(year, month, 1)
         end = date(year, month, calendar.monthrange(year, month)[1])
-        return await self.repo.get_records_in_range(goal_id, start, end)
+        return await self.repo.get_records_in_range(goal_id, user_id, start, end)
 
     async def get_monthly_summary(
         self, user_id: str, year: int, month: int
@@ -155,8 +155,8 @@ class GoalsService:
             for row in rows
         ]
 
-    async def get_streak(self, goal_id: str) -> int:
-        records = await self.repo.get_recent_records(goal_id, days=30)
+    async def get_streak(self, goal_id: str, user_id: str) -> int:
+        records = await self.repo.get_recent_records(goal_id, user_id, days=30)
         dates = [r.record_date for r in records]
         if not dates:
             return 0

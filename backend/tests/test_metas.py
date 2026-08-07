@@ -311,3 +311,23 @@ async def test_api_v1_goals_records_requires_valid_goal(api_auth_client):
         "/api/v1/goals/does-not-exist/records", params={"year": 2026, "month": 7}
     )
     assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_list_goals_with_existing_goal(auth_client):
+    """La vista HTML solo recorre el loop de recent_records si hay al menos una
+    meta — con la lista vacia nunca se llama al repo y un cambio de firma pasa
+    desapercibido."""
+    await auth_client.post("/metas/nueva", data={
+        "title": "Leer",
+        "description": "",
+        "goal_type": "binary",
+        "target_value": "10",
+        "unit": "dias",
+        "color": "#7C3AED",
+        "icon": "fa-book",
+    })
+
+    response = await auth_client.get("/metas/")
+    assert response.status_code == 200
+    assert "Leer" in response.text
