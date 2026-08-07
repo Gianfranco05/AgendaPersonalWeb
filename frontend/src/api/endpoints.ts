@@ -795,3 +795,31 @@ export async function disconnectGoogleCalendar(): Promise<Settings> {
   const { data } = await apiClient.post<Settings>('/api/v1/settings/google/disconnect');
   return data;
 }
+
+// ── Cuenta (export y baja) ──
+
+export async function exportMyData(): Promise<Blob> {
+  if (MOCK_ENABLED) {
+    return mockDelay(
+      new Blob([JSON.stringify({ user: {}, format_version: 1 }, null, 2)], {
+        type: 'application/json',
+      }),
+    );
+  }
+  // responseType blob: el export puede ser grande y se baja como archivo, no se
+  // parsea a un objeto en memoria.
+  const { data } = await apiClient.get<Blob>('/api/v1/me/export', {
+    responseType: 'blob',
+  });
+  return data;
+}
+
+export async function deleteMyAccount(password: string): Promise<void> {
+  if (MOCK_ENABLED) {
+    await mockDelay(null);
+    return;
+  }
+  // El backend pide la contraseña en el body para reautenticar antes de un
+  // borrado irreversible; axios manda body en DELETE via `data`.
+  await apiClient.delete('/api/v1/me', { data: { password } });
+}

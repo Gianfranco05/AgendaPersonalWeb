@@ -8,6 +8,7 @@ from app.api.v1.settings import router as settings_router
 from app.api.v1.fitness import router as fitness_router
 from app.api.v1.nutrition import router as nutrition_router
 from app.api.v1.tasks import router as tasks_router
+from app.api.v1.account import router as account_router
 from app.modules.billing.api_routes import router as billing_router
 from app.infra.router import router as infra_router
 
@@ -21,5 +22,6 @@ api_router.include_router(settings_router)
 api_router.include_router(fitness_router)
 api_router.include_router(nutrition_router)
 api_router.include_router(tasks_router)
+api_router.include_router(account_router)
 api_router.include_router(billing_router)
 api_router.include_router(infra_router)

@@ -122,6 +122,18 @@ export default function RegisterPage() {
             </button>
           </form>
 
+          <p className="mt-4 text-center text-xs text-gray-400 dark:text-slate-500">
+            Al crear una cuenta aceptás los{' '}
+            <Link to="/terms" className="hover:underline">
+              Términos y Condiciones
+            </Link>{' '}
+            y la{' '}
+            <Link to="/privacy" className="hover:underline">
+              Política de Privacidad
+            </Link>
+            .
+          </p>
+
           <p className="mt-6 text-center text-sm text-gray-500 dark:text-slate-400">
             ¿Ya tenés cuenta?{' '}
             <Link to="/login" className="font-medium text-brand-indigo hover:text-brand-indigo-hover">

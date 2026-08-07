@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { Sun, Moon, Save, Check, Loader2, Calendar, RefreshCw, Unlink } from 'lucide-react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { Sun, Moon, Save, Check, Loader2, Calendar, RefreshCw, Unlink, Download, Trash2, AlertTriangle } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { useTheme } from '../../context/ThemeContext';
 import { useSettings, syncGoogle, disconnectGoogle } from '../../hooks/useSettings';
+import { exportMyData, deleteMyAccount } from '../../api/endpoints';
 
 const inputCls =
   'w-full rounded-lg border border-gray-200 dark:border-slate-700 px-3 py-2 text-sm focus:border-brand-indigo focus:outline-none focus:ring-1 focus:ring-brand-indigo disabled:bg-gray-50 disabled:text-gray-400';
@@ -68,6 +69,53 @@ export default function SettingsPage() {
       setGoogleMessage('Error al desconectar Google Calendar.');
     } finally {
       setGoogleAction('idle');
+    }
+  }
+
+  const [exportState, setExportState] = useState<'idle' | 'working' | 'error'>('idle');
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deleteState, setDeleteState] = useState<'idle' | 'working' | 'error'>('idle');
+  const [deleteError, setDeleteError] = useState('');
+
+  async function handleExport() {
+    setExportState('working');
+    try {
+      const blob = await exportMyData();
+      // Descarga sin navegar: el endpoint requiere la cookie de sesión, así que
+      // un <a href> directo tampoco haría daño, pero esto evita perder el estado
+      // de la página y funciona igual con el token Bearer del cliente mobile.
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `vida-personal-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      setExportState('idle');
+    } catch {
+      setExportState('error');
+    }
+  }
+
+  async function handleDelete(e: React.FormEvent) {
+    e.preventDefault();
+    if (deleteState === 'working') return;
+    setDeleteState('working');
+    setDeleteError('');
+    try {
+      await deleteMyAccount(deletePassword);
+      // La cuenta ya no existe: no tiene sentido llamar a logout (su endpoint
+      // respondería 401). Se limpia el estado local y se sale a /login.
+      useAuthStore.setState({ user: null, isAuthenticated: false });
+      window.location.href = '/login';
+    } catch (err) {
+      setDeleteState('error');
+      setDeleteError(
+        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ??
+          'No se pudo eliminar la cuenta',
+      );
     }
   }
 
@@ -201,6 +249,112 @@ export default function SettingsPage() {
           </div>
         )}
       </div>
+
+      <div className="space-y-4 rounded-xl bg-white dark:bg-slate-800 p-6 shadow-sm">
+        <div className="flex items-center gap-2">
+          <Download size={18} className="text-brand-indigo" />
+          <h3 className="text-sm font-semibold text-gray-700 dark:text-slate-200">Tus datos</h3>
+        </div>
+        <p className="text-sm text-gray-500 dark:text-slate-400">
+          Descargá un archivo JSON con todo lo que guardamos: transacciones, tareas,
+          notas, eventos, metas, entrenamientos y comidas.
+        </p>
+        <button
+          type="button"
+          onClick={handleExport}
+          disabled={exportState === 'working'}
+          className="flex items-center gap-2 rounded-lg border border-gray-200 dark:border-slate-700 px-4 py-2 text-sm text-gray-700 dark:text-slate-200 transition-colors hover:bg-gray-50 dark:hover:bg-slate-700/50 disabled:opacity-50"
+        >
+          {exportState === 'working' ? (
+            <Loader2 size={16} className="animate-spin" />
+          ) : (
+            <Download size={16} />
+          )}
+          {exportState === 'working' ? 'Preparando…' : 'Descargar mis datos'}
+        </button>
+        {exportState === 'error' && (
+          <p className="text-sm text-red-500 dark:text-red-400">
+            No se pudo generar la descarga. Probá de nuevo.
+          </p>
+        )}
+      </div>
+
+      <div className="space-y-4 rounded-xl border border-rose-200 dark:border-rose-900/50 bg-white dark:bg-slate-800 p-6 shadow-sm">
+        <div className="flex items-center gap-2">
+          <AlertTriangle size={18} className="text-rose-500" />
+          <h3 className="text-sm font-semibold text-rose-600 dark:text-rose-400">
+            Eliminar cuenta
+          </h3>
+        </div>
+        <p className="text-sm text-gray-500 dark:text-slate-400">
+          Borra tu cuenta y todos tus datos de forma permanente. No se puede
+          deshacer: descargá tus datos antes si querés conservarlos.
+        </p>
+
+        {!confirmingDelete ? (
+          <button
+            type="button"
+            onClick={() => setConfirmingDelete(true)}
+            className="flex items-center gap-2 rounded-lg border border-rose-200 dark:border-rose-900/50 px-4 py-2 text-sm text-rose-500 transition-colors hover:bg-rose-50 dark:hover:bg-rose-900/20"
+          >
+            <Trash2 size={16} />
+            Eliminar mi cuenta
+          </button>
+        ) : (
+          <form onSubmit={handleDelete} className="space-y-3">
+            <label className="block text-xs font-medium text-gray-500 dark:text-slate-400">
+              Confirmá tu contraseña para continuar
+            </label>
+            <input
+              type="password"
+              value={deletePassword}
+              onChange={(e) => setDeletePassword(e.target.value)}
+              autoComplete="current-password"
+              required
+              className={inputCls}
+            />
+            <div className="flex items-center gap-3">
+              <button
+                type="submit"
+                disabled={deleteState === 'working' || !deletePassword}
+                className="flex items-center gap-2 rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {deleteState === 'working' ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <Trash2 size={16} />
+                )}
+                {deleteState === 'working' ? 'Eliminando…' : 'Eliminar definitivamente'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setConfirmingDelete(false);
+                  setDeletePassword('');
+                  setDeleteState('idle');
+                  setDeleteError('');
+                }}
+                className="text-sm text-gray-500 dark:text-slate-400 hover:underline"
+              >
+                Cancelar
+              </button>
+            </div>
+            {deleteState === 'error' && (
+              <p className="text-sm text-red-500 dark:text-red-400">{deleteError}</p>
+            )}
+          </form>
+        )}
+      </div>
+
+      <p className="pb-2 text-center text-xs text-gray-400 dark:text-slate-500">
+        <Link to="/terms" className="hover:underline">
+          Términos y Condiciones
+        </Link>
+        {' · '}
+        <Link to="/privacy" className="hover:underline">
+          Política de Privacidad
+        </Link>
+      </p>
     </div>
   );
 }

@@ -19,6 +19,8 @@ const EventsPage = lazy(() => import('./pages/Events/EventsPage'));
 const FitnessPage = lazy(() => import('./pages/Fitness/FitnessPage'));
 const NutritionPage = lazy(() => import('./pages/Nutrition/NutritionPage'));
 const HabitsPage = lazy(() => import('./pages/Habits/HabitsPage'));
+const TermsPage = lazy(() => import('./pages/Legal/TermsPage'));
+const PrivacyPage = lazy(() => import('./pages/Legal/PrivacyPage'));
 
 export default function App() {
   const checkAuth = useAuthStore((s) => s.checkAuth);
@@ -34,6 +36,10 @@ export default function App() {
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
+            {/* Públicas: tienen que ser accesibles antes de registrarse, ya que
+                el registro remite a ellas. */}
+            <Route path="/terms" element={<Suspense fallback={<LoadingSkeleton type="page" />}><TermsPage /></Suspense>} />
+            <Route path="/privacy" element={<Suspense fallback={<LoadingSkeleton type="page" />}><PrivacyPage /></Suspense>} />
             <Route element={<ProtectedRoute />}>
               <Route element={<Layout />}>
                 <Route path="/" element={<DashboardPage />} />
