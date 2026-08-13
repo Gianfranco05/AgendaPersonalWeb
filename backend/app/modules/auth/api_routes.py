@@ -405,9 +405,15 @@ async def api_reset_password(
 async def api_logout(
     request: Request,
     response: Response,
+    data: Optional[RefreshRequest] = None,
     db: AsyncSession = Depends(get_db),
 ):
-    raw = request.cookies.get(settings.REFRESH_COOKIE_NAME)
+    # Mobile no tiene cookies: manda el refresh en el body para poder revocarlo.
+    # Sin esto su sesion sigue viva en el server hasta vencer, aunque el celular
+    # ya haya borrado el token.
+    raw = (data.refresh_token if data else None) or request.cookies.get(
+        settings.REFRESH_COOKIE_NAME
+    )
     if raw:
         await RefreshService(db).revoke(raw)
     response.delete_cookie(settings.JWT_COOKIE_NAME)

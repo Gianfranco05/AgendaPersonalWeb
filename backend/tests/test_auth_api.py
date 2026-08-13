@@ -61,3 +61,37 @@ async def test_cookie_still_works_without_bearer_header(auth_client):
     # que agregar soporte Bearer no rompe el camino de cookie.
     response = await auth_client.get("/api/v1/tasks")
     assert response.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_logout_with_body_revokes_refresh_token(client, test_user):
+    login_resp = await client.post("/auth/api/login", json={
+        "email": "test@test.com",
+        "password": "test123",
+    })
+    refresh_token = login_resp.json()["refresh_token"]
+
+    # Sin cookies, como la app movil: el refresh viaja en el body.
+    client.cookies.clear()
+
+    logout_resp = await client.post(
+        "/auth/api/logout", json={"refresh_token": refresh_token}
+    )
+    assert logout_resp.status_code == 200
+
+    # El refresh revocado ya no puede renovar la sesion.
+    refresh_resp = await client.post(
+        "/auth/api/refresh", json={"refresh_token": refresh_token}
+    )
+    assert refresh_resp.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_logout_without_body_still_works(client, test_user):
+    await client.post("/auth/api/login", json={
+        "email": "test@test.com",
+        "password": "test123",
+    })
+    # La web no manda body: el refresh sale de la cookie.
+    response = await client.post("/auth/api/logout")
+    assert response.status_code == 200
