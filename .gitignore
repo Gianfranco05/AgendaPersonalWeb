@@ -3,13 +3,26 @@ __pycache__/
 *.py[cod]
 *$py.class
 *.so
-.env
-*.db
 venv/
 env/
 *.egg-info/
 dist/
 build/
+
+# Variables de entorno. `.env` solo cubre ese nombre exacto: sin `.env.*` un
+# `.env.local` o `.env.prod` se subiria con las claves adentro.
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Bases de datos locales (contienen los datos reales de los usuarios)
+*.db
+*.sqlite
+*.sqlite3
+
+# Archivos subidos por usuarios (datos personales)
+uploads/
 
 # Node
 node_modules/
