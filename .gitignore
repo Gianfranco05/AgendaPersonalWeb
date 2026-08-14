@@ -41,6 +41,10 @@ cookies.txt
 *.swp
 *.swo
 
+# Configuracion local de Claude Code (permisos, comandos, skills): es del
+# entorno de trabajo, no del proyecto. Queda en el disco, fuera del repo.
+.claude/
+
 # OS
 .DS_Store
 Thumbs.db
