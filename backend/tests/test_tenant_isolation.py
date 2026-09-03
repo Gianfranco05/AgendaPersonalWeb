@@ -12,6 +12,7 @@ async def _register(client: AsyncClient, email: str) -> None:
         "email": email,
         "full_name": "Test",
         "password": "testpass123",
+        "accept_terms": True,
     })
     assert resp.status_code == 201, resp.text
 

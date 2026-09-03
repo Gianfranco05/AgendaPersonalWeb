@@ -42,6 +42,13 @@ class Settings(BaseSettings):
     APP_NAME: str = "Vida Personal"
     APP_VERSION: str = "1.0.0"
 
+    # Version de Terminos y Condiciones / Politica de Privacidad vigente (ver
+    # legal/). Subir esto obliga a re-aceptar a TODOS los usuarios (incluidos
+    # los que ya habian aceptado una version anterior) la proxima vez que
+    # abran la app — es la forma de notificar un cambio significativo de
+    # terminos sin depender de que alguien lea un mail.
+    CURRENT_TERMS_VERSION: str = "1.0"
+
     ALLOWED_ORIGINS: str = (
         "http://localhost:8000,http://127.0.0.1:8000,"
         "http://localhost:5173,http://127.0.0.1:5173"

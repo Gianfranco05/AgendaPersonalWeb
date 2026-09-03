@@ -27,6 +27,14 @@ class User(Base):
     is_superuser: Mapped[bool] = mapped_column(Boolean, default=False)
     # No bloquea el login: la SPA lo usa para mostrar un aviso hasta confirmar.
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Version de Terminos/Privacidad aceptada (ver settings.CURRENT_TERMS_VERSION).
+    # None = nunca acepto nada (cuenta nueva, o cuenta de antes de que existiera
+    # este campo). Si no coincide con la version actual, el cliente tiene que
+    # mostrar el gate de aceptacion antes de dejar usar el resto de la app.
+    terms_accepted_version: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    terms_accepted_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

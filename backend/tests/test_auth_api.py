@@ -20,6 +20,7 @@ async def test_api_register_returns_access_token(client):
         "email": "mobile@test.com",
         "full_name": "Mobile User",
         "password": "mobilepass123",
+        "accept_terms": True,
     })
     assert response.status_code == 201
     data = response.json()

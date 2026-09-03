@@ -1,6 +1,6 @@
 import logging
 import secrets
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Request, Response, HTTPException, status
@@ -34,6 +34,14 @@ class RegisterRequest(BaseModel):
     email: EmailStr
     full_name: str
     password: str
+    # Checkbox obligatorio del formulario. Sin default a proposito: Pydantic
+    # v2 no corre validators sobre un valor default salvo validate_default=True,
+    # asi que un default=False dejaria pasar el campo ausente sin chequear
+    # nada. Sin default, omitirlo ya da 422 "field required" solo. Tampoco es
+    # solo un chequeo de UI: el backend lo exige para que "creaste la cuenta"
+    # implique siempre "aceptaste la version vigente" — sin esto, alguien
+    # podria pegarle directo a la API salteando el checkbox del cliente.
+    accept_terms: bool
 
     @field_validator("password")
     @classmethod
@@ -42,12 +50,23 @@ class RegisterRequest(BaseModel):
             raise ValueError("La contraseña debe tener al menos 6 caracteres")
         return v
 
+    @field_validator("accept_terms")
+    @classmethod
+    def must_accept_terms(cls, v):
+        if not v:
+            raise ValueError("Tenés que aceptar los Términos y la Política de Privacidad")
+        return v
+
 
 class UserOut(BaseModel):
     id: str
     email: str
     full_name: str
     is_verified: bool = True
+    # None = todavia no acepto la version vigente (ver settings.CURRENT_TERMS_VERSION).
+    # El cliente compara esto contra la version actual para decidir si muestra
+    # el gate de aceptacion antes de dejar usar el resto de la app.
+    terms_accepted_version: Optional[str] = None
 
 
 class AuthResponse(BaseModel):
@@ -57,6 +76,7 @@ class AuthResponse(BaseModel):
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
+    terms_accepted_version: Optional[str] = None
 
 
 class RefreshRequest(BaseModel):
@@ -180,6 +200,7 @@ async def api_login(
         full_name=user.full_name,
         access_token=access_token,
         refresh_token=refresh_token,
+        terms_accepted_version=user.terms_accepted_version,
     )
 
 
@@ -202,6 +223,9 @@ async def api_register(
         email=data.email,
         full_name=data.full_name,
         password_hash=hash_password(data.password),
+        # accept_terms=True ya lo garantizo el validator del schema.
+        terms_accepted_version=settings.CURRENT_TERMS_VERSION,
+        terms_accepted_at=datetime.now(timezone.utc),
     )
     db.add(user)
     await db.commit()
@@ -219,6 +243,7 @@ async def api_register(
         full_name=user.full_name,
         access_token=access_token,
         refresh_token=refresh_token,
+        terms_accepted_version=user.terms_accepted_version,
     )
 
 
@@ -229,6 +254,7 @@ async def api_me(current_user: User = Depends(get_current_user)):
         email=current_user.email,
         full_name=current_user.full_name,
         is_verified=current_user.is_verified,
+        terms_accepted_version=current_user.terms_accepted_version,
     )
 
 
@@ -247,6 +273,41 @@ async def api_update_me(
         email=current_user.email,
         full_name=current_user.full_name,
         is_verified=current_user.is_verified,
+        terms_accepted_version=current_user.terms_accepted_version,
+    )
+
+
+class AcceptTermsRequest(BaseModel):
+    # El cliente manda la version que esta mostrando (embebida en el bundle),
+    # no la actual del server: si no coinciden, es porque el cliente quedo
+    # desactualizado (mostro un texto viejo) y el server rechaza la
+    # aceptacion en vez de guardar silenciosamente que acepto "la vigente" —
+    # eso invalidaria la evidencia de que acepto el texto que en verdad leyo.
+    version: str
+
+
+@router.post("/accept-terms", response_model=UserOut)
+async def api_accept_terms(
+    data: AcceptTermsRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if data.version != settings.CURRENT_TERMS_VERSION:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Los Términos cambiaron. Actualizá la app antes de continuar.",
+        )
+    current_user.terms_accepted_version = data.version
+    current_user.terms_accepted_at = datetime.now(timezone.utc)
+    db.add(current_user)
+    await db.commit()
+    await db.refresh(current_user)
+    return UserOut(
+        id=str(current_user.id),
+        email=current_user.email,
+        full_name=current_user.full_name,
+        is_verified=current_user.is_verified,
+        terms_accepted_version=current_user.terms_accepted_version,
     )
 
 
@@ -358,6 +419,7 @@ async def api_verify_email(
         email=user.email,
         full_name=user.full_name,
         is_verified=user.is_verified,
+        terms_accepted_version=user.terms_accepted_version,
     )
 
 
