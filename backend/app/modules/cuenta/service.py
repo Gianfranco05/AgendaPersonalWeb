@@ -24,7 +24,10 @@ from app.modules.billing.models import Subscription
 from app.modules.eventos.models import Event
 from app.modules.finanzas.models import BankAccount, Budget, Category, Transaction
 from app.modules.fitness.models import Exercise, WorkoutSession
+from app.modules.estudio.models import Exam, Subject
+from app.modules.focus.models import FocusSession
 from app.modules.metas.models import Goal, HabitRecord
+from app.modules.modulos.models import EnabledModule
 from app.modules.nutricion.models import Meal
 from app.modules.tareas.models import Task
 
@@ -43,7 +46,9 @@ OWNED_TABLES: list[tuple[str, Any]] = [
     ("transactions", Transaction),
     ("budgets", Budget),
     ("habit_records", HabitRecord),
+    ("exams", Exam),
     # Padres.
+    ("subjects", Subject),
     ("categories", Category),
     ("goals", Goal),
     ("bank_accounts", BankAccount),
@@ -55,6 +60,8 @@ OWNED_TABLES: list[tuple[str, Any]] = [
     ("workout_sessions", WorkoutSession),
     ("user_preferences", UserPreference),
     ("subscriptions", Subscription),
+    ("enabled_modules", EnabledModule),
+    ("focus_sessions", FocusSession),
     ("refresh_tokens", RefreshToken),
     ("verification_tokens", VerificationToken),
 ]

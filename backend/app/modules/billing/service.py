@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.auth.models import User
-from app.modules.billing.models import Plan, Subscription
+from app.modules.billing.models import Plan, Subscription, SubscriptionStatus
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +71,24 @@ class BillingService:
         terminal = {"canceled", "unpaid", "incomplete_expired"}
         sub.plan = Plan.FREE if status in terminal else Plan.PRO
 
+        await self.db.commit()
+        return True
+
+    async def apply_elite_purchase(self, customer_id: str) -> bool:
+        """Pago unico de Elite: no hay objeto de suscripcion de Stripe, asi que
+        esto se dispara desde checkout.session.completed en vez de un evento
+        customer.subscription.*.
+        """
+        sub = await self._by_customer(customer_id)
+        if sub is None:
+            logger.warning(
+                "Webhook de Stripe (Elite) para un customer desconocido: %s", customer_id
+            )
+            return False
+
+        sub.plan = Plan.ELITE
+        sub.status = SubscriptionStatus.ACTIVE
+        sub.current_period_end = None
         await self.db.commit()
         return True
 

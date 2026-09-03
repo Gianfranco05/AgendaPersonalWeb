@@ -11,6 +11,9 @@ from app.core.base import Base
 class Plan:
     FREE = "free"
     PRO = "pro"
+    # Pago unico (lifetime): no tiene stripe_subscription_id ni current_period_end
+    # (no hay periodo que vencer), se marca via el evento checkout.session.completed.
+    ELITE = "elite"
 
 
 class SubscriptionStatus:
@@ -60,6 +63,8 @@ class Subscription(Base):
 
     @property
     def is_pro(self) -> bool:
+        if self.plan == Plan.ELITE:
+            return True
         if self.plan != Plan.PRO or self.status not in ENTITLED_STATUSES:
             return False
         if self.current_period_end is None:

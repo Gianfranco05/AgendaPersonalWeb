@@ -1,7 +1,10 @@
+import logging
+import secrets
 from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Request, Response, HTTPException, status
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, EmailStr, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,10 +14,13 @@ from app.config import settings
 from app.core.security import verify_password, create_access_token, hash_password
 from app.core.dependencies import get_current_user
 from app.core.http_security import rate_limit_auth
+from app.core.redirect_safety import validate_app_redirect
 from app.core.email import send_password_reset_email, send_verification_email
 from app.modules.auth.models import User, VerificationPurpose
 from app.modules.auth.refresh_service import RefreshService, RefreshTokenReuseError
 from app.modules.auth.verification_service import VerificationService
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth/api", tags=["auth-json"])
 
@@ -419,3 +425,150 @@ async def api_logout(
     response.delete_cookie(settings.JWT_COOKIE_NAME)
     response.delete_cookie(settings.REFRESH_COOKIE_NAME)
     return {"ok": True}
+
+
+# ── Iniciar sesion con Google ──────────────────────────────────────────────
+#
+# El intercambio con Google lo hace siempre el backend, nunca el cliente: el
+# celular no puede guardar un client secret con seguridad. El flujo es:
+#
+#   1. GET /google/login?app_redirect=<url a la que el navegador debe volver
+#      dentro de la app> -> redirige a la pantalla de consentimiento de
+#      Google, con esta URL viajando (firmada) en el parametro `state`.
+#   2. Google vuelve a GET /google/callback?code&state -> el backend valida
+#      el state, canjea el code, verifica la identidad, crea o encuentra al
+#      usuario, emite la sesion propia, y redirige de vuelta a `app_redirect`
+#      con el access/refresh token en la query string.
+#
+def _sign_oauth_state(app_redirect: str) -> str:
+    import base64
+    import hashlib
+    import hmac
+    import json
+    import time
+
+    payload = json.dumps({"r": app_redirect, "exp": time.time() + 300}).encode()
+    body = base64.urlsafe_b64encode(payload).decode()
+    sig = hmac.new(settings.SECRET_KEY.encode(), body.encode(), hashlib.sha256).hexdigest()
+    return f"{body}.{sig}"
+
+
+def _verify_oauth_state(state: str) -> Optional[str]:
+    import base64
+    import hashlib
+    import hmac
+    import json
+    import time
+
+    try:
+        body, sig = state.split(".", 1)
+        expected = hmac.new(settings.SECRET_KEY.encode(), body.encode(), hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(sig, expected):
+            return None
+        payload = json.loads(base64.urlsafe_b64decode(body.encode()))
+        if payload.get("exp", 0) < time.time():
+            return None
+        return payload.get("r")
+    except Exception:
+        return None
+
+
+def _build_google_login_flow():
+    from google_auth_oauthlib.flow import Flow
+
+    return Flow.from_client_config(
+        client_config={
+            "web": {
+                "client_id": settings.GOOGLE_CLIENT_ID,
+                "client_secret": settings.GOOGLE_CLIENT_SECRET,
+                "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                "token_uri": "https://oauth2.googleapis.com/token",
+                "redirect_uris": [settings.GOOGLE_LOGIN_REDIRECT_URI],
+            }
+        },
+        scopes=[
+            "openid",
+            "https://www.googleapis.com/auth/userinfo.email",
+            "https://www.googleapis.com/auth/userinfo.profile",
+        ],
+        redirect_uri=settings.GOOGLE_LOGIN_REDIRECT_URI,
+    )
+
+
+@router.get("/google/login")
+async def api_google_login_start(app_redirect: str):
+    if not settings.GOOGLE_CLIENT_ID or not settings.GOOGLE_CLIENT_SECRET:
+        raise HTTPException(status_code=503, detail="Login con Google no esta configurado")
+
+    validate_app_redirect(app_redirect)
+
+    flow = _build_google_login_flow()
+    auth_url, _ = flow.authorization_url(
+        access_type="online",
+        include_granted_scopes="true",
+        prompt="select_account",
+        state=_sign_oauth_state(app_redirect),
+    )
+    return RedirectResponse(url=auth_url, status_code=303)
+
+
+@router.get("/google/callback")
+async def api_google_login_callback(
+    request: Request,
+    code: Optional[str] = None,
+    state: Optional[str] = None,
+    error: Optional[str] = None,
+    db: AsyncSession = Depends(get_db),
+):
+    app_redirect = _verify_oauth_state(state) if state else None
+    if not app_redirect:
+        raise HTTPException(status_code=400, detail="Sesión de login inválida o vencida")
+
+    if error or not code:
+        return RedirectResponse(url=f"{app_redirect}?error=google_denied", status_code=303)
+
+    try:
+        import asyncio
+
+        from google.auth.transport import requests as google_requests
+        from google.oauth2 import id_token as google_id_token
+
+        flow = _build_google_login_flow()
+        await asyncio.to_thread(flow.fetch_token, code=code)
+        credentials = flow.credentials
+
+        idinfo = await asyncio.to_thread(
+            google_id_token.verify_oauth2_token,
+            credentials.id_token,
+            google_requests.Request(),
+            settings.GOOGLE_CLIENT_ID,
+        )
+        email = idinfo["email"]
+        full_name = idinfo.get("name") or email.split("@")[0]
+    except Exception:
+        logger.exception("Fallo el intercambio de codigo o la verificacion de identidad con Google")
+        return RedirectResponse(url=f"{app_redirect}?error=google_failed", status_code=303)
+
+    result = await db.execute(select(User).where(User.email == email))
+    user = result.scalar_one_or_none()
+
+    if user is None:
+        # Cuenta nueva, creada solo por Google: el hash es aleatorio e
+        # inutilizable — nadie puede loguearse con password en esta cuenta.
+        # El email ya viene verificado por Google, asi que is_verified=True.
+        user = User(
+            email=email,
+            full_name=full_name,
+            password_hash=hash_password(secrets.token_urlsafe(32)),
+            is_verified=True,
+        )
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
+    elif not user.is_active:
+        return RedirectResponse(url=f"{app_redirect}?error=inactive_account", status_code=303)
+
+    redirect_response = RedirectResponse(url="about:blank", status_code=303)
+    access_token, refresh_token = await _issue_session(db, redirect_response, request, user)
+    redirect_response.headers["location"] = f"{app_redirect}?access_token={access_token}&refresh_token={refresh_token}"
+    return redirect_response

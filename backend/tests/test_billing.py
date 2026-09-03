@@ -40,6 +40,22 @@ def _signed(payload: dict) -> tuple[str, dict]:
     }
 
 
+def _checkout_completed_event(customer_id: str, tier: str, mode: str = "payment") -> dict:
+    return {
+        "id": "evt_checkout",
+        "object": "event",
+        "type": "checkout.session.completed",
+        "data": {
+            "object": {
+                "id": "cs_test_123",
+                "customer": customer_id,
+                "mode": mode,
+                "metadata": {"tier": tier},
+            }
+        },
+    }
+
+
 def _subscription_event(customer_id: str, status: str, period_end_days: int = 30) -> dict:
     return {
         "id": "evt_test",
@@ -245,3 +261,111 @@ async def test_everything_is_pro_when_billing_is_disabled(db_session, test_user)
     from app.core.plans import current_user_is_pro
 
     assert await current_user_is_pro(current_user=test_user, db=db_session) is True
+
+
+async def test_elite_plan_is_always_pro_and_never_expires():
+    # Pago unico: no tiene current_period_end (nada que vencer) ni depende de status.
+    assert _sub(plan=Plan.ELITE, status=None, current_period_end=None).is_pro is True
+
+
+# ── Tiers / precios / app_redirect (mobile) ──────────────────────────────────
+
+async def test_plans_empty_when_billing_disabled(api_auth_client):
+    resp = await api_auth_client.get("/api/v1/billing/plans")
+    assert resp.status_code == 200
+    assert resp.json() == {"billing_enabled": False, "plans": []}
+
+
+async def test_plans_lists_only_configured_tiers(api_auth_client, billing_enabled, monkeypatch):
+    from unittest.mock import MagicMock
+
+    fake_price = MagicMock(unit_amount=799, currency="usd", recurring={"interval": "month"})
+    fake_stripe = MagicMock()
+    fake_stripe.Price.retrieve.return_value = fake_price
+    monkeypatch.setattr(
+        "app.modules.billing.api_routes._stripe", lambda: fake_stripe
+    )
+
+    resp = await api_auth_client.get("/api/v1/billing/plans")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["billing_enabled"] is True
+    # billing_enabled solo configura STRIPE_PRICE_ID_PRO: anual y elite quedan afuera.
+    assert len(data["plans"]) == 1
+    assert data["plans"][0] == {
+        "tier": "pro_monthly",
+        "amount": 799,
+        "currency": "usd",
+        "interval": "month",
+    }
+
+
+async def test_checkout_rejects_invalid_tier(api_auth_client, billing_enabled):
+    resp = await api_auth_client.post("/api/v1/billing/checkout?tier=bogus")
+    assert resp.status_code == 400
+
+
+async def test_checkout_rejects_unconfigured_tier(api_auth_client, billing_enabled):
+    # billing_enabled solo configura STRIPE_PRICE_ID_PRO, no elite ni anual.
+    resp = await api_auth_client.post("/api/v1/billing/checkout?tier=elite")
+    assert resp.status_code == 400
+
+
+async def test_checkout_rejects_invalid_app_redirect(api_auth_client, billing_enabled):
+    resp = await api_auth_client.post(
+        "/api/v1/billing/checkout",
+        params={"app_redirect": "https://evil.example.com/steal"},
+    )
+    assert resp.status_code == 400
+
+
+async def test_portal_rejects_invalid_app_redirect(
+    api_auth_client, db_session, test_user, billing_enabled
+):
+    sub = await BillingService(db_session).get_or_create(test_user.id)
+    sub.stripe_customer_id = "cus_real"
+    await db_session.commit()
+
+    resp = await api_auth_client.post(
+        "/api/v1/billing/portal",
+        params={"app_redirect": "https://evil.example.com"},
+    )
+    assert resp.status_code == 400
+
+
+# ── Webhook: checkout.session.completed (Elite / pago unico) ────────────────
+
+async def test_webhook_elite_purchase_upgrades_user(
+    api_auth_client, db_session, test_user, billing_enabled
+):
+    sub = await BillingService(db_session).get_or_create(test_user.id)
+    sub.stripe_customer_id = "cus_real"
+    await db_session.commit()
+
+    body, headers = _signed(_checkout_completed_event("cus_real", "elite"))
+    resp = await api_auth_client.post("/api/v1/billing/webhook", content=body, headers=headers)
+    assert resp.status_code == 200
+
+    me = await api_auth_client.get("/api/v1/billing/me")
+    data = me.json()
+    assert data["plan"] == Plan.ELITE
+    assert data["is_pro"] is True
+    assert data["current_period_end"] is None
+
+
+async def test_webhook_checkout_completed_ignores_subscription_mode(
+    api_auth_client, db_session, test_user, billing_enabled
+):
+    # El checkout.session.completed de una suscripcion (mode="subscription") no
+    # debe tocar nada: el estado real de esas lo dan customer.subscription.*.
+    sub = await BillingService(db_session).get_or_create(test_user.id)
+    sub.stripe_customer_id = "cus_real"
+    await db_session.commit()
+
+    body, headers = _signed(
+        _checkout_completed_event("cus_real", "pro_monthly", mode="subscription")
+    )
+    await api_auth_client.post("/api/v1/billing/webhook", content=body, headers=headers)
+
+    me = await api_auth_client.get("/api/v1/billing/me")
+    assert me.json()["plan"] == Plan.FREE

@@ -80,6 +80,11 @@ class Settings(BaseSettings):
     STRIPE_SECRET_KEY: str = ""
     STRIPE_WEBHOOK_SECRET: str = ""
     STRIPE_PRICE_ID_PRO: str = ""
+    # Planes opcionales: vacios = no disponibles (el checkout de ese tier
+    # devuelve 400 en vez de romper). Se suman sin migracion porque `plan` es
+    # un string libre, no un enum a nivel de base de datos.
+    STRIPE_PRICE_ID_PRO_ANNUAL: str = ""
+    STRIPE_PRICE_ID_ELITE: str = ""
     # A donde vuelve el usuario despues de pagar o de salir del portal.
     BILLING_SUCCESS_URL: str = ""
     BILLING_CANCEL_URL: str = ""
@@ -92,6 +97,12 @@ class Settings(BaseSettings):
     GOOGLE_CLIENT_ID: str = ""
     GOOGLE_CLIENT_SECRET: str = ""
     GOOGLE_REDIRECT_URI: str = "http://localhost:8000/ajustes/google/callback"
+
+    # Callback de "Iniciar sesion con Google" (flujo distinto al de arriba: ese
+    # conecta el calendario de una cuenta ya logueada, este autentica). Mismo
+    # Client ID/Secret sirven para los dos — solo hay que sumar esta URL a la
+    # lista de "Authorized redirect URIs" en Google Cloud Console.
+    GOOGLE_LOGIN_REDIRECT_URI: str = "http://localhost:8000/auth/api/google/callback"
 
     # A donde redirigir tras el callback de Google OAuth. Vacio = ruta relativa
     # (correcto en prod, donde nginx sirve frontend y backend desde el mismo origen).
