@@ -57,12 +57,26 @@ class Settings(BaseSettings):
     # separado y el limite efectivo se multiplica por la cantidad de replicas.
     REDIS_URL: str = ""
 
+    # Token para GET /metrics (opcional). Vacio = el endpoint queda publico,
+    # aceptable en dev o detras de una red interna. En prod expuesto a
+    # internet, seteá esto y configurá Prometheus con `authorization:
+    # credentials: <token>` en el scrape config — sin esto, cualquiera puede
+    # ver conteos de requests por ruta/status (reconocimiento de la app).
+    METRICS_TOKEN: str = ""
+
     # Content-Security-Policy for HTML responses. Empty = disabled.
     # Example: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'"
     CONTENT_SECURITY_POLICY: str = ""
 
     UPLOAD_DIR: str = "uploads"
     MAX_UPLOAD_SIZE: int = 10485760
+
+    # Limite global de tamaño de body para cualquier request (bytes). Sin
+    # esto, ningun endpoint (ni siquiera /auth/register, publico) tenia forma
+    # de rechazar un payload de varios MB antes de parsearlo entero — cierra
+    # el vector de DoS por memoria/filas gigantes en un solo lugar en vez de
+    # tocar max_length en cada campo de texto de cada modulo.
+    MAX_REQUEST_BODY_SIZE: int = 1_048_576  # 1 MiB
 
     # Email transaccional (Resend). Sin API key los mails se loguean en vez de
     # enviarse — asi dev y tests funcionan sin red ni cuenta.
@@ -144,6 +158,16 @@ class Settings(BaseSettings):
                 raise ValueError(
                     "DATABASE_URL no puede ser SQLite en producción. Usá Postgres "
                     "(ver docker-compose.prod.yml, servicio `db`)."
+                )
+            if not self.RESEND_API_KEY:
+                # Sin esto, send_email() cae al fallback de "dev" que loguea el
+                # link completo de verificacion/reset (con el token) a nivel
+                # INFO — en prod eso es un token de sesion de facto filtrado a
+                # los logs de la app.
+                raise ValueError(
+                    "RESEND_API_KEY vacío en producción: los mails de verificación y "
+                    "reset de contraseña no se enviarían y su link (con el token) "
+                    "quedaría logueado en texto plano."
                 )
         return self
 

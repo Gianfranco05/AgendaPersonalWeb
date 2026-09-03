@@ -5,7 +5,7 @@ from httpx import AsyncClient, ASGITransport
 
 from app.main import app
 from app.database import get_db
-from app.core.http_security import auth_rate_limiter
+from app.core.http_security import auth_rate_limiter, billing_rate_limiter
 from app.core.base import Base
 from app.core.security import hash_password
 from app.modules.auth.models import User
@@ -19,6 +19,7 @@ TEST_DATABASE_URL = "sqlite+aiosqlite://"
 async def _reset_rate_limiter():
     # The limiter is process-global; without this, logins accumulate across tests
     auth_rate_limiter.reset()
+    billing_rate_limiter.reset()
     yield
 
 

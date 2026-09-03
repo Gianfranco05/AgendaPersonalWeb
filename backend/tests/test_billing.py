@@ -144,6 +144,19 @@ async def test_checkout_rejects_something_already_owned(
     assert resp.status_code == 400
 
 
+async def test_checkout_is_rate_limited_per_user(api_auth_client, test_user, billing_enabled):
+    from app.core.http_security import billing_rate_limiter
+
+    # Bucket propio de billing (10/5min), keyed por user_id: agotarlo sin
+    # gastar 10 requests HTTP reales, que ademas fallarian por "ya tenés esta
+    # plantilla" al repetir.
+    for _ in range(10):
+        assert await billing_rate_limiter.hit(str(test_user.id)) == 0
+
+    resp = await api_auth_client.post("/api/v1/billing/checkout", params={"module": "study"})
+    assert resp.status_code == 429
+
+
 async def test_checkout_rejects_an_invalid_app_redirect(api_auth_client, billing_enabled):
     resp = await api_auth_client.post(
         "/api/v1/billing/checkout",

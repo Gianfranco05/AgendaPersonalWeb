@@ -19,8 +19,11 @@ async def send_email(to: str, subject: str, html: str) -> bool:
     abajo el registro ni el pedido de reset."""
     if not settings.RESEND_API_KEY:
         # Dev/test: sin API key no se manda nada, se deja rastro en el log para
-        # poder seguir el flujo a mano.
-        logger.info(
+        # poder seguir el flujo a mano. DEBUG (no INFO) a proposito: el html
+        # trae el link con el token de verificacion/reset, y este fallback no
+        # puede activarse en produccion (ver _guard_production en config.py),
+        # asi que solo interesa en desarrollo, donde SIEMPRE se loguea en DEBUG.
+        logger.debug(
             "Email no enviado (RESEND_API_KEY vacio) | to=%s | subject=%s\n%s",
             to,
             subject,

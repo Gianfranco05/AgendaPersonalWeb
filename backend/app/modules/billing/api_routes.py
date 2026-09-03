@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.core.dependencies import get_current_user
+from app.core.http_security import rate_limit_billing
 from app.core.redirect_safety import validate_app_redirect
 from app.database import get_db
 from app.modules.auth.models import User
@@ -105,7 +106,9 @@ async def get_store(
     return StoreOut(billing_enabled=settings.billing_enabled, items=items)
 
 
-@router.post("/checkout", response_model=CheckoutSessionOut)
+@router.post(
+    "/checkout", response_model=CheckoutSessionOut, dependencies=[Depends(rate_limit_billing)]
+)
 async def create_checkout_session(
     module: str,
     app_redirect: Optional[str] = None,

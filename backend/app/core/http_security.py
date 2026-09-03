@@ -4,10 +4,11 @@ import time
 import uuid
 from collections import defaultdict, deque
 
-from fastapi import HTTPException, Request, status
+from fastapi import Depends, HTTPException, Request, Response, status
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.config import settings
+from app.core.dependencies import get_current_user
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +33,30 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
                 "Content-Security-Policy", settings.CONTENT_SECURITY_POLICY
             )
         return response
+
+
+class BodySizeLimitMiddleware(BaseHTTPMiddleware):
+    """Rechaza requests con body mas grande que `MAX_REQUEST_BODY_SIZE`.
+
+    Chequea el header Content-Length antes de que cualquier endpoint parsee
+    el body: sin esto, un JSON de varios MB (o GB) en cualquier campo de
+    texto libre — incluido /auth/register, que es publico — se procesa
+    entero antes de que un validator de Pydantic tenga chance de rechazarlo.
+    Un cliente que omita Content-Length y mande el body chunked se escapa de
+    este check; la defensa de fondo para ese caso es el limite de body de
+    nginx delante del proceso (`client_max_body_size`), no este middleware.
+    """
+
+    async def dispatch(self, request: Request, call_next):
+        content_length = request.headers.get("content-length")
+        if content_length is not None:
+            try:
+                size = int(content_length)
+            except ValueError:
+                size = None
+            if size is not None and size > settings.MAX_REQUEST_BODY_SIZE:
+                return Response(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE)
+        return await call_next(request)
 
 
 class SlidingWindowRateLimiter:
@@ -132,20 +157,26 @@ class RedisSlidingWindowRateLimiter:
         self._fallback.reset()
 
 
-def _build_auth_rate_limiter():
+def _build_rate_limiter(max_attempts: int, window_seconds: int):
     if settings.REDIS_URL:
         return RedisSlidingWindowRateLimiter(
             redis_url=settings.REDIS_URL,
-            max_attempts=settings.RATE_LIMIT_MAX_ATTEMPTS,
-            window_seconds=settings.RATE_LIMIT_WINDOW_SECONDS,
+            max_attempts=max_attempts,
+            window_seconds=window_seconds,
         )
-    return SlidingWindowRateLimiter(
-        max_attempts=settings.RATE_LIMIT_MAX_ATTEMPTS,
-        window_seconds=settings.RATE_LIMIT_WINDOW_SECONDS,
-    )
+    return SlidingWindowRateLimiter(max_attempts=max_attempts, window_seconds=window_seconds)
 
 
-auth_rate_limiter = _build_auth_rate_limiter()
+auth_rate_limiter = _build_rate_limiter(
+    settings.RATE_LIMIT_MAX_ATTEMPTS, settings.RATE_LIMIT_WINDOW_SECONDS
+)
+# Bucket separado del de auth: mezclar intentos de login fallidos con
+# checkouts de billing haria que lo uno bloquee lo otro sin motivo. La
+# ventana es mas laxa (nadie compra 10 plantillas en 5 min de uso real) y la
+# key es el user_id, no la IP — es una accion autenticada, y por IP
+# castigaria a cualquiera detras del mismo NAT/red corporativa que el
+# usuario.
+billing_rate_limiter = _build_rate_limiter(max_attempts=10, window_seconds=300)
 
 
 async def rate_limit_auth(request: Request) -> None:
@@ -153,6 +184,20 @@ async def rate_limit_auth(request: Request) -> None:
         return
     client_ip = request.client.host if request.client else "unknown"
     retry_after = await auth_rate_limiter.hit(client_ip)
+    if retry_after:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Demasiados intentos. Probá de nuevo en unos minutos.",
+            headers={"Retry-After": str(retry_after)},
+        )
+
+
+async def rate_limit_billing(
+    current_user=Depends(get_current_user),
+) -> None:
+    if not settings.RATE_LIMIT_ENABLED:
+        return
+    retry_after = await billing_rate_limiter.hit(str(current_user.id))
     if retry_after:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
