@@ -24,7 +24,9 @@ from app.modules.billing.models import StripeCustomer
 from app.modules.eventos.models import Event
 from app.modules.finanzas.models import BankAccount, Budget, Category, Transaction
 from app.modules.fitness.models import Exercise, WorkoutSession
+from app.modules.biblioteca.models import Book
 from app.modules.estudio.models import Exam, Subject
+from app.modules.peliculas.models import MediaItem
 from app.modules.focus.models import FocusSession
 from app.modules.metas.models import Goal, HabitRecord
 from app.modules.modulos.models import EnabledModule, ModulePurchase
@@ -49,6 +51,8 @@ OWNED_TABLES: list[tuple[str, Any]] = [
     ("exams", Exam),
     # Padres.
     ("subjects", Subject),
+    ("books", Book),
+    ("media_items", MediaItem),
     ("categories", Category),
     ("goals", Goal),
     ("bank_accounts", BankAccount),
