@@ -6,11 +6,15 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_current_user
+from app.core.entitlements import require_module
 from app.database import get_db
 from app.modules.auth.models import User
 from app.modules.estudio.service import StudyService
 
-router = APIRouter(prefix="/study", tags=["study"])
+# Plantilla de pago: sin la compra, el server no deja tocar estos endpoints.
+router = APIRouter(
+    prefix="/study", tags=["study"], dependencies=[Depends(require_module("study"))]
+)
 
 
 # ── Schemas ──────────────────────────────────────────────────────────────────

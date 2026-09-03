@@ -58,28 +58,11 @@ async def delete_my_account(
             detail="Contraseña incorrecta",
         )
 
-    service = AccountService(db)
-
-    # Cancelar en Stripe ANTES de borrar: despues no queda de donde sacar el id
-    # de la suscripcion y el usuario seguiria pagando por una cuenta inexistente.
-    subscription_id = await service.get_stripe_subscription_id(str(current_user.id))
-    if subscription_id and settings.billing_enabled:
-        try:
-            import stripe
-
-            stripe.api_key = settings.STRIPE_SECRET_KEY
-            stripe.Subscription.delete(subscription_id)
-        except Exception:
-            # Un fallo de Stripe no puede dejar al usuario sin poder borrarse: se
-            # loguea para resolverlo a mano en vez de bloquear la baja.
-            logger.exception(
-                "No se pudo cancelar la suscripcion %s de Stripe al borrar la "
-                "cuenta %s — cancelar manualmente",
-                subscription_id,
-                current_user.id,
-            )
-
-    await service.delete_account(current_user)
+    # No hay nada que cancelar en Stripe: las plantillas son de pago unico, no
+    # queda ningun cobro corriendo. El customer se deja vivo en Stripe a
+    # proposito — es el respaldo contable de las compras y de un eventual
+    # reembolso, y no se puede reconstruir despues de borrar la cuenta.
+    await AccountService(db).delete_account(current_user)
 
     response = JSONResponse(content={"detail": "Cuenta eliminada"})
     response.delete_cookie(settings.JWT_COOKIE_NAME)

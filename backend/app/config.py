@@ -79,19 +79,31 @@ class Settings(BaseSettings):
     # y los endpoints de checkout/portal devuelven 503 en vez de romper.
     STRIPE_SECRET_KEY: str = ""
     STRIPE_WEBHOOK_SECRET: str = ""
-    STRIPE_PRICE_ID_PRO: str = ""
-    # Planes opcionales: vacios = no disponibles (el checkout de ese tier
-    # devuelve 400 en vez de romper). Se suman sin migracion porque `plan` es
-    # un string libre, no un enum a nivel de base de datos.
-    STRIPE_PRICE_ID_PRO_ANNUAL: str = ""
-    STRIPE_PRICE_ID_ELITE: str = ""
-    # A donde vuelve el usuario despues de pagar o de salir del portal.
+
+    # Precio (pago unico) de cada plantilla que se vende. Vacio = esa plantilla
+    # todavia no se puede comprar: aparece como "proximamente" en la tienda en
+    # vez de romper el checkout. Los nombres los referencia
+    # modulos/registry.py via ModuleDef.price_setting.
+    STRIPE_PRICE_ID_MODULE_STUDY: str = ""
+    STRIPE_PRICE_ID_MODULE_LIBRARY: str = ""
+    STRIPE_PRICE_ID_MODULE_MEDIA: str = ""
+    STRIPE_PRICE_ID_MODULE_WORK: str = ""
+    STRIPE_PRICE_ID_MODULE_TRAVEL: str = ""
+    STRIPE_PRICE_ID_MODULE_VEHICLE: str = ""
+    STRIPE_PRICE_ID_MODULE_PROJECTS: str = ""
+
+    # A donde vuelve el usuario despues de pagar.
     BILLING_SUCCESS_URL: str = ""
     BILLING_CANCEL_URL: str = ""
 
     @property
     def billing_enabled(self) -> bool:
-        return bool(self.STRIPE_SECRET_KEY and self.STRIPE_PRICE_ID_PRO)
+        """Se puede cobrar. Sin esto la tienda queda en solo lectura.
+
+        No exige que haya precios cargados: una instancia self-hosted puede
+        tener Stripe configurado y todavia ninguna plantilla a la venta.
+        """
+        return bool(self.STRIPE_SECRET_KEY)
 
     # Google OAuth (optional — leave empty to disable Google Calendar integration)
     GOOGLE_CLIENT_ID: str = ""

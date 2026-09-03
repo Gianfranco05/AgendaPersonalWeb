@@ -7,7 +7,8 @@ from app.core.base import Base
 from app.core.security import hash_password
 from app.modules.anotaciones.models import Note, Tag, note_tags
 from app.modules.auth.models import User
-from app.modules.billing.models import Subscription
+from app.modules.billing.models import StripeCustomer
+from app.modules.modulos.models import ModulePurchase
 from app.modules.cuenta.service import OWNED_TABLES
 from app.modules.fitness.models import Exercise, WorkoutSession
 from app.modules.finanzas.models import Category, Transaction
@@ -83,7 +84,8 @@ async def _seed_datos(db_session, user):
     )
 
     db_session.add(Task(user_id=str(user.id), title="Comprar pan"))
-    db_session.add(Subscription(user_id=str(user.id), plan="pro"))
+    db_session.add(StripeCustomer(user_id=str(user.id), stripe_customer_id="cus_test"))
+    db_session.add(ModulePurchase(user_id=str(user.id), module_key="study", amount_paid=1500))
 
     await db_session.commit()
 
@@ -124,7 +126,13 @@ async def test_export_no_incluye_credenciales(api_auth_client, db_session, test_
     assert "password_hash" not in data["user"]
     assert "refresh_tokens" not in data
     assert "verification_tokens" not in data
-    assert "stripe_customer_id" not in data["subscriptions"][0]
+    # Identificadores internos de Stripe: no son datos del usuario y exponerlos
+    # solo sirve para enumerar la cuenta de Stripe del negocio.
+    assert "stripe_customer_id" not in data["stripe_customers"][0]
+    assert "stripe_session_id" not in data["module_purchases"][0]
+    # Lo que si le sirve al usuario: que compro y cuanto pago.
+    assert data["module_purchases"][0]["module_key"] == "study"
+    assert data["module_purchases"][0]["amount_paid"] == 1500
 
 
 @pytest.mark.asyncio

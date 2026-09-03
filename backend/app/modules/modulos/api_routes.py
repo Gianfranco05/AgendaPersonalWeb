@@ -15,8 +15,13 @@ class ModuleOut(BaseModel):
     label: str
     description: str
     icon: str
+    #: Incluida en la app (gratis, no se puede desactivar).
     is_base: bool
+    #: La tiene el usuario: base, o comprada.
+    owned: bool
     enabled: bool
+    #: Tiene precio cargado en Stripe, o sea que ya se puede comprar.
+    for_sale: bool
 
 
 class ToggleModuleRequest(BaseModel):

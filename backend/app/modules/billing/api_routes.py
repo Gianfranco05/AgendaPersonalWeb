@@ -1,6 +1,6 @@
+import asyncio
 import json
 import logging
-from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -13,44 +13,32 @@ from app.core.redirect_safety import validate_app_redirect
 from app.database import get_db
 from app.modules.auth.models import User
 from app.modules.billing.service import BillingService
+from app.modules.modulos.registry import MODULE_BY_KEY, PAID_MODULES
+from app.modules.modulos.service import ModulesService, price_id_for
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/billing", tags=["billing"])
 
 
-class SubscriptionOut(BaseModel):
-    plan: str
-    status: Optional[str] = None
-    is_pro: bool
-    current_period_end: Optional[datetime] = None
+class StoreItemOut(BaseModel):
+    key: str
+    label: str
+    description: str
+    icon: str
+    owned: bool
+    #: None cuando la plantilla todavia no tiene precio cargado en Stripe.
+    amount: Optional[int] = None
+    currency: Optional[str] = None
+
+
+class StoreOut(BaseModel):
     billing_enabled: bool
+    items: list[StoreItemOut]
 
 
 class CheckoutSessionOut(BaseModel):
     url: str
-
-
-class PriceOut(BaseModel):
-    tier: str
-    amount: int
-    currency: str
-    interval: Optional[str] = None
-
-
-class PlansOut(BaseModel):
-    billing_enabled: bool
-    plans: list[PriceOut]
-
-
-# Cada tier mapea a un Price ID de Stripe (configurable, algunos pueden estar
-# vacios todavia) y a un modo de Checkout: "subscription" para recurrente,
-# "payment" para pago unico (Elite/lifetime, no genera objeto de suscripcion).
-_TIERS = {
-    "pro_monthly": {"price_attr": "STRIPE_PRICE_ID_PRO", "mode": "subscription"},
-    "pro_annual": {"price_attr": "STRIPE_PRICE_ID_PRO_ANNUAL", "mode": "subscription"},
-    "elite": {"price_attr": "STRIPE_PRICE_ID_ELITE", "mode": "payment"},
-}
 
 
 def _require_billing_configured() -> None:
@@ -68,157 +56,111 @@ def _stripe():
     return stripe
 
 
-def _checkout_return_urls(app_redirect: Optional[str]) -> tuple[str, str]:
-    """success_url/cancel_url para la Checkout Session o el Billing Portal.
+async def _fetch_price(price_id: str) -> Optional[dict]:
+    """Precio de Stripe, o None si no se pudo traer.
 
-    Con `app_redirect` (mobile, deep link a la app) Stripe redirige el
-    navegador ahi directamente al terminar — no hace falta un roundtrip de
-    estado firmado como en el login con Google, porque el redirect final lo
-    hace Stripe, no nosotros.
+    Un precio mal configurado no puede tumbar la tienda entera: esa plantilla
+    aparece sin precio y las demas se siguen viendo.
     """
-    if app_redirect:
-        validate_app_redirect(app_redirect)
-        return f"{app_redirect}?checkout=ok", f"{app_redirect}?checkout=cancel"
-    return (
-        settings.BILLING_SUCCESS_URL
-        or f"{settings.PUBLIC_BASE_URL.rstrip('/')}/ajustes?checkout=ok",
-        settings.BILLING_CANCEL_URL
-        or f"{settings.PUBLIC_BASE_URL.rstrip('/')}/ajustes?checkout=cancel",
-    )
+    stripe = _stripe()
+    try:
+        price = await asyncio.to_thread(stripe.Price.retrieve, price_id)
+        return {"amount": price.unit_amount, "currency": price.currency}
+    except Exception:
+        logger.exception("Fallo obteniendo el precio de Stripe %s", price_id)
+        return None
 
 
-@router.get("/me", response_model=SubscriptionOut)
-async def get_my_subscription(
+@router.get("/store", response_model=StoreOut)
+async def get_store(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    sub = await BillingService(db).get_or_create(str(current_user.id))
-    return SubscriptionOut(
-        plan=sub.plan,
-        status=sub.status,
-        is_pro=sub.is_pro,
-        current_period_end=sub.current_period_end,
-        billing_enabled=settings.billing_enabled,
-    )
+    owned = await ModulesService(db).owned_keys(str(current_user.id))
 
+    price_ids = {m.key: price_id_for(m) for m in PAID_MODULES}
+    con_precio = {k: v for k, v in price_ids.items() if v}
+    # En paralelo: son varias llamadas a Stripe y en serie se notan al abrir la
+    # tienda.
+    resultados = await asyncio.gather(
+        *(_fetch_price(pid) for pid in con_precio.values())
+    ) if con_precio and settings.billing_enabled else []
+    precios = dict(zip(con_precio.keys(), resultados))
 
-@router.get("/plans", response_model=PlansOut)
-async def get_plans():
-    if not settings.billing_enabled:
-        return PlansOut(billing_enabled=False, plans=[])
-
-    stripe = _stripe()
-    plans: list[PriceOut] = []
-    for tier, cfg in _TIERS.items():
-        price_id = getattr(settings, cfg["price_attr"])
-        if not price_id:
-            continue
-        try:
-            price = stripe.Price.retrieve(price_id)
-        except Exception:
-            logger.exception("Fallo obteniendo el precio de Stripe para %s", tier)
-            continue
-        plans.append(
-            PriceOut(
-                tier=tier,
-                amount=price.unit_amount,
-                currency=price.currency,
-                interval=price.recurring["interval"] if price.recurring else None,
+    items = []
+    for m in PAID_MODULES:
+        precio = precios.get(m.key)
+        items.append(
+            StoreItemOut(
+                key=m.key,
+                label=m.label,
+                description=m.description,
+                icon=m.icon,
+                owned=m.key in owned,
+                amount=precio["amount"] if precio else None,
+                currency=precio["currency"] if precio else None,
             )
         )
 
-    return PlansOut(billing_enabled=True, plans=plans)
+    return StoreOut(billing_enabled=settings.billing_enabled, items=items)
 
 
 @router.post("/checkout", response_model=CheckoutSessionOut)
 async def create_checkout_session(
-    tier: str = "pro_monthly",
+    module: str,
     app_redirect: Optional[str] = None,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     _require_billing_configured()
-    if tier not in _TIERS:
-        raise HTTPException(status_code=400, detail="Plan inválido")
 
-    price_id = getattr(settings, _TIERS[tier]["price_attr"])
+    module_def = MODULE_BY_KEY.get(module)
+    if module_def is None or module_def.is_base:
+        raise HTTPException(status_code=400, detail="Plantilla inválida")
+
+    price_id = price_id_for(module_def)
     if not price_id:
-        raise HTTPException(status_code=400, detail="Este plan todavía no está disponible")
+        raise HTTPException(status_code=400, detail="Esta plantilla todavía no está a la venta")
 
-    success_url, cancel_url = _checkout_return_urls(app_redirect)
+    modules = ModulesService(db)
+    if module in await modules.owned_keys(str(current_user.id)):
+        raise HTTPException(status_code=400, detail="Ya tenés esta plantilla")
+
+    if app_redirect:
+        validate_app_redirect(app_redirect)
+        success_url = f"{app_redirect}?checkout=ok"
+        cancel_url = f"{app_redirect}?checkout=cancel"
+    else:
+        base = settings.PUBLIC_BASE_URL.rstrip("/")
+        success_url = settings.BILLING_SUCCESS_URL or f"{base}/ajustes?checkout=ok"
+        cancel_url = settings.BILLING_CANCEL_URL or f"{base}/ajustes?checkout=cancel"
 
     stripe = _stripe()
-    service = BillingService(db)
-    sub = await service.get_or_create(str(current_user.id))
-
-    if not sub.stripe_customer_id:
+    billing = BillingService(db)
+    customer_id = await billing.get_customer_id(str(current_user.id))
+    if not customer_id:
         customer = stripe.Customer.create(
             email=current_user.email,
             name=current_user.full_name,
             metadata={"user_id": str(current_user.id)},
         )
-        sub = await service.link_customer(str(current_user.id), customer.id)
+        customer_id = await billing.link_customer(str(current_user.id), customer.id)
 
     try:
         session = stripe.checkout.Session.create(
-            mode=_TIERS[tier]["mode"],
-            customer=sub.stripe_customer_id,
+            # Pago unico: la plantilla queda en la cuenta, no se renueva.
+            mode="payment",
+            customer=customer_id,
             line_items=[{"price": price_id, "quantity": 1}],
             success_url=success_url,
             cancel_url=cancel_url,
-            metadata={"user_id": str(current_user.id), "tier": tier},
+            metadata={"user_id": str(current_user.id), "module_key": module},
         )
     except Exception:
         logger.exception("Fallo creando la Checkout Session de Stripe")
         raise HTTPException(status_code=502, detail="No se pudo iniciar el pago")
 
     return CheckoutSessionOut(url=session.url)
-
-
-@router.post("/portal", response_model=CheckoutSessionOut)
-async def create_portal_session(
-    app_redirect: Optional[str] = None,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    _require_billing_configured()
-    stripe = _stripe()
-
-    sub = await BillingService(db).get_or_create(str(current_user.id))
-    if not sub.stripe_customer_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Todavía no tenés una suscripción",
-        )
-
-    if app_redirect:
-        validate_app_redirect(app_redirect)
-        return_url = app_redirect
-    else:
-        return_url = settings.BILLING_SUCCESS_URL or f"{settings.PUBLIC_BASE_URL.rstrip('/')}/ajustes"
-
-    try:
-        session = stripe.billing_portal.Session.create(
-            customer=sub.stripe_customer_id,
-            return_url=return_url,
-        )
-    except Exception:
-        logger.exception("Fallo creando la sesión del portal de Stripe")
-        raise HTTPException(status_code=502, detail="No se pudo abrir el portal")
-
-    return CheckoutSessionOut(url=session.url)
-
-
-# Eventos que cambian el derecho a Pro. checkout.session.completed no alcanza
-# para suscripciones: no trae el estado ni las renovaciones o bajas
-# posteriores. Para Elite (pago unico) es al reves: no existe un objeto de
-# suscripcion en absoluto, asi que checkout.session.completed es la unica
-# fuente de verdad posible.
-_SUBSCRIPTION_EVENTS = {
-    "customer.subscription.created",
-    "customer.subscription.updated",
-    "customer.subscription.deleted",
-}
 
 
 @router.post("/webhook", include_in_schema=False)
@@ -236,7 +178,7 @@ async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db)):
 
     try:
         # Verificar la firma es lo unico que separa esto de un endpoint publico
-        # donde cualquiera se regala el plan Pro.
+        # donde cualquiera se regala las plantillas.
         event = stripe.Webhook.construct_event(
             payload, signature, settings.STRIPE_WEBHOOK_SECRET
         )
@@ -247,20 +189,42 @@ async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db)):
         logger.warning("Webhook de Stripe con payload ilegible")
         raise HTTPException(status_code=400, detail="Payload inválido")
 
-    event_type = event["type"]
-
-    if event_type in _SUBSCRIPTION_EVENTS:
+    if event["type"] == "checkout.session.completed":
         # construct_event devuelve StripeObject, que no expone .get(); se
         # reparsea el payload ya verificado para trabajar con dicts planos.
         data = json.loads(payload)["data"]["object"]
-        await BillingService(db).apply_subscription_event(data)
-    elif event_type == "checkout.session.completed":
-        data = json.loads(payload)["data"]["object"]
-        if data.get("mode") == "payment" and data.get("metadata", {}).get("tier") == "elite":
-            customer_id = data.get("customer")
-            if customer_id:
-                await BillingService(db).apply_elite_purchase(customer_id)
+        await _grant_purchase(db, data)
 
     # 200 siempre que la firma sea valida: un evento que no manejamos no es un
     # error, y devolver != 2xx hace que Stripe lo reintente en loop.
     return {"received": True}
+
+
+async def _grant_purchase(db: AsyncSession, session: dict) -> None:
+    metadata = session.get("metadata") or {}
+    module_key = metadata.get("module_key")
+    if not module_key:
+        return
+
+    # Solo se entrega con el pago cobrado: un checkout completado con pago
+    # pendiente (algunos medios lo permiten) todavia no es una compra.
+    if session.get("payment_status") not in (None, "paid", "no_payment_required"):
+        logger.info(
+            "Checkout de %s sin pago confirmado (%s)", module_key, session.get("payment_status")
+        )
+        return
+
+    user_id = metadata.get("user_id")
+    if not user_id and session.get("customer"):
+        user_id = await BillingService(db).user_id_for_customer(session["customer"])
+    if not user_id:
+        logger.warning("Checkout completado sin usuario identificable: %s", session.get("id"))
+        return
+
+    await ModulesService(db).grant(
+        user_id=user_id,
+        module_key=module_key,
+        amount_paid=session.get("amount_total"),
+        currency=session.get("currency"),
+        stripe_session_id=session.get("id"),
+    )

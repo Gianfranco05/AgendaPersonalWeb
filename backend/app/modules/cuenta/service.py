@@ -20,14 +20,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.ajustes.models import UserPreference
 from app.modules.anotaciones.models import Note, Tag, note_tags
 from app.modules.auth.models import RefreshToken, User, VerificationToken
-from app.modules.billing.models import Subscription
+from app.modules.billing.models import StripeCustomer
 from app.modules.eventos.models import Event
 from app.modules.finanzas.models import BankAccount, Budget, Category, Transaction
 from app.modules.fitness.models import Exercise, WorkoutSession
 from app.modules.estudio.models import Exam, Subject
 from app.modules.focus.models import FocusSession
 from app.modules.metas.models import Goal, HabitRecord
-from app.modules.modulos.models import EnabledModule
+from app.modules.modulos.models import EnabledModule, ModulePurchase
 from app.modules.nutricion.models import Meal
 from app.modules.tareas.models import Task
 
@@ -59,7 +59,8 @@ OWNED_TABLES: list[tuple[str, Any]] = [
     ("meals", Meal),
     ("workout_sessions", WorkoutSession),
     ("user_preferences", UserPreference),
-    ("subscriptions", Subscription),
+    ("stripe_customers", StripeCustomer),
+    ("module_purchases", ModulePurchase),
     ("enabled_modules", EnabledModule),
     ("focus_sessions", FocusSession),
     ("refresh_tokens", RefreshToken),
@@ -76,7 +77,8 @@ REDACTED_COLUMNS: dict[str, set[str]] = {
     "users": {"password_hash"},
     # Identificadores internos de Stripe: no son datos personales del usuario y
     # exponerlos solo sirve para enumerar la cuenta de Stripe del negocio.
-    "subscriptions": {"stripe_customer_id", "stripe_subscription_id"},
+    "stripe_customers": {"stripe_customer_id"},
+    "module_purchases": {"stripe_session_id"},
 }
 
 
@@ -181,14 +183,3 @@ class AccountService:
         await self.db.execute(delete(User).where(User.id == user_id))
         await self.db.commit()
 
-    async def get_stripe_subscription_id(self, user_id: str) -> Optional[str]:
-        """Devuelve la suscripcion de Stripe activa, si la hay.
-
-        Se consulta ANTES de borrar: si la cuenta se va sin cancelar en Stripe,
-        el cobro sigue corriendo contra una cuenta que ya no existe.
-        """
-        result = await self.db.execute(
-            select(Subscription).where(Subscription.user_id == str(user_id))
-        )
-        sub = result.scalar_one_or_none()
-        return sub.stripe_subscription_id if sub else None
