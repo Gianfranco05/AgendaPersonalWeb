@@ -27,6 +27,10 @@ from app.modules.fitness.models import Exercise, WorkoutSession
 from app.modules.biblioteca.models import Book
 from app.modules.estudio.models import Exam, Subject
 from app.modules.peliculas.models import MediaItem
+from app.modules.proyectos.models import Project, ProjectTask
+from app.modules.trabajo.models import WorkOpportunity
+from app.modules.vehiculo.models import MaintenanceRecord, Vehicle
+from app.modules.viajes.models import PackingItem, Trip
 from app.modules.focus.models import FocusSession
 from app.modules.metas.models import Goal, HabitRecord
 from app.modules.modulos.models import EnabledModule, ModulePurchase
@@ -49,10 +53,17 @@ OWNED_TABLES: list[tuple[str, Any]] = [
     ("budgets", Budget),
     ("habit_records", HabitRecord),
     ("exams", Exam),
+    ("packing_items", PackingItem),
+    ("maintenance_records", MaintenanceRecord),
+    ("project_tasks", ProjectTask),
     # Padres.
     ("subjects", Subject),
     ("books", Book),
     ("media_items", MediaItem),
+    ("work_opportunities", WorkOpportunity),
+    ("trips", Trip),
+    ("vehicles", Vehicle),
+    ("projects", Project),
     ("categories", Category),
     ("goals", Goal),
     ("bank_accounts", BankAccount),

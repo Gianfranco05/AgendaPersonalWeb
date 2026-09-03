@@ -15,6 +15,10 @@ from app.modules.focus.api_routes import router as focus_router
 from app.modules.estudio.api_routes import router as study_router
 from app.modules.biblioteca.api_routes import router as library_router
 from app.modules.peliculas.api_routes import router as media_router
+from app.modules.trabajo.api_routes import router as work_router
+from app.modules.viajes.api_routes import router as travel_router
+from app.modules.vehiculo.api_routes import router as vehicle_router
+from app.modules.proyectos.api_routes import router as projects_router
 from app.infra.router import router as infra_router
 
 api_router = APIRouter()
@@ -34,4 +38,8 @@ api_router.include_router(focus_router)
 api_router.include_router(study_router)
 api_router.include_router(library_router)
 api_router.include_router(media_router)
+api_router.include_router(work_router)
+api_router.include_router(travel_router)
+api_router.include_router(vehicle_router)
+api_router.include_router(projects_router)
 api_router.include_router(infra_router)
