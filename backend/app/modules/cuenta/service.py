@@ -32,6 +32,7 @@ from app.modules.trabajo.models import WorkOpportunity
 from app.modules.vehiculo.models import MaintenanceRecord, Vehicle
 from app.modules.viajes.models import PackingItem, Trip
 from app.modules.focus.models import FocusSession
+from app.modules.recordatorios.models import Reminder
 from app.modules.metas.models import Goal, HabitRecord
 from app.modules.modulos.models import EnabledModule, ModulePurchase
 from app.modules.nutricion.models import Meal
@@ -78,6 +79,7 @@ OWNED_TABLES: list[tuple[str, Any]] = [
     ("module_purchases", ModulePurchase),
     ("enabled_modules", EnabledModule),
     ("focus_sessions", FocusSession),
+    ("reminders", Reminder),
     ("refresh_tokens", RefreshToken),
     ("verification_tokens", VerificationToken),
 ]
