@@ -20,6 +20,8 @@ import type {
   Settings,
   Session,
   Reminder,
+  ModuleInfo,
+  StoreCatalog,
 } from '../types';
 
 const MOCK_ENABLED = import.meta.env.VITE_MOCK_ENABLED === 'true';
@@ -906,4 +908,73 @@ export async function deleteReminder(id: string): Promise<void> {
     return;
   }
   await apiClient.delete(`/api/v1/reminders/${id}`);
+}
+
+// ── Módulos (plantillas) ──
+
+const MOCK_MODULES: ModuleInfo[] = [
+  { key: 'habits', label: 'Hábitos', description: 'Seguimiento diario de hábitos', icon: 'check_circle', is_base: true, owned: true, enabled: true, for_sale: false },
+  { key: 'tasks', label: 'Tareas', description: 'Tareas y tablero por estado', icon: 'task_alt', is_base: true, owned: true, enabled: true, for_sale: false },
+  { key: 'notes', label: 'Notas y Documentos', description: 'Notas rápidas y adjuntos', icon: 'description', is_base: true, owned: true, enabled: true, for_sale: false },
+  { key: 'finance', label: 'Finanzas Personales', description: 'Ingresos, gastos y balance', icon: 'payments', is_base: true, owned: true, enabled: true, for_sale: false },
+  { key: 'fitness_nutrition', label: 'Rutinas y Dietas', description: 'Entrenamiento y nutrición', icon: 'fitness_center', is_base: true, owned: true, enabled: true, for_sale: false },
+  { key: 'calendar', label: 'Calendario y Eventos', description: 'Agenda y eventos', icon: 'calendar_today', is_base: true, owned: true, enabled: true, for_sale: false },
+  { key: 'study', label: 'Estudio & Universidad', description: 'Materias, exámenes y promedio', icon: 'school', is_base: false, owned: true, enabled: true, for_sale: true },
+  { key: 'library', label: 'Biblioteca & Lecturas', description: 'Libros leídos y pendientes, con puntaje', icon: 'menu_book', is_base: false, owned: false, enabled: false, for_sale: true },
+  { key: 'media', label: 'Películas & Series', description: 'Lo que viste y lo que querés ver, con puntaje', icon: 'movie', is_base: false, owned: false, enabled: false, for_sale: true },
+  { key: 'work', label: 'Trabajo & Carrera', description: 'Tareas laborales, reuniones y pipeline', icon: 'work', is_base: false, owned: false, enabled: false, for_sale: true },
+  { key: 'travel', label: 'Viajes & Equipaje', description: 'Itinerarios, reservas y checklist de equipaje', icon: 'flight', is_base: false, owned: false, enabled: false, for_sale: true },
+  { key: 'vehicle', label: 'Vehículo & Mantenimiento', description: 'Combustible, revisiones técnicas e ITV', icon: 'directions_car', is_base: false, owned: false, enabled: false, for_sale: true },
+  { key: 'projects', label: 'Gestión de Proyectos', description: 'Tableros Kanban, sprints y entregables', icon: 'view_kanban', is_base: false, owned: false, enabled: false, for_sale: true },
+];
+
+export async function fetchModules(): Promise<ModuleInfo[]> {
+  if (MOCK_ENABLED) {
+    return mockDelay(MOCK_MODULES.map((m) => ({ ...m })));
+  }
+  const { data } = await apiClient.get<ModuleInfo[]>('/api/v1/modules');
+  return data;
+}
+
+export async function toggleModule(key: string, enabled: boolean): Promise<ModuleInfo> {
+  if (MOCK_ENABLED) {
+    const mock = MOCK_MODULES.find((m) => m.key === key);
+    return mockDelay({ ...(mock as ModuleInfo), enabled });
+  }
+  const { data } = await apiClient.put<ModuleInfo>(`/api/v1/modules/${key}`, { enabled });
+  return data;
+}
+
+// ── Tienda (compra de plantillas) ──
+
+export async function fetchStore(): Promise<StoreCatalog> {
+  if (MOCK_ENABLED) {
+    return mockDelay({
+      billing_enabled: true,
+      items: MOCK_MODULES.filter((m) => !m.is_base).map((m) => ({
+        key: m.key,
+        label: m.label,
+        description: m.description,
+        icon: m.icon,
+        owned: m.owned,
+        amount: m.owned ? null : 199900,
+        currency: m.owned ? null : 'ars',
+      })),
+    });
+  }
+  const { data } = await apiClient.get<StoreCatalog>('/api/v1/billing/store');
+  return data;
+}
+
+// Pensado solo para web: no se manda `app_redirect` (eso es exclusivo del
+// flujo mobile con deep link), así el backend arma success/cancel URLs HTTPS
+// normales con BILLING_SUCCESS_URL / PUBLIC_BASE_URL.
+export async function createCheckout(moduleKey: string): Promise<{ url: string }> {
+  if (MOCK_ENABLED) {
+    return mockDelay({ url: `${window.location.origin}/store?checkout=ok` });
+  }
+  const { data } = await apiClient.post<{ url: string }>('/api/v1/billing/checkout', null, {
+    params: { module: moduleKey },
+  });
+  return data;
 }

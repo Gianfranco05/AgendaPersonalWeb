@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, PiggyBank, StickyNote, ListTodo, Calendar, Target, Settings, Menu, X, LogOut, Dumbbell, Apple, Repeat, Sun, Moon } from 'lucide-react';
+import { LayoutDashboard, PiggyBank, StickyNote, ListTodo, Calendar, Target, Settings, Menu, X, LogOut, Dumbbell, Apple, Repeat, Sun, Moon, LayoutGrid } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { useTheme } from '../context/ThemeContext';
 
@@ -14,6 +14,7 @@ const navItems = [
   { to: '/habits', label: 'Hábitos', icon: Repeat },
   { to: '/notes', label: 'Notas', icon: StickyNote },
   { to: '/tasks', label: 'Tareas', icon: ListTodo },
+  { to: '/modules', label: 'Módulos', icon: LayoutGrid },
   { to: '/settings', label: 'Configuración', icon: Settings },
 ];
 

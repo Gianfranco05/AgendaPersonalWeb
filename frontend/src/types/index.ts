@@ -210,3 +210,35 @@ export interface Reminder {
   minute: number;
   enabled: boolean;
 }
+
+// ── Módulos y Tienda ──
+
+export interface ModuleInfo {
+  key: string;
+  label: string;
+  description: string;
+  icon: string;
+  /** Incluido en la app: gratis y no se puede desactivar. */
+  is_base: boolean;
+  /** El usuario la tiene: base, o comprada. */
+  owned: boolean;
+  enabled: boolean;
+  /** Tiene precio cargado en Stripe: ya se puede comprar. */
+  for_sale: boolean;
+}
+
+export interface StoreItem {
+  key: string;
+  label: string;
+  description: string;
+  icon: string;
+  owned: boolean;
+  /** En la unidad mínima de la moneda (centavos). null si todavía no tiene precio en Stripe. */
+  amount: number | null;
+  currency: string | null;
+}
+
+export interface StoreCatalog {
+  billing_enabled: boolean;
+  items: StoreItem[];
+}
