@@ -357,3 +357,89 @@ export interface FocusSummary {
   week_seconds: number;
   active: FocusSession | null;
 }
+
+// ── Travel (viajes y equipaje) ──
+
+export type TripStatus = 'planeado' | 'en_curso' | 'completado';
+
+export interface Trip {
+  id: string;
+  destination: string;
+  start_date: string | null;
+  end_date: string | null;
+  status: TripStatus;
+  budget: number | null;
+  notes: string | null;
+}
+
+export interface PackingItem {
+  id: string;
+  trip_id: string;
+  name: string;
+  packed: boolean;
+}
+
+export interface TravelSummary {
+  total: number;
+  planeados: number;
+  completados: number;
+  next_trip: Trip | null;
+}
+
+// ── Vehicle (vehículo y mantenimiento) ──
+
+export type MaintenanceRecordType = 'combustible' | 'revision' | 'itv' | 'gasto';
+
+export interface Vehicle {
+  id: string;
+  name: string;
+  brand: string | null;
+  model: string | null;
+  plate: string | null;
+}
+
+export interface MaintenanceRecord {
+  id: string;
+  vehicle_id: string;
+  record_type: MaintenanceRecordType;
+  record_date: string;
+  cost: number | null;
+  odometer_km: number | null;
+  notes: string | null;
+}
+
+export interface VehicleSummary {
+  vehicles_total: number;
+  records_total: number;
+  total_spent: number;
+  last_record: MaintenanceRecord | null;
+}
+
+// ── Projects (gestión de proyectos) ──
+
+export type ProjectStatus = 'activo' | 'pausado' | 'completado';
+export type ProjectTaskStatus = 'pendiente' | 'en_progreso' | 'hecho';
+
+export interface Project {
+  id: string;
+  name: string;
+  description: string | null;
+  status: ProjectStatus;
+}
+
+export interface ProjectTask {
+  id: string;
+  project_id: string;
+  title: string;
+  status: ProjectTaskStatus;
+  due_date: string | null;
+  notes: string | null;
+}
+
+export interface ProjectsSummary {
+  projects_total: number;
+  projects_active: number;
+  tasks_pending: number;
+  tasks_in_progress: number;
+  tasks_done: number;
+}

@@ -37,6 +37,15 @@ import type {
   WorkSummary,
   FocusSession,
   FocusSummary,
+  Trip,
+  PackingItem,
+  TravelSummary,
+  Vehicle,
+  MaintenanceRecord,
+  VehicleSummary,
+  Project,
+  ProjectTask,
+  ProjectsSummary,
 } from '../types';
 
 const MOCK_ENABLED = import.meta.env.VITE_MOCK_ENABLED === 'true';
@@ -994,6 +1003,122 @@ export async function createCheckout(moduleKey: string): Promise<{ url: string }
   return data;
 }
 
+// ── Travel (plantilla de pago: /travel requiere haber comprado el módulo) ──
+
+export async function fetchTrips(): Promise<Trip[]> {
+  if (MOCK_ENABLED) {
+    return mockDelay([]);
+  }
+  const { data } = await apiClient.get<Trip[]>('/api/v1/travel/trips');
+  return data;
+}
+
+export async function createTrip(input: Partial<Trip>): Promise<Trip> {
+  if (MOCK_ENABLED) {
+    return mockDelay({ ...input, id: generateId() } as Trip);
+  }
+  const { data } = await apiClient.post<Trip>('/api/v1/travel/trips', input);
+  return data;
+}
+
+export async function updateTrip(id: string, input: Partial<Trip>): Promise<Trip> {
+  if (MOCK_ENABLED) {
+    return mockDelay({ ...input, id } as Trip);
+  }
+  const { data } = await apiClient.patch<Trip>(`/api/v1/travel/trips/${id}`, input);
+  return data;
+}
+
+export async function deleteTrip(id: string): Promise<void> {
+  if (MOCK_ENABLED) {
+    return mockDelay(undefined);
+  }
+  await apiClient.delete(`/api/v1/travel/trips/${id}`);
+}
+
+export async function fetchPackingItems(tripId: string): Promise<PackingItem[]> {
+  if (MOCK_ENABLED) {
+    return mockDelay([]);
+  }
+  const { data } = await apiClient.get<PackingItem[]>(`/api/v1/travel/trips/${tripId}/items`);
+  return data;
+}
+
+export async function addPackingItem(tripId: string, name: string): Promise<PackingItem> {
+  if (MOCK_ENABLED) {
+    return mockDelay({ id: generateId(), trip_id: tripId, name, packed: false });
+  }
+  const { data } = await apiClient.post<PackingItem>(`/api/v1/travel/trips/${tripId}/items`, { name });
+  return data;
+}
+
+export async function setPackingItemPacked(id: string, packed: boolean): Promise<PackingItem> {
+  if (MOCK_ENABLED) {
+    return mockDelay({ id, packed } as PackingItem);
+  }
+  const { data } = await apiClient.patch<PackingItem>(`/api/v1/travel/items/${id}`, { packed });
+  return data;
+}
+
+export async function deletePackingItem(id: string): Promise<void> {
+  if (MOCK_ENABLED) {
+    return mockDelay(undefined);
+  }
+  await apiClient.delete(`/api/v1/travel/items/${id}`);
+}
+
+export async function fetchTravelSummary(): Promise<TravelSummary> {
+  if (MOCK_ENABLED) {
+    return mockDelay({ total: 0, planeados: 0, completados: 0, next_trip: null });
+  }
+  const { data } = await apiClient.get<TravelSummary>('/api/v1/travel/summary');
+  return data;
+}
+
+// ── Vehicle (plantilla de pago: /vehicle requiere haber comprado el módulo) ──
+
+export async function fetchVehicles(): Promise<Vehicle[]> {
+  if (MOCK_ENABLED) {
+    return mockDelay([]);
+  }
+  const { data } = await apiClient.get<Vehicle[]>('/api/v1/vehicle/vehicles');
+  return data;
+}
+
+export async function createVehicle(input: Partial<Vehicle>): Promise<Vehicle> {
+  if (MOCK_ENABLED) {
+    return mockDelay({ ...input, id: generateId() } as Vehicle);
+  }
+  const { data } = await apiClient.post<Vehicle>('/api/v1/vehicle/vehicles', input);
+  return data;
+}
+
+export async function updateVehicle(id: string, input: Partial<Vehicle>): Promise<Vehicle> {
+  if (MOCK_ENABLED) {
+    return mockDelay({ ...input, id } as Vehicle);
+  }
+  const { data } = await apiClient.patch<Vehicle>(`/api/v1/vehicle/vehicles/${id}`, input);
+  return data;
+}
+
+export async function deleteVehicle(id: string): Promise<void> {
+  if (MOCK_ENABLED) {
+    return mockDelay(undefined);
+  }
+  await apiClient.delete(`/api/v1/vehicle/vehicles/${id}`);
+}
+
+// El backend no tiene PATCH para records: solo se crean o se borran.
+export async function fetchMaintenanceRecords(vehicleId?: string): Promise<MaintenanceRecord[]> {
+  if (MOCK_ENABLED) {
+    return mockDelay([]);
+  }
+  const { data } = await apiClient.get<MaintenanceRecord[]>('/api/v1/vehicle/records', {
+    params: vehicleId ? { vehicle_id: vehicleId } : undefined,
+  });
+  return data;
+}
+
 // ── Study (plantilla de pago) ──
 
 export async function fetchSubjects(): Promise<Subject[]> {
@@ -1296,6 +1421,74 @@ export async function fetchFocusSummary(): Promise<FocusSummary> {
   return data;
 }
 
+export async function createMaintenanceRecord(
+  input: Partial<MaintenanceRecord>,
+): Promise<MaintenanceRecord> {
+  if (MOCK_ENABLED) {
+    return mockDelay({ ...input, id: generateId() } as MaintenanceRecord);
+  }
+  const { data } = await apiClient.post<MaintenanceRecord>('/api/v1/vehicle/records', input);
+  return data;
+}
+
+export async function deleteMaintenanceRecord(id: string): Promise<void> {
+  if (MOCK_ENABLED) {
+    return mockDelay(undefined);
+  }
+  await apiClient.delete(`/api/v1/vehicle/records/${id}`);
+}
+
+export async function fetchVehicleSummary(): Promise<VehicleSummary> {
+  if (MOCK_ENABLED) {
+    return mockDelay({ vehicles_total: 0, records_total: 0, total_spent: 0, last_record: null });
+  }
+  const { data } = await apiClient.get<VehicleSummary>('/api/v1/vehicle/summary');
+  return data;
+}
+
+// ── Projects (plantilla de pago: /projects requiere haber comprado el módulo) ──
+
+export async function fetchProjects(): Promise<Project[]> {
+  if (MOCK_ENABLED) {
+    return mockDelay([]);
+  }
+  const { data } = await apiClient.get<Project[]>('/api/v1/projects');
+  return data;
+}
+
+export async function createProject(input: Partial<Project>): Promise<Project> {
+  if (MOCK_ENABLED) {
+    return mockDelay({ ...input, id: generateId() } as Project);
+  }
+  const { data } = await apiClient.post<Project>('/api/v1/projects', input);
+  return data;
+}
+
+export async function updateProject(id: string, input: Partial<Project>): Promise<Project> {
+  if (MOCK_ENABLED) {
+    return mockDelay({ ...input, id } as Project);
+  }
+  const { data } = await apiClient.patch<Project>(`/api/v1/projects/${id}`, input);
+  return data;
+}
+
+export async function deleteProject(id: string): Promise<void> {
+  if (MOCK_ENABLED) {
+    return mockDelay(undefined);
+  }
+  await apiClient.delete(`/api/v1/projects/${id}`);
+}
+
+export async function fetchProjectTasks(projectId?: string): Promise<ProjectTask[]> {
+  if (MOCK_ENABLED) {
+    return mockDelay([]);
+  }
+  const { data } = await apiClient.get<ProjectTask[]>('/api/v1/projects/tasks', {
+    params: projectId ? { project_id: projectId } : undefined,
+  });
+  return data;
+}
+
 export async function fetchFocusSessions(params?: { limit?: number }): Promise<FocusSession[]> {
   if (MOCK_ENABLED) {
     return mockDelay([
@@ -1345,4 +1538,44 @@ export async function deleteFocusSession(id: string): Promise<void> {
     return mockDelay(undefined);
   }
   await apiClient.delete(`/api/v1/focus/sessions/${id}`);
+}
+
+export async function createProjectTask(input: Partial<ProjectTask>): Promise<ProjectTask> {
+  if (MOCK_ENABLED) {
+    return mockDelay({ ...input, id: generateId() } as ProjectTask);
+  }
+  const { data } = await apiClient.post<ProjectTask>('/api/v1/projects/tasks', input);
+  return data;
+}
+
+export async function updateProjectTask(
+  id: string,
+  input: Partial<ProjectTask>,
+): Promise<ProjectTask> {
+  if (MOCK_ENABLED) {
+    return mockDelay({ ...input, id } as ProjectTask);
+  }
+  const { data } = await apiClient.patch<ProjectTask>(`/api/v1/projects/tasks/${id}`, input);
+  return data;
+}
+
+export async function deleteProjectTask(id: string): Promise<void> {
+  if (MOCK_ENABLED) {
+    return mockDelay(undefined);
+  }
+  await apiClient.delete(`/api/v1/projects/tasks/${id}`);
+}
+
+export async function fetchProjectsSummary(): Promise<ProjectsSummary> {
+  if (MOCK_ENABLED) {
+    return mockDelay({
+      projects_total: 0,
+      projects_active: 0,
+      tasks_pending: 0,
+      tasks_in_progress: 0,
+      tasks_done: 0,
+    });
+  }
+  const { data } = await apiClient.get<ProjectsSummary>('/api/v1/projects/summary');
+  return data;
 }

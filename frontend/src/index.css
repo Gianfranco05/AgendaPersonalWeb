@@ -53,10 +53,13 @@
   --color-brand-nutrition: #14b8a6;
   --color-brand-goals: #a855f7;
   --color-brand-study: #3b82f6;
-  --color-brand-library: #d97706;
-  --color-brand-media: #e11d48;
-  --color-brand-work: #0ea5e9;
+  --color-brand-library: #a16207;
+  --color-brand-media: #db2777;
+  --color-brand-work: #0284c7;
   --color-brand-focus: #8b5cf6;
+  --color-brand-travel: #0ea5e9;
+  --color-brand-vehicle: #d97706;
+  --color-brand-projects: #e11d48;
 
   --animate-fade-in: fade-in 0.4s ease-out both;
   --animate-fade-in-up: fade-in-up 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
