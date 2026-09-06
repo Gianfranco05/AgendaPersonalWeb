@@ -189,3 +189,24 @@ export interface NutritionSummary {
   week_carbs_g: number;
   week_fat_g: number;
 }
+
+// ── Sessions ──
+
+export interface Session {
+  id: string;
+  device_info: string | null;
+  created_at: string;
+  last_used_at: string | null;
+  expires_at: string;
+}
+
+// ── Reminders ──
+
+export interface Reminder {
+  id: string;
+  message: string;
+  icon: string;
+  hour: number;
+  minute: number;
+  enabled: boolean;
+}

@@ -18,6 +18,8 @@ import type {
   Budget,
   BudgetProgress,
   Settings,
+  Session,
+  Reminder,
 } from '../types';
 
 const MOCK_ENABLED = import.meta.env.VITE_MOCK_ENABLED === 'true';
@@ -822,4 +824,86 @@ export async function deleteMyAccount(password: string): Promise<void> {
   // El backend pide la contraseña en el body para reautenticar antes de un
   // borrado irreversible; axios manda body en DELETE via `data`.
   await apiClient.delete('/api/v1/me', { data: { password } });
+}
+
+// ── Sessions ──
+
+export async function fetchSessions(): Promise<Session[]> {
+  if (MOCK_ENABLED) {
+    return mockDelay([
+      {
+        id: generateId(),
+        device_info: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/128.0',
+        created_at: new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString(),
+        last_used_at: new Date().toISOString(),
+        expires_at: new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString(),
+      },
+      {
+        id: generateId(),
+        device_info: 'okhttp/4.12.0 (Android 14)',
+        created_at: new Date(Date.now() - 5 * 24 * 3600 * 1000).toISOString(),
+        last_used_at: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
+        expires_at: new Date(Date.now() + 25 * 24 * 3600 * 1000).toISOString(),
+      },
+    ]);
+  }
+  const { data } = await apiClient.get<Session[]>('/auth/api/sessions');
+  return data;
+}
+
+export async function revokeSession(id: string): Promise<void> {
+  if (MOCK_ENABLED) {
+    await mockDelay(null);
+    return;
+  }
+  await apiClient.delete(`/auth/api/sessions/${id}`);
+}
+
+// ── Reminders ──
+
+export async function fetchReminders(): Promise<Reminder[]> {
+  if (MOCK_ENABLED) {
+    return mockDelay([
+      { id: generateId(), message: '¿Cargaste tus hábitos de hoy?', icon: '🔔', hour: 21, minute: 0, enabled: true },
+    ]);
+  }
+  const { data } = await apiClient.get<Reminder[]>('/api/v1/reminders');
+  return data;
+}
+
+export async function createReminder(
+  input: Omit<Reminder, 'id'>,
+): Promise<Reminder> {
+  if (MOCK_ENABLED) {
+    return mockDelay({ id: generateId(), ...input });
+  }
+  const { data } = await apiClient.post<Reminder>('/api/v1/reminders', input);
+  return data;
+}
+
+export async function updateReminder(
+  id: string,
+  input: Partial<Omit<Reminder, 'id'>>,
+): Promise<Reminder> {
+  if (MOCK_ENABLED) {
+    return mockDelay({
+      id,
+      message: '',
+      icon: '🔔',
+      hour: 9,
+      minute: 0,
+      enabled: true,
+      ...input,
+    });
+  }
+  const { data } = await apiClient.patch<Reminder>(`/api/v1/reminders/${id}`, input);
+  return data;
+}
+
+export async function deleteReminder(id: string): Promise<void> {
+  if (MOCK_ENABLED) {
+    await mockDelay(null);
+    return;
+  }
+  await apiClient.delete(`/api/v1/reminders/${id}`);
 }

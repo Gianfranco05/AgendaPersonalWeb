@@ -5,6 +5,8 @@ import { useAuthStore } from '../../store/authStore';
 import { useTheme } from '../../context/ThemeContext';
 import { useSettings, syncGoogle, disconnectGoogle } from '../../hooks/useSettings';
 import { exportMyData, deleteMyAccount } from '../../api/endpoints';
+import SessionsSection from './SessionsSection';
+import ReminderSection from './ReminderSection';
 
 const inputCls =
   'w-full rounded-lg border border-gray-200 dark:border-slate-700 px-3 py-2 text-sm focus:border-brand-indigo focus:outline-none focus:ring-1 focus:ring-brand-indigo disabled:bg-gray-50 disabled:text-gray-400';
@@ -278,6 +280,10 @@ export default function SettingsPage() {
           </p>
         )}
       </div>
+
+      <SessionsSection />
+
+      <ReminderSection />
 
       <div className="space-y-4 rounded-xl border border-rose-200 dark:border-rose-900/50 bg-white dark:bg-slate-800 p-6 shadow-sm">
         <div className="flex items-center gap-2">
