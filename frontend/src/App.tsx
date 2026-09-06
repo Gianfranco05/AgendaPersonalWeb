@@ -21,6 +21,8 @@ const NutritionPage = lazy(() => import('./pages/Nutrition/NutritionPage'));
 const HabitsPage = lazy(() => import('./pages/Habits/HabitsPage'));
 const TermsPage = lazy(() => import('./pages/Legal/TermsPage'));
 const PrivacyPage = lazy(() => import('./pages/Legal/PrivacyPage'));
+const ModulesPage = lazy(() => import('./pages/Modules/ModulesPage'));
+const StorePage = lazy(() => import('./pages/Store/StorePage'));
 
 export default function App() {
   const checkAuth = useAuthStore((s) => s.checkAuth);
@@ -51,6 +53,8 @@ export default function App() {
                 <Route path="/habits" element={<Suspense fallback={<LoadingSkeleton type="page" />}><HabitsPage /></Suspense>} />
                 <Route path="/notes" element={<Suspense fallback={<LoadingSkeleton type="page" />}><NotesPage /></Suspense>} />
                 <Route path="/tasks" element={<Suspense fallback={<LoadingSkeleton type="page" />}><KanbanBoard /></Suspense>} />
+                <Route path="/modules" element={<Suspense fallback={<LoadingSkeleton type="page" />}><ModulesPage /></Suspense>} />
+                <Route path="/store" element={<Suspense fallback={<LoadingSkeleton type="page" />}><StorePage /></Suspense>} />
                 <Route path="/settings" element={<SettingsPage />} />
               </Route>
             </Route>
