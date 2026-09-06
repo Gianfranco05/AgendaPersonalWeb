@@ -14,6 +14,10 @@ ALLOWED_APP_REDIRECT_SCHEMES = (
     "vidapersonal://",
     "http://localhost",
     "http://127.0.0.1",
+    # La web de desarrollo (Vite, puerto 5173) ya queda cubierta por el
+    # prefijo genérico "http://localhost" de arriba (coincide sin importar
+    # el puerto), asi que no hace falta una entrada aparte para ella.
+    # TODO: agregar dominio de producción real cuando exista.
 )
 
 

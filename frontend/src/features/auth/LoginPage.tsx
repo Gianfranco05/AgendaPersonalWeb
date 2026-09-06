@@ -2,8 +2,11 @@ import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
+import GoogleIcon from '../../components/icons/GoogleIcon';
+
+const API_BASE = import.meta.env.VITE_API_URL ?? '';
 
 const loginSchema = z.object({
   email: z.string().email('Email inválido'),
@@ -12,8 +15,15 @@ const loginSchema = z.object({
 
 type LoginForm = z.infer<typeof loginSchema>;
 
+function handleGoogleLogin() {
+  const redirectUri = `${window.location.origin}/auth/google/callback`;
+  window.location.href = `${API_BASE}/auth/api/google/login?app_redirect=${encodeURIComponent(redirectUri)}`;
+}
+
 export default function LoginPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const googleError = (location.state as { googleError?: string } | null)?.googleError;
   const { login, isAuthenticated } = useAuthStore();
 
   const {
@@ -69,6 +79,9 @@ export default function LoginPage() {
           </div>
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            {googleError && (
+              <div className="rounded-lg bg-red-50 p-3 text-sm text-red-600">{googleError}</div>
+            )}
             {errors.root && (
               <div className="rounded-lg bg-red-50 p-3 text-sm text-red-600">
                 {errors.root.message}
@@ -115,15 +128,26 @@ export default function LoginPage() {
             </button>
           </form>
 
+          <div className="my-5 flex items-center gap-3">
+            <div className="h-px flex-1 bg-brand-border" />
+            <span className="text-xs text-gray-400 dark:text-slate-500">o</span>
+            <div className="h-px flex-1 bg-brand-border" />
+          </div>
+
+          <button
+            type="button"
+            onClick={handleGoogleLogin}
+            className="flex w-full items-center justify-center gap-2 rounded-lg border border-brand-border bg-white py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+          >
+            <GoogleIcon />
+            Continuar con Google
+          </button>
+
           <p className="mt-6 text-center text-sm text-gray-500 dark:text-slate-400">
             ¿No tenés cuenta?{' '}
             <Link to="/register" className="font-medium text-brand-indigo hover:text-brand-indigo-hover">
               Registrate
             </Link>
-          </p>
-
-          <p className="mt-4 text-center text-xs text-gray-400 dark:text-slate-500">
-            App local de un solo usuario
           </p>
         </div>
       </div>

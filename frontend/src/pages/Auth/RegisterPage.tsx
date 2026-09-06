@@ -3,11 +3,17 @@ import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useNavigate, Link } from 'react-router-dom';
 import * as authApi from '../../api/authApi';
+import GoogleIcon from '../../components/icons/GoogleIcon';
+
+const API_BASE = import.meta.env.VITE_API_URL ?? '';
 
 const registerSchema = z.object({
   name: z.string().min(1, 'El nombre es requerido'),
   email: z.string().email('Email inválido'),
   password: z.string().min(6, 'La contraseña debe tener al menos 6 caracteres'),
+  acceptTerms: z.boolean().refine((v) => v === true, {
+    message: 'Tenés que aceptar los Términos y la Política de Privacidad',
+  }),
 });
 
 type RegisterForm = z.infer<typeof registerSchema>;
@@ -26,13 +32,18 @@ export default function RegisterPage() {
 
   async function onSubmit(data: RegisterForm) {
     try {
-      await authApi.register(data.name, data.email, data.password);
+      await authApi.register(data.name, data.email, data.password, data.acceptTerms);
       navigate('/login', { state: { registered: true } });
     } catch (err: unknown) {
       const data = (err as any)?.response?.data;
       const detail = Array.isArray(data?.detail) ? data.detail[0]?.msg : data?.detail;
       setError('root', { message: detail ?? 'Error al registrarse' });
     }
+  }
+
+  function handleGoogleSignup() {
+    const redirectUri = `${window.location.origin}/auth/google/callback`;
+    window.location.href = `${API_BASE}/auth/api/google/login?app_redirect=${encodeURIComponent(redirectUri)}`;
   }
 
   return (
@@ -113,6 +124,30 @@ export default function RegisterPage() {
               )}
             </div>
 
+            <div>
+              <label className="flex items-start gap-2 text-xs text-gray-500 dark:text-slate-400">
+                <input
+                  {...register('acceptTerms')}
+                  type="checkbox"
+                  className="mt-0.5 h-4 w-4 rounded border-brand-border text-brand-indigo focus:ring-brand-indigo"
+                />
+                <span>
+                  Acepto los{' '}
+                  <Link to="/terms" className="hover:underline" target="_blank" rel="noopener noreferrer">
+                    Términos y Condiciones
+                  </Link>{' '}
+                  y la{' '}
+                  <Link to="/privacy" className="hover:underline" target="_blank" rel="noopener noreferrer">
+                    Política de Privacidad
+                  </Link>
+                  .
+                </span>
+              </label>
+              {errors.acceptTerms && (
+                <p className="mt-1 text-xs text-red-500">{errors.acceptTerms.message}</p>
+              )}
+            </div>
+
             <button
               type="submit"
               disabled={isSubmitting}
@@ -122,17 +157,20 @@ export default function RegisterPage() {
             </button>
           </form>
 
-          <p className="mt-4 text-center text-xs text-gray-400 dark:text-slate-500">
-            Al crear una cuenta aceptás los{' '}
-            <Link to="/terms" className="hover:underline">
-              Términos y Condiciones
-            </Link>{' '}
-            y la{' '}
-            <Link to="/privacy" className="hover:underline">
-              Política de Privacidad
-            </Link>
-            .
-          </p>
+          <div className="my-5 flex items-center gap-3">
+            <div className="h-px flex-1 bg-brand-border" />
+            <span className="text-xs text-gray-400 dark:text-slate-500">o</span>
+            <div className="h-px flex-1 bg-brand-border" />
+          </div>
+
+          <button
+            type="button"
+            onClick={handleGoogleSignup}
+            className="flex w-full items-center justify-center gap-2 rounded-lg border border-brand-border bg-white py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+          >
+            <GoogleIcon />
+            Continuar con Google
+          </button>
 
           <p className="mt-6 text-center text-sm text-gray-500 dark:text-slate-400">
             ¿Ya tenés cuenta?{' '}

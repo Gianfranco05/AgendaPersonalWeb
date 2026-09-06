@@ -9,6 +9,7 @@ import DashboardPage from './pages/Dashboard/DashboardPage';
 import GoalsPage from './pages/Goals/GoalsPage';
 import SettingsPage from './pages/Settings/SettingsPage';
 import RegisterPage from './pages/Auth/RegisterPage';
+import GoogleCallbackPage from './pages/Auth/GoogleCallbackPage';
 import LoginPage from './features/auth/LoginPage';
 import { useAuthStore } from './store/authStore';
 
@@ -23,6 +24,7 @@ const TermsPage = lazy(() => import('./pages/Legal/TermsPage'));
 const PrivacyPage = lazy(() => import('./pages/Legal/PrivacyPage'));
 const ModulesPage = lazy(() => import('./pages/Modules/ModulesPage'));
 const StorePage = lazy(() => import('./pages/Store/StorePage'));
+const AcceptTermsPage = lazy(() => import('./pages/Legal/AcceptTermsPage'));
 
 export default function App() {
   const checkAuth = useAuthStore((s) => s.checkAuth);
@@ -38,10 +40,19 @@ export default function App() {
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
+            <Route path="/auth/google/callback" element={<GoogleCallbackPage />} />
             {/* Públicas: tienen que ser accesibles antes de registrarse, ya que
                 el registro remite a ellas. */}
             <Route path="/terms" element={<Suspense fallback={<LoadingSkeleton type="page" />}><TermsPage /></Suspense>} />
             <Route path="/privacy" element={<Suspense fallback={<LoadingSkeleton type="page" />}><PrivacyPage /></Suspense>} />
+            {/* Requiere sesión iniciada, pero sin pasar por el gate de términos
+                (evita el loop de redirección contra sí misma). */}
+            <Route element={<ProtectedRoute skipTermsGate />}>
+              <Route
+                path="/accept-terms"
+                element={<Suspense fallback={<LoadingSkeleton type="page" />}><AcceptTermsPage /></Suspense>}
+              />
+            </Route>
             <Route element={<ProtectedRoute />}>
               <Route element={<Layout />}>
                 <Route path="/" element={<DashboardPage />} />
