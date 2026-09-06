@@ -52,6 +52,9 @@
   --color-brand-habits: #22c55e;
   --color-brand-nutrition: #14b8a6;
   --color-brand-goals: #a855f7;
+  --color-brand-travel: #0ea5e9;
+  --color-brand-vehicle: #d97706;
+  --color-brand-projects: #e11d48;
 
   --animate-fade-in: fade-in 0.4s ease-out both;
   --animate-fade-in-up: fade-in-up 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
