@@ -25,6 +25,14 @@ const PrivacyPage = lazy(() => import('./pages/Legal/PrivacyPage'));
 const ModulesPage = lazy(() => import('./pages/Modules/ModulesPage'));
 const StorePage = lazy(() => import('./pages/Store/StorePage'));
 const AcceptTermsPage = lazy(() => import('./pages/Legal/AcceptTermsPage'));
+const StudyPage = lazy(() => import('./pages/Study/StudyPage'));
+const LibraryPage = lazy(() => import('./pages/Library/LibraryPage'));
+const MediaPage = lazy(() => import('./pages/Media/MediaPage'));
+const WorkPage = lazy(() => import('./pages/Work/WorkPage'));
+const FocusPage = lazy(() => import('./pages/Focus/FocusPage'));
+const TravelPage = lazy(() => import('./pages/Travel/TravelPage'));
+const VehiclePage = lazy(() => import('./pages/Vehicle/VehiclePage'));
+const ProjectsPage = lazy(() => import('./pages/Projects/ProjectsPage'));
 
 export default function App() {
   const checkAuth = useAuthStore((s) => s.checkAuth);
@@ -66,6 +74,16 @@ export default function App() {
                 <Route path="/tasks" element={<Suspense fallback={<LoadingSkeleton type="page" />}><KanbanBoard /></Suspense>} />
                 <Route path="/modules" element={<Suspense fallback={<LoadingSkeleton type="page" />}><ModulesPage /></Suspense>} />
                 <Route path="/store" element={<Suspense fallback={<LoadingSkeleton type="page" />}><StorePage /></Suspense>} />
+                <Route path="/focus" element={<Suspense fallback={<LoadingSkeleton type="page" />}><FocusPage /></Suspense>} />
+                {/* Plantillas de pago único: el gate de "no comprada" lo maneja cada
+                    página mostrando un 402 con link a /store, no el router. */}
+                <Route path="/study" element={<Suspense fallback={<LoadingSkeleton type="page" />}><StudyPage /></Suspense>} />
+                <Route path="/library" element={<Suspense fallback={<LoadingSkeleton type="page" />}><LibraryPage /></Suspense>} />
+                <Route path="/media" element={<Suspense fallback={<LoadingSkeleton type="page" />}><MediaPage /></Suspense>} />
+                <Route path="/work" element={<Suspense fallback={<LoadingSkeleton type="page" />}><WorkPage /></Suspense>} />
+                <Route path="/travel" element={<Suspense fallback={<LoadingSkeleton type="page" />}><TravelPage /></Suspense>} />
+                <Route path="/vehicle" element={<Suspense fallback={<LoadingSkeleton type="page" />}><VehiclePage /></Suspense>} />
+                <Route path="/projects" element={<Suspense fallback={<LoadingSkeleton type="page" />}><ProjectsPage /></Suspense>} />
                 <Route path="/settings" element={<SettingsPage />} />
               </Route>
             </Route>
