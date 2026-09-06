@@ -18,6 +18,21 @@ import type {
   Budget,
   BudgetProgress,
   Settings,
+  Subject,
+  Exam,
+  StudySummary,
+  Book,
+  BookStatus,
+  LibrarySummary,
+  MediaItem,
+  MediaType,
+  MediaStatus,
+  MediaSummary,
+  WorkOpportunity,
+  OpportunityStatus,
+  WorkSummary,
+  FocusSession,
+  FocusSummary,
 } from '../types';
 
 const MOCK_ENABLED = import.meta.env.VITE_MOCK_ENABLED === 'true';
@@ -822,4 +837,357 @@ export async function deleteMyAccount(password: string): Promise<void> {
   // El backend pide la contraseña en el body para reautenticar antes de un
   // borrado irreversible; axios manda body en DELETE via `data`.
   await apiClient.delete('/api/v1/me', { data: { password } });
+}
+
+// ── Study (plantilla de pago) ──
+
+export async function fetchSubjects(): Promise<Subject[]> {
+  if (MOCK_ENABLED) {
+    return mockDelay([
+      { id: 'sub1', name: 'Álgebra II', professor: 'Prof. Gómez', color: '#6366F1', status: 'cursando' },
+      { id: 'sub2', name: 'Física I', professor: null, color: '#F59E0B', status: 'aprobada' },
+      { id: 'sub3', name: 'Programación III', professor: 'Prof. Ruiz', color: '#10B981', status: 'pendiente' },
+    ]);
+  }
+  const { data } = await apiClient.get<Subject[]>('/api/v1/study/subjects');
+  return data;
+}
+
+export async function createSubject(subject: Partial<Subject>): Promise<Subject> {
+  if (MOCK_ENABLED) {
+    return mockDelay({
+      id: generateId(),
+      name: subject.name ?? '',
+      professor: subject.professor ?? null,
+      color: subject.color ?? '#6366F1',
+      status: subject.status ?? 'cursando',
+    });
+  }
+  const { data } = await apiClient.post<Subject>('/api/v1/study/subjects', subject);
+  return data;
+}
+
+export async function updateSubject(id: string, subject: Partial<Subject>): Promise<Subject> {
+  if (MOCK_ENABLED) {
+    return mockDelay({ ...subject, id } as Subject);
+  }
+  const { data } = await apiClient.patch<Subject>(`/api/v1/study/subjects/${id}`, subject);
+  return data;
+}
+
+export async function deleteSubject(id: string): Promise<void> {
+  if (MOCK_ENABLED) {
+    return mockDelay(undefined);
+  }
+  await apiClient.delete(`/api/v1/study/subjects/${id}`);
+}
+
+export async function fetchExams(params?: { upcoming?: boolean }): Promise<Exam[]> {
+  if (MOCK_ENABLED) {
+    const today = new Date().toISOString().split('T')[0];
+    const mockExams: Exam[] = [
+      { id: 'ex1', subject_id: 'sub1', title: 'Primer parcial', exam_date: today, grade: null, notes: null },
+      { id: 'ex2', subject_id: 'sub2', title: 'Final', exam_date: '2026-03-10', grade: 8.5, notes: null },
+    ];
+    if (params?.upcoming) {
+      return mockDelay(mockExams.filter((e) => e.exam_date >= today));
+    }
+    return mockDelay(mockExams);
+  }
+  const { data } = await apiClient.get<Exam[]>('/api/v1/study/exams', { params });
+  return data;
+}
+
+export async function createExam(exam: Partial<Exam>): Promise<Exam> {
+  if (MOCK_ENABLED) {
+    return mockDelay({
+      id: generateId(),
+      subject_id: exam.subject_id ?? '',
+      title: exam.title ?? '',
+      exam_date: exam.exam_date ?? new Date().toISOString().split('T')[0],
+      grade: exam.grade ?? null,
+      notes: exam.notes ?? null,
+    });
+  }
+  const { data } = await apiClient.post<Exam>('/api/v1/study/exams', exam);
+  return data;
+}
+
+export async function updateExam(id: string, exam: Partial<Exam>): Promise<Exam> {
+  if (MOCK_ENABLED) {
+    return mockDelay({ ...exam, id } as Exam);
+  }
+  const { data } = await apiClient.patch<Exam>(`/api/v1/study/exams/${id}`, exam);
+  return data;
+}
+
+export async function deleteExam(id: string): Promise<void> {
+  if (MOCK_ENABLED) {
+    return mockDelay(undefined);
+  }
+  await apiClient.delete(`/api/v1/study/exams/${id}`);
+}
+
+export async function fetchStudySummary(): Promise<StudySummary> {
+  if (MOCK_ENABLED) {
+    return mockDelay({
+      subjects_total: 3,
+      subjects_cursando: 1,
+      subjects_aprobadas: 1,
+      average_grade: 8.5,
+      next_exam: null,
+      upcoming_count: 0,
+    });
+  }
+  const { data } = await apiClient.get<StudySummary>('/api/v1/study/summary');
+  return data;
+}
+
+// ── Library / Biblioteca (plantilla de pago) ──
+
+export async function fetchBooks(params?: { status?: BookStatus }): Promise<Book[]> {
+  if (MOCK_ENABLED) {
+    const mockBooks: Book[] = [
+      {
+        id: 'bk1', title: 'Rayuela', author: 'Julio Cortázar', status: 'leido', rating: 4.5,
+        pages: 640, notes: null, started_date: null, finished_date: null,
+      },
+      {
+        id: 'bk2', title: 'Sapiens', author: 'Yuval Noah Harari', status: 'leyendo', rating: null,
+        pages: 450, notes: null, started_date: null, finished_date: null,
+      },
+    ];
+    return mockDelay(params?.status ? mockBooks.filter((b) => b.status === params.status) : mockBooks);
+  }
+  const { data } = await apiClient.get<Book[]>('/api/v1/library/books', { params });
+  return data;
+}
+
+export async function createBook(book: Partial<Book>): Promise<Book> {
+  if (MOCK_ENABLED) {
+    return mockDelay({
+      id: generateId(),
+      title: book.title ?? '',
+      author: book.author ?? null,
+      status: book.status ?? 'pendiente',
+      rating: book.rating ?? null,
+      pages: book.pages ?? null,
+      notes: book.notes ?? null,
+      started_date: book.started_date ?? null,
+      finished_date: book.finished_date ?? null,
+    });
+  }
+  const { data } = await apiClient.post<Book>('/api/v1/library/books', book);
+  return data;
+}
+
+export async function updateBook(id: string, book: Partial<Book>): Promise<Book> {
+  if (MOCK_ENABLED) {
+    return mockDelay({ ...book, id } as Book);
+  }
+  const { data } = await apiClient.patch<Book>(`/api/v1/library/books/${id}`, book);
+  return data;
+}
+
+export async function deleteBook(id: string): Promise<void> {
+  if (MOCK_ENABLED) {
+    return mockDelay(undefined);
+  }
+  await apiClient.delete(`/api/v1/library/books/${id}`);
+}
+
+export async function fetchLibrarySummary(): Promise<LibrarySummary> {
+  if (MOCK_ENABLED) {
+    return mockDelay({ total: 2, pendientes: 0, leyendo: 1, leidos: 1, average_rating: 4.5 });
+  }
+  const { data } = await apiClient.get<LibrarySummary>('/api/v1/library/summary');
+  return data;
+}
+
+// ── Media / Películas y series (plantilla de pago) ──
+
+export async function fetchMediaItems(params?: {
+  status?: MediaStatus;
+  media_type?: MediaType;
+}): Promise<MediaItem[]> {
+  if (MOCK_ENABLED) {
+    let mockItems: MediaItem[] = [
+      { id: 'md1', title: 'Interstellar', media_type: 'pelicula', status: 'visto', rating: 5, year: 2014, notes: null },
+      { id: 'md2', title: 'Breaking Bad', media_type: 'serie', status: 'viendo', rating: null, year: 2008, notes: null },
+    ];
+    if (params?.status) mockItems = mockItems.filter((i) => i.status === params.status);
+    if (params?.media_type) mockItems = mockItems.filter((i) => i.media_type === params.media_type);
+    return mockDelay(mockItems);
+  }
+  const { data } = await apiClient.get<MediaItem[]>('/api/v1/media/items', { params });
+  return data;
+}
+
+export async function createMediaItem(item: Partial<MediaItem>): Promise<MediaItem> {
+  if (MOCK_ENABLED) {
+    return mockDelay({
+      id: generateId(),
+      title: item.title ?? '',
+      media_type: item.media_type ?? 'pelicula',
+      status: item.status ?? 'pendiente',
+      rating: item.rating ?? null,
+      year: item.year ?? null,
+      notes: item.notes ?? null,
+    });
+  }
+  const { data } = await apiClient.post<MediaItem>('/api/v1/media/items', item);
+  return data;
+}
+
+export async function updateMediaItem(id: string, item: Partial<MediaItem>): Promise<MediaItem> {
+  if (MOCK_ENABLED) {
+    return mockDelay({ ...item, id } as MediaItem);
+  }
+  const { data } = await apiClient.patch<MediaItem>(`/api/v1/media/items/${id}`, item);
+  return data;
+}
+
+export async function deleteMediaItem(id: string): Promise<void> {
+  if (MOCK_ENABLED) {
+    return mockDelay(undefined);
+  }
+  await apiClient.delete(`/api/v1/media/items/${id}`);
+}
+
+export async function fetchMediaSummary(): Promise<MediaSummary> {
+  if (MOCK_ENABLED) {
+    return mockDelay({ total: 2, pendientes: 0, viendo: 1, vistos: 1, average_rating: 5 });
+  }
+  const { data } = await apiClient.get<MediaSummary>('/api/v1/media/summary');
+  return data;
+}
+
+// ── Work / Trabajo y carrera (plantilla de pago) ──
+
+export async function fetchOpportunities(params?: { status?: OpportunityStatus }): Promise<WorkOpportunity[]> {
+  if (MOCK_ENABLED) {
+    const mockOpportunities: WorkOpportunity[] = [
+      {
+        id: 'wk1', company: 'Acme', role: 'Backend Developer', status: 'entrevista',
+        salary: 1500000, applied_date: '2026-08-01', notes: null,
+      },
+      {
+        id: 'wk2', company: 'Globex', role: 'Fullstack Developer', status: 'aplicado',
+        salary: null, applied_date: '2026-08-20', notes: null,
+      },
+    ];
+    return mockDelay(
+      params?.status ? mockOpportunities.filter((o) => o.status === params.status) : mockOpportunities,
+    );
+  }
+  const { data } = await apiClient.get<WorkOpportunity[]>('/api/v1/work/opportunities', { params });
+  return data;
+}
+
+export async function createOpportunity(opportunity: Partial<WorkOpportunity>): Promise<WorkOpportunity> {
+  if (MOCK_ENABLED) {
+    return mockDelay({
+      id: generateId(),
+      company: opportunity.company ?? '',
+      role: opportunity.role ?? '',
+      status: opportunity.status ?? 'aplicado',
+      salary: opportunity.salary ?? null,
+      applied_date: opportunity.applied_date ?? null,
+      notes: opportunity.notes ?? null,
+    });
+  }
+  const { data } = await apiClient.post<WorkOpportunity>('/api/v1/work/opportunities', opportunity);
+  return data;
+}
+
+export async function updateOpportunity(
+  id: string,
+  opportunity: Partial<WorkOpportunity>,
+): Promise<WorkOpportunity> {
+  if (MOCK_ENABLED) {
+    return mockDelay({ ...opportunity, id } as WorkOpportunity);
+  }
+  const { data } = await apiClient.patch<WorkOpportunity>(`/api/v1/work/opportunities/${id}`, opportunity);
+  return data;
+}
+
+export async function deleteOpportunity(id: string): Promise<void> {
+  if (MOCK_ENABLED) {
+    return mockDelay(undefined);
+  }
+  await apiClient.delete(`/api/v1/work/opportunities/${id}`);
+}
+
+export async function fetchWorkSummary(): Promise<WorkSummary> {
+  if (MOCK_ENABLED) {
+    return mockDelay({ total: 2, active: 2, entrevista: 1, oferta: 0, aceptado: 0 });
+  }
+  const { data } = await apiClient.get<WorkSummary>('/api/v1/work/summary');
+  return data;
+}
+
+// ── Focus / Enfoque (gratis, sin gate de módulo) ──
+
+export async function fetchFocusSummary(): Promise<FocusSummary> {
+  if (MOCK_ENABLED) {
+    return mockDelay({ today_seconds: 3600, week_seconds: 14400, active: null });
+  }
+  // Minutos al este de UTC: getTimezoneOffset() de JS usa el signo opuesto
+  // (positivo al oeste), por eso se invierte antes de mandarlo.
+  const tzOffsetMinutes = -new Date().getTimezoneOffset();
+  const { data } = await apiClient.get<FocusSummary>('/api/v1/focus/summary', {
+    params: { tz_offset_minutes: tzOffsetMinutes },
+  });
+  return data;
+}
+
+export async function fetchFocusSessions(params?: { limit?: number }): Promise<FocusSession[]> {
+  if (MOCK_ENABLED) {
+    return mockDelay([
+      {
+        id: 'fc1',
+        started_at: new Date(Date.now() - 3600_000).toISOString(),
+        ended_at: new Date(Date.now() - 1800_000).toISOString(),
+        duration_seconds: 1800,
+        label: 'Informe mensual',
+      },
+    ]);
+  }
+  const { data } = await apiClient.get<FocusSession[]>('/api/v1/focus/sessions', { params });
+  return data;
+}
+
+export async function startFocusSession(label?: string): Promise<FocusSession> {
+  if (MOCK_ENABLED) {
+    return mockDelay({
+      id: generateId(),
+      started_at: new Date().toISOString(),
+      ended_at: null,
+      duration_seconds: null,
+      label: label ?? null,
+    });
+  }
+  const { data } = await apiClient.post<FocusSession>('/api/v1/focus/start', label ? { label } : {});
+  return data;
+}
+
+export async function stopFocusSession(): Promise<FocusSession> {
+  if (MOCK_ENABLED) {
+    return mockDelay({
+      id: generateId(),
+      started_at: new Date(Date.now() - 60_000).toISOString(),
+      ended_at: new Date().toISOString(),
+      duration_seconds: 60,
+      label: null,
+    });
+  }
+  const { data } = await apiClient.post<FocusSession>('/api/v1/focus/stop');
+  return data;
+}
+
+export async function deleteFocusSession(id: string): Promise<void> {
+  if (MOCK_ENABLED) {
+    return mockDelay(undefined);
+  }
+  await apiClient.delete(`/api/v1/focus/sessions/${id}`);
 }

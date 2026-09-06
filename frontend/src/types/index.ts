@@ -189,3 +189,118 @@ export interface NutritionSummary {
   week_carbs_g: number;
   week_fat_g: number;
 }
+
+// ── Study ──
+
+export type SubjectStatus = 'cursando' | 'aprobada' | 'pendiente';
+
+export interface Subject {
+  id: string;
+  name: string;
+  professor: string | null;
+  color: string;
+  status: SubjectStatus;
+}
+
+export interface Exam {
+  id: string;
+  subject_id: string;
+  title: string;
+  exam_date: string;
+  grade: number | null;
+  notes: string | null;
+}
+
+export interface StudySummary {
+  subjects_total: number;
+  subjects_cursando: number;
+  subjects_aprobadas: number;
+  average_grade: number | null;
+  next_exam: Exam | null;
+  upcoming_count: number;
+}
+
+// ── Library ──
+
+export type BookStatus = 'pendiente' | 'leyendo' | 'leido';
+
+export interface Book {
+  id: string;
+  title: string;
+  author: string | null;
+  status: BookStatus;
+  rating: number | null;
+  pages: number | null;
+  notes: string | null;
+  started_date: string | null;
+  finished_date: string | null;
+}
+
+export interface LibrarySummary {
+  total: number;
+  pendientes: number;
+  leyendo: number;
+  leidos: number;
+  average_rating: number | null;
+}
+
+// ── Media (películas y series) ──
+
+export type MediaType = 'pelicula' | 'serie';
+export type MediaStatus = 'pendiente' | 'viendo' | 'visto';
+
+export interface MediaItem {
+  id: string;
+  title: string;
+  media_type: MediaType;
+  status: MediaStatus;
+  rating: number | null;
+  year: number | null;
+  notes: string | null;
+}
+
+export interface MediaSummary {
+  total: number;
+  pendientes: number;
+  viendo: number;
+  vistos: number;
+  average_rating: number | null;
+}
+
+// ── Work (trabajo y carrera) ──
+
+export type OpportunityStatus = 'aplicado' | 'entrevista' | 'oferta' | 'rechazado' | 'aceptado';
+
+export interface WorkOpportunity {
+  id: string;
+  company: string;
+  role: string;
+  status: OpportunityStatus;
+  salary: number | null;
+  applied_date: string | null;
+  notes: string | null;
+}
+
+export interface WorkSummary {
+  total: number;
+  active: number;
+  entrevista: number;
+  oferta: number;
+  aceptado: number;
+}
+
+// ── Focus (deep work) ──
+
+export interface FocusSession {
+  id: string;
+  started_at: string;
+  ended_at: string | null;
+  duration_seconds: number | null;
+  label: string | null;
+}
+
+export interface FocusSummary {
+  today_seconds: number;
+  week_seconds: number;
+  active: FocusSession | null;
+}
