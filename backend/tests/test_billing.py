@@ -239,6 +239,26 @@ async def test_webhook_ignores_a_checkout_without_confirmed_payment(
     assert await ModulesService(db_session).owned_keys(test_user.id) == set()
 
 
+async def test_webhook_without_payment_status_is_not_granted(
+    api_auth_client, db_session, test_user, billing_enabled
+):
+    # Un Checkout Session real de Stripe siempre trae payment_status; si un
+    # payload llega sin ese campo (payload inesperado/malformado) el fix debe
+    # tratarlo como NO pagado, no como "paid" implicito.
+    event = _checkout_event(user_id=test_user.id)
+    del event["data"]["object"]["payment_status"]
+    body = json.dumps(event)
+    timestamp = int(time.time())
+    signature = hmac.new(
+        WEBHOOK_SECRET.encode(), f"{timestamp}.{body}".encode(), hashlib.sha256
+    ).hexdigest()
+    headers = {"Stripe-Signature": f"t={timestamp},v1={signature}", "Content-Type": "application/json"}
+
+    resp = await api_auth_client.post("/api/v1/billing/webhook", content=body, headers=headers)
+    assert resp.status_code == 200
+    assert await ModulesService(db_session).owned_keys(test_user.id) == set()
+
+
 async def test_webhook_for_an_unknown_user_is_ignored_without_error(client, billing_enabled):
     body, headers = _signed(_checkout_event(user_id=None, customer="cus_desconocido"))
     resp = await client.post("/api/v1/billing/webhook", content=body, headers=headers)

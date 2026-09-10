@@ -210,8 +210,12 @@ async def _grant_purchase(db: AsyncSession, session: dict) -> None:
         return
 
     # Solo se entrega con el pago cobrado: un checkout completado con pago
-    # pendiente (algunos medios lo permiten) todavia no es una compra.
-    if session.get("payment_status") not in (None, "paid", "no_payment_required"):
+    # pendiente (algunos medios lo permiten) todavia no es una compra. Un
+    # Checkout Session real de Stripe siempre trae payment_status, asi que un
+    # valor ausente/no reconocido se trata como NO pagado (fail-closed) en vez
+    # de dejarlo pasar — lo contrario habria otorgado el modulo gratis ante
+    # cualquier payload inesperado.
+    if session.get("payment_status") not in ("paid", "no_payment_required"):
         logger.info(
             "Checkout de %s sin pago confirmado (%s)", module_key, session.get("payment_status")
         )
