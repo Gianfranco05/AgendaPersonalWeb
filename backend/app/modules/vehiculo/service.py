@@ -1,9 +1,10 @@
 from typing import Optional
 
 from fastapi import HTTPException
-from sqlalchemy import select, delete
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.crud_service import apply_changes, get_by_id_or_404
 from app.modules.vehiculo.models import RECORD_TYPES, MaintenanceRecord, Vehicle
 
 
@@ -24,13 +25,9 @@ class VehicleService:
         return list(result.scalars().all())
 
     async def _get_vehicle(self, user_id: str, vehicle_id: str) -> Vehicle:
-        result = await self.db.execute(
-            select(Vehicle).where(Vehicle.id == vehicle_id, Vehicle.user_id == user_id)
+        return await get_by_id_or_404(
+            self.db, Vehicle, vehicle_id, user_id, not_found_detail="Vehículo no encontrado"
         )
-        vehicle = result.scalar_one_or_none()
-        if vehicle is None:
-            raise HTTPException(status_code=404, detail="Vehículo no encontrado")
-        return vehicle
 
     async def create_vehicle(
         self,
@@ -48,9 +45,7 @@ class VehicleService:
 
     async def update_vehicle(self, user_id: str, vehicle_id: str, changes: dict) -> Vehicle:
         vehicle = await self._get_vehicle(user_id, vehicle_id)
-        for field, value in changes.items():
-            if value is not None:
-                setattr(vehicle, field, value)
+        apply_changes(vehicle, changes)
         await self.db.commit()
         await self.db.refresh(vehicle)
         return vehicle
@@ -82,15 +77,9 @@ class VehicleService:
         return list(result.scalars().all())
 
     async def _get_record(self, user_id: str, record_id: str) -> MaintenanceRecord:
-        result = await self.db.execute(
-            select(MaintenanceRecord).where(
-                MaintenanceRecord.id == record_id, MaintenanceRecord.user_id == user_id
-            )
+        return await get_by_id_or_404(
+            self.db, MaintenanceRecord, record_id, user_id, not_found_detail="Registro no encontrado"
         )
-        record = result.scalar_one_or_none()
-        if record is None:
-            raise HTTPException(status_code=404, detail="Registro no encontrado")
-        return record
 
     async def create_record(
         self,
@@ -126,13 +115,31 @@ class VehicleService:
     # ── Resumen ──────────────────────────────────────────────────────────────
 
     async def summary(self, user_id: str) -> dict:
-        vehicles = await self.list_vehicles(user_id)
-        records = await self.list_records(user_id)
-        total_spent = sum(r.cost for r in records if r.cost is not None)
+        vehicles_total = (
+            await self.db.execute(
+                select(func.count(Vehicle.id)).where(Vehicle.user_id == user_id)
+            )
+        ).scalar() or 0
+
+        record_result = await self.db.execute(
+            select(
+                func.count(MaintenanceRecord.id),
+                func.coalesce(func.sum(MaintenanceRecord.cost), 0),
+            ).where(MaintenanceRecord.user_id == user_id)
+        )
+        records_total, total_spent = record_result.one()
+
+        last_record_result = await self.db.execute(
+            select(MaintenanceRecord)
+            .where(MaintenanceRecord.user_id == user_id)
+            .order_by(MaintenanceRecord.record_date.desc())
+            .limit(1)
+        )
+        last_record = last_record_result.scalar_one_or_none()
 
         return {
-            "vehicles_total": len(vehicles),
-            "records_total": len(records),
-            "total_spent": round(total_spent, 2) if records else 0.0,
-            "last_record": records[0] if records else None,
+            "vehicles_total": vehicles_total,
+            "records_total": records_total or 0,
+            "total_spent": round(total_spent, 2) if records_total else 0.0,
+            "last_record": last_record,
         }

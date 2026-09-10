@@ -1,9 +1,10 @@
 from typing import Optional
 
 from fastapi import HTTPException
-from sqlalchemy import select
+from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.crud_service import apply_changes, get_by_id_or_404
 from app.modules.peliculas.models import MEDIA_STATUSES, MEDIA_TYPES, MediaItem, MediaStatus, MediaType
 
 
@@ -33,13 +34,9 @@ class MediaService:
         return list(result.scalars().all())
 
     async def _get_item(self, user_id: str, item_id: str) -> MediaItem:
-        result = await self.db.execute(
-            select(MediaItem).where(MediaItem.id == item_id, MediaItem.user_id == user_id)
+        return await get_by_id_or_404(
+            self.db, MediaItem, item_id, user_id, not_found_detail="No encontrado"
         )
-        item = result.scalar_one_or_none()
-        if item is None:
-            raise HTTPException(status_code=404, detail="No encontrado")
-        return item
 
     async def create_item(
         self,
@@ -71,9 +68,7 @@ class MediaService:
         item = await self._get_item(user_id, item_id)
         self._validate_status(changes.get("status"))
         self._validate_type(changes.get("media_type"))
-        for field, value in changes.items():
-            if value is not None:
-                setattr(item, field, value)
+        apply_changes(item, changes)
         await self.db.commit()
         await self.db.refresh(item)
         return item
@@ -84,14 +79,21 @@ class MediaService:
         await self.db.commit()
 
     async def summary(self, user_id: str) -> dict:
-        items = await self.list_items(user_id)
-        vistos = [i for i in items if i.status == MediaStatus.VISTO]
-        rated = [i.rating for i in vistos if i.rating is not None]
+        result = await self.db.execute(
+            select(
+                func.count(MediaItem.id),
+                func.sum(case((MediaItem.status == MediaStatus.PENDIENTE, 1), else_=0)),
+                func.sum(case((MediaItem.status == MediaStatus.VIENDO, 1), else_=0)),
+                func.sum(case((MediaItem.status == MediaStatus.VISTO, 1), else_=0)),
+                func.avg(case((MediaItem.status == MediaStatus.VISTO, MediaItem.rating), else_=None)),
+            ).where(MediaItem.user_id == user_id)
+        )
+        total, pendientes, viendo, vistos, average_rating = result.one()
 
         return {
-            "total": len(items),
-            "pendientes": sum(1 for i in items if i.status == MediaStatus.PENDIENTE),
-            "viendo": sum(1 for i in items if i.status == MediaStatus.VIENDO),
-            "vistos": len(vistos),
-            "average_rating": round(sum(rated) / len(rated), 1) if rated else None,
+            "total": total or 0,
+            "pendientes": pendientes or 0,
+            "viendo": viendo or 0,
+            "vistos": vistos or 0,
+            "average_rating": round(average_rating, 1) if average_rating is not None else None,
         }

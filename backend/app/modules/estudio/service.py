@@ -3,9 +3,10 @@ from datetime import date
 from typing import Optional
 
 from fastapi import HTTPException
-from sqlalchemy import select, delete
+from sqlalchemy import case, delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.crud_service import apply_changes, get_by_id_or_404
 from app.modules.estudio.models import SUBJECT_STATUSES, Exam, Subject, SubjectStatus
 
 
@@ -32,13 +33,9 @@ class StudyService:
         return sorted(result.scalars().all(), key=lambda s: _alphabetical_key(s.name))
 
     async def _get_subject(self, user_id: str, subject_id: str) -> Subject:
-        result = await self.db.execute(
-            select(Subject).where(Subject.id == subject_id, Subject.user_id == user_id)
+        return await get_by_id_or_404(
+            self.db, Subject, subject_id, user_id, not_found_detail="Materia no encontrada"
         )
-        subject = result.scalar_one_or_none()
-        if subject is None:
-            raise HTTPException(status_code=404, detail="Materia no encontrada")
-        return subject
 
     def _validate_status(self, status: Optional[str]) -> None:
         if status is not None and status not in SUBJECT_STATUSES:
@@ -68,9 +65,7 @@ class StudyService:
     async def update_subject(self, user_id: str, subject_id: str, changes: dict) -> Subject:
         subject = await self._get_subject(user_id, subject_id)
         self._validate_status(changes.get("status"))
-        for field, value in changes.items():
-            if value is not None:
-                setattr(subject, field, value)
+        apply_changes(subject, changes)
         await self.db.commit()
         await self.db.refresh(subject)
         return subject
@@ -96,13 +91,9 @@ class StudyService:
         return list(result.scalars().all())
 
     async def _get_exam(self, user_id: str, exam_id: str) -> Exam:
-        result = await self.db.execute(
-            select(Exam).where(Exam.id == exam_id, Exam.user_id == user_id)
+        return await get_by_id_or_404(
+            self.db, Exam, exam_id, user_id, not_found_detail="Examen no encontrado"
         )
-        exam = result.scalar_one_or_none()
-        if exam is None:
-            raise HTTPException(status_code=404, detail="Examen no encontrado")
-        return exam
 
     async def create_exam(
         self,
@@ -132,11 +123,15 @@ class StudyService:
 
     async def update_exam(self, user_id: str, exam_id: str, changes: dict) -> Exam:
         exam = await self._get_exam(user_id, exam_id)
-        if changes.get("subject_id") is not None:
+        if "subject_id" in changes:
+            # subject_id es Optional en el schema de PATCH (para no obligar a
+            # mandarlo), pero la columna es NOT NULL: un examen siempre
+            # pertenece a una materia. Null explicito se rechaza en vez de
+            # dejar que rompa el commit con un IntegrityError.
+            if changes["subject_id"] is None:
+                raise HTTPException(status_code=422, detail="subject_id no puede ser nulo")
             await self._get_subject(user_id, changes["subject_id"])
-        for field, value in changes.items():
-            if value is not None:
-                setattr(exam, field, value)
+        apply_changes(exam, changes)
         await self.db.commit()
         await self.db.refresh(exam)
         return exam
@@ -149,22 +144,37 @@ class StudyService:
     # ── Resumen ──────────────────────────────────────────────────────────────
 
     async def summary(self, user_id: str) -> dict:
-        subjects = await self.list_subjects(user_id)
-        exams = await self.list_exams(user_id)
+        subject_result = await self.db.execute(
+            select(
+                func.count(Subject.id),
+                func.sum(case((Subject.status == SubjectStatus.CURSANDO, 1), else_=0)),
+                func.sum(case((Subject.status == SubjectStatus.APROBADA, 1), else_=0)),
+            ).where(Subject.user_id == user_id)
+        )
+        subjects_total, subjects_cursando, subjects_aprobadas = subject_result.one()
 
-        graded = [e.grade for e in exams if e.grade is not None]
-        upcoming = [e for e in exams if e.exam_date >= date.today()]
-        upcoming.sort(key=lambda e: e.exam_date)
+        today = date.today()
+        exam_result = await self.db.execute(
+            select(
+                func.avg(Exam.grade),
+                func.sum(case((Exam.exam_date >= today, 1), else_=0)),
+            ).where(Exam.user_id == user_id)
+        )
+        average_grade, upcoming_count = exam_result.one()
+
+        next_exam_result = await self.db.execute(
+            select(Exam)
+            .where(Exam.user_id == user_id, Exam.exam_date >= today)
+            .order_by(Exam.exam_date)
+            .limit(1)
+        )
+        next_exam = next_exam_result.scalar_one_or_none()
 
         return {
-            "subjects_total": len(subjects),
-            "subjects_cursando": sum(
-                1 for s in subjects if s.status == SubjectStatus.CURSANDO
-            ),
-            "subjects_aprobadas": sum(
-                1 for s in subjects if s.status == SubjectStatus.APROBADA
-            ),
-            "average_grade": round(sum(graded) / len(graded), 2) if graded else None,
-            "next_exam": upcoming[0] if upcoming else None,
-            "upcoming_count": len(upcoming),
+            "subjects_total": subjects_total or 0,
+            "subjects_cursando": subjects_cursando or 0,
+            "subjects_aprobadas": subjects_aprobadas or 0,
+            "average_grade": round(average_grade, 2) if average_grade is not None else None,
+            "next_exam": next_exam,
+            "upcoming_count": upcoming_count or 0,
         }

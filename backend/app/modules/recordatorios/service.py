@@ -1,7 +1,7 @@
-from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.crud_service import apply_changes, get_by_id_or_404
 from app.modules.recordatorios.models import Reminder
 
 
@@ -18,13 +18,9 @@ class ReminderService:
         return list(result.scalars().all())
 
     async def _get(self, user_id: str, reminder_id: str) -> Reminder:
-        result = await self.db.execute(
-            select(Reminder).where(Reminder.id == reminder_id, Reminder.user_id == user_id)
+        return await get_by_id_or_404(
+            self.db, Reminder, reminder_id, user_id, not_found_detail="Recordatorio no encontrado"
         )
-        reminder = result.scalar_one_or_none()
-        if reminder is None:
-            raise HTTPException(status_code=404, detail="Recordatorio no encontrado")
-        return reminder
 
     async def create_reminder(
         self,
@@ -50,9 +46,7 @@ class ReminderService:
 
     async def update_reminder(self, user_id: str, reminder_id: str, changes: dict) -> Reminder:
         reminder = await self._get(user_id, reminder_id)
-        for field, value in changes.items():
-            if value is not None:
-                setattr(reminder, field, value)
+        apply_changes(reminder, changes)
         await self.db.commit()
         await self.db.refresh(reminder)
         return reminder

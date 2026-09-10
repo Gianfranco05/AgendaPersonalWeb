@@ -89,6 +89,23 @@ async def test_update_unknown_book_is_404(api_auth_client):
     assert resp.status_code == 404
 
 
+async def test_update_with_explicit_null_clears_the_field(api_auth_client):
+    """Regresion: un PATCH con `author: null` debe borrar el autor, no ignorarlo.
+
+    `changes` ya viene filtrado por `exclude_unset=True` en el router, asi que
+    si el campo aparece es porque el cliente lo mando de verdad — incluido un
+    `None` explicito para borrar un campo opcional.
+    """
+    libro = await _crear_libro(api_auth_client, author="Cortázar")
+    assert libro["author"] == "Cortázar"
+
+    resp = await api_auth_client.patch(
+        f"/api/v1/library/books/{libro['id']}", json={"author": None}
+    )
+    assert resp.status_code == 200
+    assert resp.json()["author"] is None
+
+
 async def test_delete_book(api_auth_client):
     libro = await _crear_libro(api_auth_client)
     assert (await api_auth_client.delete(f"/api/v1/library/books/{libro['id']}")).status_code == 204

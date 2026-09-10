@@ -1,9 +1,10 @@
 from typing import Optional
 
 from fastapi import HTTPException
-from sqlalchemy import select, delete
+from sqlalchemy import case, delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.crud_service import apply_changes, get_by_id_or_404
 from app.modules.proyectos.models import (
     PROJECT_STATUSES,
     TASK_STATUSES,
@@ -35,13 +36,9 @@ class ProjectsService:
         return list(result.scalars().all())
 
     async def _get_project(self, user_id: str, project_id: str) -> Project:
-        result = await self.db.execute(
-            select(Project).where(Project.id == project_id, Project.user_id == user_id)
+        return await get_by_id_or_404(
+            self.db, Project, project_id, user_id, not_found_detail="Proyecto no encontrado"
         )
-        project = result.scalar_one_or_none()
-        if project is None:
-            raise HTTPException(status_code=404, detail="Proyecto no encontrado")
-        return project
 
     async def create_project(
         self, user_id: str, name: str, description: Optional[str] = None, status: Optional[str] = None
@@ -61,9 +58,7 @@ class ProjectsService:
     async def update_project(self, user_id: str, project_id: str, changes: dict) -> Project:
         project = await self._get_project(user_id, project_id)
         self._validate_project_status(changes.get("status"))
-        for field, value in changes.items():
-            if value is not None:
-                setattr(project, field, value)
+        apply_changes(project, changes)
         await self.db.commit()
         await self.db.refresh(project)
         return project
@@ -88,13 +83,9 @@ class ProjectsService:
         return list(result.scalars().all())
 
     async def _get_task(self, user_id: str, task_id: str) -> ProjectTask:
-        result = await self.db.execute(
-            select(ProjectTask).where(ProjectTask.id == task_id, ProjectTask.user_id == user_id)
+        return await get_by_id_or_404(
+            self.db, ProjectTask, task_id, user_id, not_found_detail="Tarea no encontrada"
         )
-        task = result.scalar_one_or_none()
-        if task is None:
-            raise HTTPException(status_code=404, detail="Tarea no encontrada")
-        return task
 
     async def create_task(
         self,
@@ -123,9 +114,7 @@ class ProjectsService:
     async def update_task(self, user_id: str, task_id: str, changes: dict) -> ProjectTask:
         task = await self._get_task(user_id, task_id)
         self._validate_task_status(changes.get("status"))
-        for field, value in changes.items():
-            if value is not None:
-                setattr(task, field, value)
+        apply_changes(task, changes)
         await self.db.commit()
         await self.db.refresh(task)
         return task
@@ -138,13 +127,27 @@ class ProjectsService:
     # ── Resumen ──────────────────────────────────────────────────────────────
 
     async def summary(self, user_id: str) -> dict:
-        projects = await self.list_projects(user_id)
-        tasks = await self.list_tasks(user_id)
+        project_result = await self.db.execute(
+            select(
+                func.count(Project.id),
+                func.sum(case((Project.status == ProjectStatus.ACTIVO, 1), else_=0)),
+            ).where(Project.user_id == user_id)
+        )
+        projects_total, projects_active = project_result.one()
+
+        task_result = await self.db.execute(
+            select(
+                func.sum(case((ProjectTask.status == TaskStatus.PENDIENTE, 1), else_=0)),
+                func.sum(case((ProjectTask.status == TaskStatus.EN_PROGRESO, 1), else_=0)),
+                func.sum(case((ProjectTask.status == TaskStatus.HECHO, 1), else_=0)),
+            ).where(ProjectTask.user_id == user_id)
+        )
+        tasks_pending, tasks_in_progress, tasks_done = task_result.one()
 
         return {
-            "projects_total": len(projects),
-            "projects_active": sum(1 for p in projects if p.status == ProjectStatus.ACTIVO),
-            "tasks_pending": sum(1 for t in tasks if t.status == TaskStatus.PENDIENTE),
-            "tasks_in_progress": sum(1 for t in tasks if t.status == TaskStatus.EN_PROGRESO),
-            "tasks_done": sum(1 for t in tasks if t.status == TaskStatus.HECHO),
+            "projects_total": projects_total or 0,
+            "projects_active": projects_active or 0,
+            "tasks_pending": tasks_pending or 0,
+            "tasks_in_progress": tasks_in_progress or 0,
+            "tasks_done": tasks_done or 0,
         }

@@ -1,9 +1,10 @@
 from typing import Optional
 
 from fastapi import HTTPException
-from sqlalchemy import select
+from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.crud_service import apply_changes, get_by_id_or_404
 from app.modules.trabajo.models import (
     OPPORTUNITY_STATUSES,
     TERMINAL_STATUSES,
@@ -29,15 +30,9 @@ class WorkService:
         return list(result.scalars().all())
 
     async def _get(self, user_id: str, opportunity_id: str) -> WorkOpportunity:
-        result = await self.db.execute(
-            select(WorkOpportunity).where(
-                WorkOpportunity.id == opportunity_id, WorkOpportunity.user_id == user_id
-            )
+        return await get_by_id_or_404(
+            self.db, WorkOpportunity, opportunity_id, user_id, not_found_detail="No encontrado"
         )
-        opp = result.scalar_one_or_none()
-        if opp is None:
-            raise HTTPException(status_code=404, detail="No encontrado")
-        return opp
 
     async def create_opportunity(
         self,
@@ -67,9 +62,7 @@ class WorkService:
     async def update_opportunity(self, user_id: str, opportunity_id: str, changes: dict) -> WorkOpportunity:
         opp = await self._get(user_id, opportunity_id)
         self._validate_status(changes.get("status"))
-        for field, value in changes.items():
-            if value is not None:
-                setattr(opp, field, value)
+        apply_changes(opp, changes)
         await self.db.commit()
         await self.db.refresh(opp)
         return opp
@@ -80,13 +73,21 @@ class WorkService:
         await self.db.commit()
 
     async def summary(self, user_id: str) -> dict:
-        opportunities = await self.list_opportunities(user_id)
-        active = [o for o in opportunities if o.status not in TERMINAL_STATUSES]
+        result = await self.db.execute(
+            select(
+                func.count(WorkOpportunity.id),
+                func.sum(case((WorkOpportunity.status.notin_(TERMINAL_STATUSES), 1), else_=0)),
+                func.sum(case((WorkOpportunity.status == OpportunityStatus.ENTREVISTA, 1), else_=0)),
+                func.sum(case((WorkOpportunity.status == OpportunityStatus.OFERTA, 1), else_=0)),
+                func.sum(case((WorkOpportunity.status == OpportunityStatus.ACEPTADO, 1), else_=0)),
+            ).where(WorkOpportunity.user_id == user_id)
+        )
+        total, active, entrevista, oferta, aceptado = result.one()
 
         return {
-            "total": len(opportunities),
-            "active": len(active),
-            "entrevista": sum(1 for o in opportunities if o.status == OpportunityStatus.ENTREVISTA),
-            "oferta": sum(1 for o in opportunities if o.status == OpportunityStatus.OFERTA),
-            "aceptado": sum(1 for o in opportunities if o.status == OpportunityStatus.ACEPTADO),
+            "total": total or 0,
+            "active": active or 0,
+            "entrevista": entrevista or 0,
+            "oferta": oferta or 0,
+            "aceptado": aceptado or 0,
         }

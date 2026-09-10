@@ -1,9 +1,10 @@
 from typing import Optional
 
 from fastapi import HTTPException
-from sqlalchemy import select
+from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.crud_service import apply_changes, get_by_id_or_404
 from app.modules.biblioteca.models import BOOK_STATUSES, Book, BookStatus
 
 
@@ -24,13 +25,9 @@ class LibraryService:
         return list(result.scalars().all())
 
     async def _get_book(self, user_id: str, book_id: str) -> Book:
-        result = await self.db.execute(
-            select(Book).where(Book.id == book_id, Book.user_id == user_id)
+        return await get_by_id_or_404(
+            self.db, Book, book_id, user_id, not_found_detail="Libro no encontrado"
         )
-        book = result.scalar_one_or_none()
-        if book is None:
-            raise HTTPException(status_code=404, detail="Libro no encontrado")
-        return book
 
     async def create_book(
         self,
@@ -60,9 +57,7 @@ class LibraryService:
     async def update_book(self, user_id: str, book_id: str, changes: dict) -> Book:
         book = await self._get_book(user_id, book_id)
         self._validate_status(changes.get("status"))
-        for field, value in changes.items():
-            if value is not None:
-                setattr(book, field, value)
+        apply_changes(book, changes)
         await self.db.commit()
         await self.db.refresh(book)
         return book
@@ -73,14 +68,21 @@ class LibraryService:
         await self.db.commit()
 
     async def summary(self, user_id: str) -> dict:
-        books = await self.list_books(user_id)
-        leidos = [b for b in books if b.status == BookStatus.LEIDO]
-        rated = [b.rating for b in leidos if b.rating is not None]
+        result = await self.db.execute(
+            select(
+                func.count(Book.id),
+                func.sum(case((Book.status == BookStatus.PENDIENTE, 1), else_=0)),
+                func.sum(case((Book.status == BookStatus.LEYENDO, 1), else_=0)),
+                func.sum(case((Book.status == BookStatus.LEIDO, 1), else_=0)),
+                func.avg(case((Book.status == BookStatus.LEIDO, Book.rating), else_=None)),
+            ).where(Book.user_id == user_id)
+        )
+        total, pendientes, leyendo, leidos, average_rating = result.one()
 
         return {
-            "total": len(books),
-            "pendientes": sum(1 for b in books if b.status == BookStatus.PENDIENTE),
-            "leyendo": sum(1 for b in books if b.status == BookStatus.LEYENDO),
-            "leidos": len(leidos),
-            "average_rating": round(sum(rated) / len(rated), 1) if rated else None,
+            "total": total or 0,
+            "pendientes": pendientes or 0,
+            "leyendo": leyendo or 0,
+            "leidos": leidos or 0,
+            "average_rating": round(average_rating, 1) if average_rating is not None else None,
         }

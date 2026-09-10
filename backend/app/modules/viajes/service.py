@@ -1,10 +1,10 @@
-from datetime import date
 from typing import Optional
 
 from fastapi import HTTPException
-from sqlalchemy import select, delete
+from sqlalchemy import case, delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.crud_service import apply_changes, get_by_id_or_404
 from app.modules.viajes.models import TRIP_STATUSES, PackingItem, Trip, TripStatus
 
 
@@ -25,13 +25,9 @@ class TravelService:
         return list(result.scalars().all())
 
     async def _get_trip(self, user_id: str, trip_id: str) -> Trip:
-        result = await self.db.execute(
-            select(Trip).where(Trip.id == trip_id, Trip.user_id == user_id)
+        return await get_by_id_or_404(
+            self.db, Trip, trip_id, user_id, not_found_detail="Viaje no encontrado"
         )
-        trip = result.scalar_one_or_none()
-        if trip is None:
-            raise HTTPException(status_code=404, detail="Viaje no encontrado")
-        return trip
 
     async def create_trip(
         self,
@@ -61,9 +57,7 @@ class TravelService:
     async def update_trip(self, user_id: str, trip_id: str, changes: dict) -> Trip:
         trip = await self._get_trip(user_id, trip_id)
         self._validate_status(changes.get("status"))
-        for field, value in changes.items():
-            if value is not None:
-                setattr(trip, field, value)
+        apply_changes(trip, changes)
         await self.db.commit()
         await self.db.refresh(trip)
         return trip
@@ -88,13 +82,9 @@ class TravelService:
         return list(result.scalars().all())
 
     async def _get_item(self, user_id: str, item_id: str) -> PackingItem:
-        result = await self.db.execute(
-            select(PackingItem).where(PackingItem.id == item_id, PackingItem.user_id == user_id)
+        return await get_by_id_or_404(
+            self.db, PackingItem, item_id, user_id, not_found_detail="Item no encontrado"
         )
-        item = result.scalar_one_or_none()
-        if item is None:
-            raise HTTPException(status_code=404, detail="Item no encontrado")
-        return item
 
     async def add_item(self, user_id: str, trip_id: str, name: str) -> PackingItem:
         await self._get_trip(user_id, trip_id)
@@ -119,15 +109,29 @@ class TravelService:
     # ── Resumen ──────────────────────────────────────────────────────────────
 
     async def summary(self, user_id: str) -> dict:
-        trips = await self.list_trips(user_id)
-        upcoming = [
-            t for t in trips if t.status in (TripStatus.PLANEADO, TripStatus.EN_CURSO)
-        ]
-        upcoming.sort(key=lambda t: (t.start_date is None, t.start_date or date.max))
+        result = await self.db.execute(
+            select(
+                func.count(Trip.id),
+                func.sum(case((Trip.status == TripStatus.PLANEADO, 1), else_=0)),
+                func.sum(case((Trip.status == TripStatus.COMPLETADO, 1), else_=0)),
+            ).where(Trip.user_id == user_id)
+        )
+        total, planeados, completados = result.one()
+
+        next_trip_result = await self.db.execute(
+            select(Trip)
+            .where(
+                Trip.user_id == user_id,
+                Trip.status.in_((TripStatus.PLANEADO, TripStatus.EN_CURSO)),
+            )
+            .order_by(Trip.start_date.is_(None), Trip.start_date)
+            .limit(1)
+        )
+        next_trip = next_trip_result.scalar_one_or_none()
 
         return {
-            "total": len(trips),
-            "planeados": sum(1 for t in trips if t.status == TripStatus.PLANEADO),
-            "completados": sum(1 for t in trips if t.status == TripStatus.COMPLETADO),
-            "next_trip": upcoming[0] if upcoming else None,
+            "total": total or 0,
+            "planeados": planeados or 0,
+            "completados": completados or 0,
+            "next_trip": next_trip,
         }
