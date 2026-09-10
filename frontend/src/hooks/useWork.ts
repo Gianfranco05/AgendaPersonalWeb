@@ -1,5 +1,4 @@
-import { mutate as globalMutate } from 'swr';
-import { useApiSWR } from './useApiSWR';
+import { createResourceHooks } from './createResourceHooks';
 import {
   fetchOpportunities,
   createOpportunity,
@@ -9,34 +8,21 @@ import {
 } from '../api/endpoints';
 import type { WorkOpportunity } from '../types';
 
-const OPPORTUNITIES_KEY = 'work/opportunities';
-const SUMMARY_KEY = 'work/summary';
+const work = createResourceHooks<
+  WorkOpportunity,
+  Awaited<ReturnType<typeof fetchWorkSummary>>,
+  Parameters<typeof fetchOpportunities>[0]
+>({
+  listKey: 'work/opportunities',
+  summaryKey: 'work/summary',
+  fetchList: fetchOpportunities,
+  fetchSummary: fetchWorkSummary,
+  createItem: createOpportunity,
+  updateItem: updateOpportunity,
+  deleteItem: deleteOpportunity,
+});
 
-export function useOpportunities(params?: Parameters<typeof fetchOpportunities>[0]) {
-  return useApiSWR([OPPORTUNITIES_KEY, JSON.stringify(params ?? {})], () => fetchOpportunities(params));
-}
-
-export function useWorkSummary() {
-  return useApiSWR(SUMMARY_KEY, fetchWorkSummary);
-}
-
-async function revalidate() {
-  await Promise.all([
-    globalMutate((key) => Array.isArray(key) && key[0] === OPPORTUNITIES_KEY),
-    globalMutate(SUMMARY_KEY),
-  ]);
-}
-
-export async function saveOpportunity(opportunity: WorkOpportunity | null, data: Partial<WorkOpportunity>) {
-  if (opportunity) {
-    await updateOpportunity(opportunity.id, data);
-  } else {
-    await createOpportunity(data);
-  }
-  await revalidate();
-}
-
-export async function removeOpportunity(id: string) {
-  await deleteOpportunity(id);
-  await revalidate();
-}
+export const useOpportunities = work.useList;
+export const useWorkSummary = work.useSummary;
+export const saveOpportunity = work.save;
+export const removeOpportunity = work.remove;
