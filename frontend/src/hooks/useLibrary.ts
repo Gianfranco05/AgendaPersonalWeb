@@ -1,36 +1,18 @@
-import { mutate as globalMutate } from 'swr';
-import { useApiSWR } from './useApiSWR';
+import { createResourceHooks } from './createResourceHooks';
 import { fetchBooks, createBook, updateBook, deleteBook, fetchLibrarySummary } from '../api/endpoints';
 import type { Book } from '../types';
 
-const BOOKS_KEY = 'library/books';
-const SUMMARY_KEY = 'library/summary';
+const library = createResourceHooks<Book, Awaited<ReturnType<typeof fetchLibrarySummary>>, Parameters<typeof fetchBooks>[0]>({
+  listKey: 'library/books',
+  summaryKey: 'library/summary',
+  fetchList: fetchBooks,
+  fetchSummary: fetchLibrarySummary,
+  createItem: createBook,
+  updateItem: updateBook,
+  deleteItem: deleteBook,
+});
 
-export function useBooks(params?: Parameters<typeof fetchBooks>[0]) {
-  return useApiSWR([BOOKS_KEY, JSON.stringify(params ?? {})], () => fetchBooks(params));
-}
-
-export function useLibrarySummary() {
-  return useApiSWR(SUMMARY_KEY, fetchLibrarySummary);
-}
-
-async function revalidate() {
-  await Promise.all([
-    globalMutate((key) => Array.isArray(key) && key[0] === BOOKS_KEY),
-    globalMutate(SUMMARY_KEY),
-  ]);
-}
-
-export async function saveBook(book: Book | null, data: Partial<Book>) {
-  if (book) {
-    await updateBook(book.id, data);
-  } else {
-    await createBook(data);
-  }
-  await revalidate();
-}
-
-export async function removeBook(id: string) {
-  await deleteBook(id);
-  await revalidate();
-}
+export const useBooks = library.useList;
+export const useLibrarySummary = library.useSummary;
+export const saveBook = library.save;
+export const removeBook = library.remove;

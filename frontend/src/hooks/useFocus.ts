@@ -1,5 +1,4 @@
-import { mutate as globalMutate } from 'swr';
-import { useApiSWR } from './useApiSWR';
+import { createResourceHooks } from './createResourceHooks';
 import {
   fetchFocusSummary,
   fetchFocusSessions,
@@ -7,33 +6,33 @@ import {
   stopFocusSession,
   deleteFocusSession,
 } from '../api/endpoints';
+import type { FocusSession, FocusSummary } from '../types';
 
-const SUMMARY_KEY = 'focus/summary';
-const SESSIONS_KEY = 'focus/sessions';
+// Sin params y sin save() genérico: `startFocus`/`stopFocus` reemplazan al
+// create/update habitual, así que sólo se reutilizan list+summary+revalidate+remove.
+const focus = createResourceHooks<FocusSession, FocusSummary, Parameters<typeof fetchFocusSessions>[0]>({
+  listKey: 'focus/sessions',
+  summaryKey: 'focus/summary',
+  fetchList: fetchFocusSessions,
+  fetchSummary: fetchFocusSummary,
+  deleteItem: deleteFocusSession,
+  paramsInKey: false,
+});
 
-export function useFocusSummary() {
-  return useApiSWR(SUMMARY_KEY, fetchFocusSummary);
-}
+export const useFocusSummary = focus.useSummary;
 
 export function useFocusSessions() {
-  return useApiSWR(SESSIONS_KEY, () => fetchFocusSessions());
-}
-
-async function revalidate() {
-  await Promise.all([globalMutate(SUMMARY_KEY), globalMutate(SESSIONS_KEY)]);
+  return focus.useList();
 }
 
 export async function startFocus(label?: string) {
   await startFocusSession(label);
-  await revalidate();
+  await focus.revalidate();
 }
 
 export async function stopFocus() {
   await stopFocusSession();
-  await revalidate();
+  await focus.revalidate();
 }
 
-export async function removeFocusSession(id: string) {
-  await deleteFocusSession(id);
-  await revalidate();
-}
+export const removeFocusSession = focus.remove;
