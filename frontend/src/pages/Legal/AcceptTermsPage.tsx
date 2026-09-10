@@ -4,9 +4,9 @@ import { useAuthStore } from '../../store/authStore';
 
 /**
  * Gate obligatorio: se muestra cuando `user.terms_accepted_version` no
- * coincide con CURRENT_TERMS_VERSION (cuenta nueva creada por Google, que no
- * pasa por el checkbox del registro normal, o versión de términos que subió
- * mientras el usuario ya tenía sesión). Ver el redirect en ProtectedRoute.
+ * coincide con `user.current_terms_version` (cuenta nueva creada por Google,
+ * que no pasa por el checkbox del registro normal, o versión de términos que
+ * subió mientras el usuario ya tenía sesión). Ver el redirect en ProtectedRoute.
  */
 export default function AcceptTermsPage() {
   const navigate = useNavigate();

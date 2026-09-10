@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { FolderKanban, Plus, Pencil, Trash2, ChevronDown } from 'lucide-react';
 import { LoadingSkeleton } from '../../components/LoadingSkeleton';
-import TemplateLocked, { isPaymentRequired } from '../../components/TemplateLocked';
+import ModuleLockedNotice, { isPaymentRequiredError } from '../../components/ModuleLockedNotice';
 import { useProjects, useProjectsSummary, removeProject } from '../../hooks/useProjects';
 import type { Project, ProjectStatus } from '../../types';
 import ProjectForm from './ProjectForm';
@@ -27,8 +27,8 @@ export default function ProjectsPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const error = projectsError ?? summaryError;
-  if (isPaymentRequired(error)) {
-    return <TemplateLocked title="Gestión de Proyectos" />;
+  if (isPaymentRequiredError(error)) {
+    return <ModuleLockedNotice moduleName="Gestión de Proyectos" />;
   }
 
   function handleNew() {

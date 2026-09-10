@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Car, Plus, Pencil, Trash2, ChevronDown } from 'lucide-react';
 import { LoadingSkeleton } from '../../components/LoadingSkeleton';
-import TemplateLocked, { isPaymentRequired } from '../../components/TemplateLocked';
+import ModuleLockedNotice, { isPaymentRequiredError } from '../../components/ModuleLockedNotice';
 import { useVehicles, useVehicleSummary, removeVehicle } from '../../hooks/useVehicle';
 import type { Vehicle } from '../../types';
 import VehicleForm from './VehicleForm';
@@ -15,8 +15,8 @@ export default function VehiclePage() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const error = vehiclesError ?? summaryError;
-  if (isPaymentRequired(error)) {
-    return <TemplateLocked title="Vehículo y Mantenimiento" />;
+  if (isPaymentRequiredError(error)) {
+    return <ModuleLockedNotice moduleName="Vehículo y Mantenimiento" />;
   }
 
   function handleNew() {

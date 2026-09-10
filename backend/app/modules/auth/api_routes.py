@@ -5,7 +5,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, Request, Response, HTTPException, status
 from fastapi.responses import RedirectResponse
-from pydantic import BaseModel, EmailStr, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -63,10 +63,13 @@ class UserOut(BaseModel):
     email: str
     full_name: str
     is_verified: bool = True
-    # None = todavia no acepto la version vigente (ver settings.CURRENT_TERMS_VERSION).
-    # El cliente compara esto contra la version actual para decidir si muestra
-    # el gate de aceptacion antes de dejar usar el resto de la app.
+    # None = todavia no acepto la version vigente (current_terms_version).
+    # El cliente compara ambos campos para decidir si muestra el gate de
+    # aceptacion antes de dejar usar el resto de la app — asi la version
+    # "vigente" vive en un solo lugar (settings.CURRENT_TERMS_VERSION) en vez
+    # de duplicarse como constante en cada cliente (web, mobile).
     terms_accepted_version: Optional[str] = None
+    current_terms_version: str = Field(default_factory=lambda: settings.CURRENT_TERMS_VERSION)
 
 
 class AuthResponse(BaseModel):
@@ -77,6 +80,7 @@ class AuthResponse(BaseModel):
     refresh_token: str
     token_type: str = "bearer"
     terms_accepted_version: Optional[str] = None
+    current_terms_version: str = Field(default_factory=lambda: settings.CURRENT_TERMS_VERSION)
 
 
 class RefreshRequest(BaseModel):

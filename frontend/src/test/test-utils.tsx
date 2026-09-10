@@ -30,12 +30,24 @@ export function renderWithProviders(
 }
 
 export function createMockAuthStore(overrides?: Partial<{
-  user: { id: string; email: string; full_name: string; terms_accepted_version: string | null } | null
+  user: {
+    id: string
+    email: string
+    full_name: string
+    terms_accepted_version: string | null
+    current_terms_version: string
+  } | null
   isAuthenticated: boolean
   isLoading: boolean
 }>) {
   return {
-    user: { id: '1', email: 'test@test.com', full_name: 'Test User', terms_accepted_version: '1.0' },
+    user: {
+      id: '1',
+      email: 'test@test.com',
+      full_name: 'Test User',
+      terms_accepted_version: '1.0',
+      current_terms_version: '1.0',
+    },
     isAuthenticated: true,
     isLoading: false,
     login: vi.fn(),

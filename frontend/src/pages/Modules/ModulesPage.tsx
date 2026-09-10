@@ -38,9 +38,7 @@ const ICONS: Record<string, typeof Package> = {
   projects: KanbanSquare,
 };
 
-// Ruta de cada plantilla comprada. Estas páginas se agregan en un batch
-// posterior de este mismo proyecto: el link queda armado igual, aunque hoy
-// no exista la ruta (React Router simplemente no matchea y no rompe nada).
+// Ruta de cada plantilla comprada.
 const MODULE_ROUTES: Record<string, string> = {
   study: '/study',
   library: '/library',
@@ -112,21 +110,38 @@ function OwnedModuleTile({
   onToggle: (enabled: boolean) => void;
 }) {
   const route = MODULE_ROUTES[module.key];
+  // Como estas plantillas no viven en el sidebar, esta tarjeta ES la
+  // navegación: si el usuario la apagó, no debe poder entrar desde acá.
+  const navigable = module.enabled && !!route;
   const content = (
     <>
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-indigo/10 text-brand-indigo">
+      <div
+        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${
+          module.enabled
+            ? 'bg-brand-indigo/10 text-brand-indigo'
+            : 'bg-gray-100 dark:bg-slate-700 text-gray-400 dark:text-slate-500'
+        }`}
+      >
         <ModuleIcon moduleKey={module.key} className="h-5 w-5" />
       </div>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium text-gray-800 dark:text-slate-100">{module.label}</p>
-        <p className="truncate text-xs text-gray-500 dark:text-slate-400">{module.description}</p>
+        <p
+          className={`truncate text-sm font-medium ${
+            module.enabled ? 'text-gray-800 dark:text-slate-100' : 'text-gray-500 dark:text-slate-400'
+          }`}
+        >
+          {module.label}
+        </p>
+        <p className="truncate text-xs text-gray-500 dark:text-slate-400">
+          {module.enabled ? module.description : 'Desactivada'}
+        </p>
       </div>
     </>
   );
 
   return (
     <div className="flex items-center gap-3 rounded-xl bg-white dark:bg-slate-800 p-4 shadow-sm">
-      {route ? (
+      {navigable ? (
         <Link to={route} className="flex min-w-0 flex-1 items-center gap-3">
           {content}
         </Link>

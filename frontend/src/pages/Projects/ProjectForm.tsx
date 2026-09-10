@@ -99,18 +99,16 @@ export default function ProjectForm({ project, onClose }: Props) {
             />
           </div>
 
-          {project ? (
-            <div>
-              <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-slate-400">Estado</label>
-              <select {...register('status')} className={inputCls}>
-                {Object.entries(STATUS_LABELS).map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          ) : null}
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-slate-400">Estado</label>
+            <select {...register('status')} className={inputCls}>
+              {Object.entries(STATUS_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </div>
 
           <div className="flex justify-end gap-3 pt-2">
             <button

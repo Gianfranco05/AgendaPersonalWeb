@@ -25,7 +25,13 @@ describe('Layout', () => {
   it('shows user initials and name', () => {
     vi.mocked(useAuthStore).mockReturnValue(
       createMockAuthStore({
-        user: { id: '1', email: 'gf@test.com', full_name: 'Gianfranco Ferraro', terms_accepted_version: '1.0' },
+        user: {
+          id: '1',
+          email: 'gf@test.com',
+          full_name: 'Gianfranco Ferraro',
+          terms_accepted_version: '1.0',
+          current_terms_version: '1.0',
+        },
       }),
     )
     renderWithProviders(<Layout />)

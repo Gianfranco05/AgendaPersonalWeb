@@ -1,5 +1,5 @@
 import { Navigate, Outlet } from 'react-router-dom';
-import { CURRENT_TERMS_VERSION, useAuthStore } from '../store/authStore';
+import { useAuthStore } from '../store/authStore';
 
 interface ProtectedRouteProps {
   // /accept-terms también requiere sesión iniciada, pero no puede pasar por
@@ -22,7 +22,7 @@ export default function ProtectedRoute({ skipTermsGate = false }: ProtectedRoute
     return <Navigate to="/login" replace />;
   }
 
-  if (!skipTermsGate && user && user.terms_accepted_version !== CURRENT_TERMS_VERSION) {
+  if (!skipTermsGate && user && user.terms_accepted_version !== user.current_terms_version) {
     return <Navigate to="/accept-terms" replace />;
   }
 

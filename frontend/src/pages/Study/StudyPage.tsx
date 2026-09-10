@@ -26,14 +26,15 @@ function formatDate(value: string): string {
 
 function daysUntil(value: string): number {
   const target = new Date(`${value}T00:00:00`).getTime();
-  const now = new Date(new Date().toISOString().split('T')[0] + 'T00:00:00').getTime();
-  return Math.round((target - now) / 86_400_000);
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  return Math.round((target - now.getTime()) / 86_400_000);
 }
 
 export default function StudyPage() {
   const { data: subjects, isLoading: subjectsLoading, error: subjectsError } = useSubjects();
-  const { data: exams, isLoading: examsLoading } = useExams();
-  const { data: summary, isLoading: summaryLoading } = useStudySummary();
+  const { data: exams, isLoading: examsLoading, error: examsError } = useExams();
+  const { data: summary, isLoading: summaryLoading, error: summaryError } = useStudySummary();
 
   const [subjectModal, setSubjectModal] = useState<{ open: boolean; subject: Subject | null }>({
     open: false,
@@ -44,7 +45,7 @@ export default function StudyPage() {
     exam: null,
   });
 
-  if (isPaymentRequiredError(subjectsError)) {
+  if (isPaymentRequiredError(subjectsError) || isPaymentRequiredError(examsError) || isPaymentRequiredError(summaryError)) {
     return <ModuleLockedNotice moduleName="Estudio" />;
   }
 

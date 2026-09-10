@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Plane, Plus, Pencil, Trash2, ChevronDown, Luggage } from 'lucide-react';
 import { LoadingSkeleton } from '../../components/LoadingSkeleton';
-import TemplateLocked, { isPaymentRequired } from '../../components/TemplateLocked';
+import ModuleLockedNotice, { isPaymentRequiredError } from '../../components/ModuleLockedNotice';
 import { useTrips, useTravelSummary, removeTrip } from '../../hooks/useTravel';
 import type { Trip, TripStatus } from '../../types';
 import TripForm from './TripForm';
@@ -33,8 +33,8 @@ export default function TravelPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const error = tripsError ?? summaryError;
-  if (isPaymentRequired(error)) {
-    return <TemplateLocked title="Viajes y Equipaje" />;
+  if (isPaymentRequiredError(error)) {
+    return <ModuleLockedNotice moduleName="Viajes y Equipaje" />;
   }
 
   function handleNew() {
