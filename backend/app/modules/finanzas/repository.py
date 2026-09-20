@@ -187,6 +187,74 @@ class TransactionRepository:
 
         return data
 
+    async def get_expense_breakdown_by_category(self, user_id: str) -> list[dict]:
+        """Gasto total por categoria (solo `expense`, sin borrados), de mayor
+        a menor. Usado por el reporte de finanzas — misma consulta que tenia
+        la ruta HTML legacy (`finanzas/routes.py::reportes`)."""
+        result = await self.db.execute(
+            select(Category.name, Category.color, func.sum(Transaction.amount))
+            .join(Transaction, Transaction.category_id == Category.id, isouter=True)
+            .where(Transaction.user_id == user_id)
+            .where(Transaction.type == TransactionType.EXPENSE)
+            .where(Transaction.is_deleted == False)
+            .group_by(Category.id, Category.name, Category.color)
+            .order_by(func.sum(Transaction.amount).desc())
+        )
+        rows = [
+            {"name": name, "color": color, "total": Decimal(str(total))}
+            for name, color, total in result.all()
+        ]
+
+        no_category_result = await self.db.execute(
+            select(func.sum(Transaction.amount))
+            .where(Transaction.user_id == user_id)
+            .where(Transaction.type == TransactionType.EXPENSE)
+            .where(Transaction.is_deleted == False)
+            .where(Transaction.category_id == None)  # noqa: E711 (SQLAlchemy requiere == None)
+        )
+        no_category_total = no_category_result.scalar() or Decimal("0")
+        if no_category_total > 0:
+            rows.append({"name": "Sin categoría", "color": "#94A3B8", "total": Decimal(str(no_category_total))})
+
+        return rows
+
+    async def get_monthly_totals(self, user_id: str, month_starts: list[date]) -> list[dict]:
+        """Ingresos/egresos de cada mes en `month_starts` (cada uno el dia 1
+        de su mes). Una consulta por mes por tipo, igual que la ruta HTML
+        legacy — a esta escala (uso personal) no justifica una consulta
+        agrupada por mes con funciones de fecha especificas del motor."""
+        totals = []
+        for month_start in month_starts:
+            if month_start.month == 12:
+                month_end = date(month_start.year + 1, 1, 1)
+            else:
+                month_end = date(month_start.year, month_start.month + 1, 1)
+
+            income_result = await self.db.execute(
+                select(func.coalesce(func.sum(Transaction.amount), 0))
+                .where(Transaction.user_id == user_id)
+                .where(Transaction.type == TransactionType.INCOME)
+                .where(Transaction.is_deleted == False)
+                .where(Transaction.transaction_date >= month_start)
+                .where(Transaction.transaction_date < month_end)
+            )
+            expense_result = await self.db.execute(
+                select(func.coalesce(func.sum(Transaction.amount), 0))
+                .where(Transaction.user_id == user_id)
+                .where(Transaction.type == TransactionType.EXPENSE)
+                .where(Transaction.is_deleted == False)
+                .where(Transaction.transaction_date >= month_start)
+                .where(Transaction.transaction_date < month_end)
+            )
+            totals.append(
+                {
+                    "month": month_start,
+                    "income": Decimal(str(income_result.scalar() or 0)),
+                    "expense": Decimal(str(expense_result.scalar() or 0)),
+                }
+            )
+        return totals
+
 
 class CategoryRepository:
     def __init__(self, db: AsyncSession):

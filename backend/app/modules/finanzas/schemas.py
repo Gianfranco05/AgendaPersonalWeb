@@ -5,6 +5,8 @@ from typing import Optional
 
 from pydantic import BaseModel, field_validator
 
+from app.modules.finanzas.enums import AccountType
+
 
 class TransactionBase(BaseModel):
     amount: Decimal
@@ -103,7 +105,29 @@ class BankAccountBase(BaseModel):
 
 
 class BankAccountCreate(BankAccountBase):
-    pass
+    @field_validator("account_type")
+    @classmethod
+    def account_type_valid(cls, v):
+        if v not in AccountType._value2member_map_:
+            raise ValueError(f"Tipo de cuenta invalido: {v}")
+        return v
+
+
+class BankAccountUpdate(BaseModel):
+    name: Optional[str] = None
+    bank_name: Optional[str] = None
+    account_type: Optional[str] = None
+    account_number: Optional[str] = None
+    last4: Optional[str] = None
+    currency: Optional[str] = None
+    balance: Optional[Decimal] = None
+
+    @field_validator("account_type")
+    @classmethod
+    def account_type_valid(cls, v):
+        if v is not None and v not in AccountType._value2member_map_:
+            raise ValueError(f"Tipo de cuenta invalido: {v}")
+        return v
 
 
 class BankAccountResponse(BankAccountBase):

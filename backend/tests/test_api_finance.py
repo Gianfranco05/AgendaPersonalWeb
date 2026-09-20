@@ -393,3 +393,128 @@ async def test_api_delete_budget(api_auth_client, test_category, db_session):
 async def test_api_budgets_requires_auth(client):
     response = await client.get("/api/v1/finance/budgets", params={"year": 2025, "month": 6})
     assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_api_finance_reports(api_auth_client, test_category):
+    await api_auth_client.post("/api/v1/finance/transactions", json={
+        "amount": "500",
+        "type": "expense",
+        "transaction_date": "2025-06-15",
+        "product_name": "Gasto categorizado",
+        "account_type": "cash",
+        "payment_method": "cash",
+        "category_id": test_category.id,
+    })
+    await api_auth_client.post("/api/v1/finance/transactions", json={
+        "amount": "1000",
+        "type": "income",
+        "transaction_date": "2025-06-15",
+        "product_name": "Ingreso",
+        "account_type": "cash",
+        "payment_method": "cash",
+    })
+
+    response = await api_auth_client.get("/api/v1/finance/reports")
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["monthly"]) == 6
+    assert any(c["name"] == test_category.name and float(c["total"]) == 500.0 for c in data["by_category"])
+    assert float(data["total_expenses"]) == 500.0
+
+
+@pytest.mark.asyncio
+async def test_api_finance_reports_requires_auth(client):
+    response = await client.get("/api/v1/finance/reports")
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_api_create_bank_account(api_auth_client):
+    response = await api_auth_client.post("/api/v1/finance/accounts", json={
+        "name": "Cuenta sueldo",
+        "bank_name": "Banco Nacion",
+        "account_type": "checking",
+        "account_number": "1234567890",
+        "currency": "ARS",
+        "balance": "10000",
+    })
+    assert response.status_code == 201
+    data = response.json()
+    assert data["name"] == "Cuenta sueldo"
+    assert data["account_type"] == "checking"
+    assert data["last4"] == "7890"
+
+
+@pytest.mark.asyncio
+async def test_api_create_bank_account_invalid_type(api_auth_client):
+    response = await api_auth_client.post("/api/v1/finance/accounts", json={
+        "name": "Cuenta invalida",
+        "account_type": "not-a-type",
+    })
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_api_list_bank_accounts(api_auth_client):
+    await api_auth_client.post("/api/v1/finance/accounts", json={
+        "name": "Ahorros",
+        "account_type": "savings",
+    })
+    response = await api_auth_client.get("/api/v1/finance/accounts")
+    assert response.status_code == 200
+    data = response.json()
+    assert any(a["name"] == "Ahorros" for a in data)
+
+
+@pytest.mark.asyncio
+async def test_api_update_bank_account(api_auth_client):
+    create_resp = await api_auth_client.post("/api/v1/finance/accounts", json={
+        "name": "Original",
+        "account_type": "cash",
+    })
+    account_id = create_resp.json()["id"]
+
+    response = await api_auth_client.put(f"/api/v1/finance/accounts/{account_id}", json={
+        "name": "Renombrada",
+        "account_type": "investment",
+    })
+    assert response.status_code == 200
+    data = response.json()
+    assert data["name"] == "Renombrada"
+    assert data["account_type"] == "investment"
+
+
+@pytest.mark.asyncio
+async def test_api_update_bank_account_not_found(api_auth_client):
+    response = await api_auth_client.put("/api/v1/finance/accounts/does-not-exist", json={
+        "name": "X",
+    })
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_api_delete_bank_account(api_auth_client):
+    create_resp = await api_auth_client.post("/api/v1/finance/accounts", json={
+        "name": "Para borrar",
+        "account_type": "cash",
+    })
+    account_id = create_resp.json()["id"]
+
+    response = await api_auth_client.delete(f"/api/v1/finance/accounts/{account_id}")
+    assert response.status_code == 204
+
+    list_resp = await api_auth_client.get("/api/v1/finance/accounts")
+    assert all(a["id"] != account_id for a in list_resp.json())
+
+
+@pytest.mark.asyncio
+async def test_api_delete_bank_account_not_found(api_auth_client):
+    response = await api_auth_client.delete("/api/v1/finance/accounts/does-not-exist")
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_api_accounts_requires_auth(client):
+    response = await client.get("/api/v1/finance/accounts")
+    assert response.status_code == 401

@@ -117,3 +117,30 @@ async def test_api_events_crud_full(api_auth_client):
 
     list_after = await api_auth_client.get("/api/v1/events")
     assert all(e["id"] != event_id for e in list_after.json())
+
+
+@pytest.mark.asyncio
+async def test_api_export_events_ics(api_auth_client):
+    await api_auth_client.post("/api/v1/events", json={
+        "title": "Evento exportable",
+        "description": "Descripcion, con coma",
+        "start_datetime": "2025-07-01T10:00:00",
+        "end_datetime": "2025-07-01T11:00:00",
+        "location": "Oficina",
+    })
+
+    response = await api_auth_client.get("/api/v1/events/export/ics")
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/calendar")
+    assert "eventos.ics" in response.headers["content-disposition"]
+    body = response.text
+    assert body.startswith("BEGIN:VCALENDAR")
+    assert "SUMMARY:Evento exportable" in body
+    assert "LOCATION:Oficina" in body
+    assert body.endswith("END:VCALENDAR\r\n")
+
+
+@pytest.mark.asyncio
+async def test_api_export_events_ics_requires_auth(client):
+    response = await client.get("/api/v1/events/export/ics")
+    assert response.status_code == 401

@@ -144,3 +144,35 @@ async def test_api_notes_crud_full(api_auth_client):
 
     get_after = await api_auth_client.get("/api/v1/notes")
     assert all(n["id"] != note_id for n in get_after.json())
+
+
+@pytest.mark.asyncio
+async def test_api_export_notes_json(api_auth_client):
+    await api_auth_client.post("/api/v1/notes", json={
+        "title": "Nota exportable",
+        "content": "Contenido exportable",
+        "tag_names": ["export"],
+    })
+    archived = await api_auth_client.post("/api/v1/notes", json={
+        "title": "Nota archivada",
+        "content": "No deberia aparecer",
+    })
+    archived_id = archived.json()["id"]
+    await api_auth_client.put(f"/api/v1/notes/{archived_id}", json={"is_archived": True})
+
+    response = await api_auth_client.get("/api/v1/notes/export/json")
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("application/json")
+    assert "notas.json" in response.headers["content-disposition"]
+    data = response.json()
+    titles = [n["title"] for n in data]
+    assert "Nota exportable" in titles
+    assert "Nota archivada" not in titles
+    exported = next(n for n in data if n["title"] == "Nota exportable")
+    assert exported["tags"] == ["export"]
+
+
+@pytest.mark.asyncio
+async def test_api_export_notes_json_requires_auth(client):
+    response = await client.get("/api/v1/notes/export/json")
+    assert response.status_code == 401

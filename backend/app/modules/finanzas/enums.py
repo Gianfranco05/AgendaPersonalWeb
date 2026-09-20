@@ -11,6 +11,7 @@ class AccountType(str, Enum):
     SAVINGS = "savings"
     CREDIT = "credit"
     CASH = "cash"
+    INVESTMENT = "investment"
 
 
 class PaymentMethod(str, Enum):

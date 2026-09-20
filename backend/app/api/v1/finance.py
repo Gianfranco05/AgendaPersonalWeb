@@ -20,6 +20,9 @@ from app.modules.finanzas.schemas import (
     BudgetUpdate,
     BudgetResponse,
     BudgetProgress,
+    BankAccountCreate,
+    BankAccountUpdate,
+    BankAccountResponse,
 )
 from app.api.v1.schemas import PaginatedResponse
 
@@ -41,6 +44,24 @@ class CategoryWithTotals(BaseModel):
     color: str
     icon: str
     total_income: Decimal
+    total_expenses: Decimal
+
+
+class CategoryExpenseTotal(BaseModel):
+    name: str
+    color: str
+    total: Decimal
+
+
+class MonthlyTotal(BaseModel):
+    month: date
+    income: Decimal
+    expense: Decimal
+
+
+class FinanceReports(BaseModel):
+    by_category: list[CategoryExpenseTotal]
+    monthly: list[MonthlyTotal]
     total_expenses: Decimal
 
 
@@ -229,3 +250,64 @@ async def delete_budget(
         raise HTTPException(status_code=404, detail="Presupuesto no encontrado")
 
     await service.delete_budget(budget)
+
+
+@router.get("/reports", response_model=FinanceReports)
+async def get_reports(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Gasto por categoria + tendencia de los ultimos 6 meses. Portado de la
+    ruta HTML legacy `/finanzas/reportes` para que web y mobile puedan
+    mostrar lo mismo sin depender de esa vista server-rendered."""
+    service = FinanzasService(db)
+    return await service.get_reports(current_user.id)
+
+
+@router.get("/accounts", response_model=list[BankAccountResponse])
+async def list_accounts(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    service = FinanzasService(db)
+    return await service.get_bank_accounts(current_user.id)
+
+
+@router.post("/accounts", response_model=BankAccountResponse, status_code=status.HTTP_201_CREATED)
+async def create_account(
+    data: BankAccountCreate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    service = FinanzasService(db)
+    return await service.create_bank_account(current_user.id, data)
+
+
+@router.put("/accounts/{account_id}", response_model=BankAccountResponse)
+async def update_account(
+    account_id: str,
+    data: BankAccountUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    service = FinanzasService(db)
+    account = await service.get_bank_account(account_id, current_user.id)
+    if not account:
+        raise HTTPException(status_code=404, detail="Cuenta no encontrada")
+
+    update_data = data.model_dump(exclude_unset=True)
+    return await service.update_bank_account(account, update_data)
+
+
+@router.delete("/accounts/{account_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_account(
+    account_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    service = FinanzasService(db)
+    account = await service.get_bank_account(account_id, current_user.id)
+    if not account:
+        raise HTTPException(status_code=404, detail="Cuenta no encontrada")
+
+    await service.delete_bank_account(account)

@@ -30,6 +30,7 @@ from app.modules.finanzas.schemas import (
     BudgetCreate,
     BudgetProgress,
     CategoryCreate,
+    BankAccountCreate,
 )
 
 
@@ -167,27 +168,60 @@ class FinanzasService:
         await self.category_repo.delete(category)
 
     async def get_bank_accounts(self, user_id: UUID):
-        return await self.bank_account_repo.get_all(user_id)
+        return await self.bank_account_repo.get_all(str(user_id))
 
-    async def create_bank_account(
-        self,
-        user_id: UUID,
-        name: str,
-        bank_name: str,
-        account_type: str,
-        account_number: str,
-        currency: str,
-    ) -> BankAccount:
+    async def get_bank_account(self, account_id: UUID, user_id: UUID) -> Optional[BankAccount]:
+        return await self.bank_account_repo.get_by_id(str(account_id), str(user_id))
+
+    async def create_bank_account(self, user_id: UUID, data: BankAccountCreate) -> BankAccount:
+        # AccountType(...) valida el valor recibido (422 si no es uno de los
+        # tipos conocidos) antes de guardarlo; la columna en si es un String
+        # plano, no un enum de base de datos.
+        account_type = AccountType(data.account_type)
+        last4 = data.last4 or (
+            data.account_number[-4:] if len(data.account_number) >= 4 else data.account_number
+        )
         account = BankAccount(
-            user_id=user_id,
-            name=name,
-            bank_name=bank_name,
-            account_type=AccountType(account_type),
-            account_number=account_number,
-            last4=account_number[-4:] if len(account_number) >= 4 else account_number,
-            currency=currency,
+            user_id=str(user_id),
+            name=data.name,
+            bank_name=data.bank_name,
+            account_type=account_type.value,
+            account_number=data.account_number,
+            last4=last4,
+            currency=data.currency,
+            balance=data.balance,
         )
         return await self.bank_account_repo.create(account)
+
+    async def update_bank_account(self, account: BankAccount, data: dict) -> BankAccount:
+        if "account_type" in data and data["account_type"] is not None:
+            data["account_type"] = AccountType(data["account_type"]).value
+        for key, value in data.items():
+            setattr(account, key, value)
+        return await self.bank_account_repo.update(account)
+
+    async def delete_bank_account(self, account: BankAccount) -> None:
+        await self.bank_account_repo.delete(account)
+
+    async def get_reports(self, user_id: UUID) -> dict:
+        """Desglose de gastos por categoria + tendencia de los ultimos 6
+        meses — mismo calculo que tenia la ruta HTML legacy
+        (`finanzas/routes.py::reportes`), portado para servir como JSON."""
+        by_category = await self.transaction_repo.get_expense_breakdown_by_category(str(user_id))
+
+        today = date.today()
+        month_starts = []
+        for i in range(5, -1, -1):
+            month = (today.month - i - 1) % 12 + 1
+            year = today.year - ((i + (12 - today.month)) // 12)
+            month_starts.append(date(year, month, 1))
+        monthly = await self.transaction_repo.get_monthly_totals(str(user_id), month_starts)
+
+        return {
+            "by_category": by_category,
+            "monthly": monthly,
+            "total_expenses": sum((row["total"] for row in by_category), Decimal("0")),
+        }
 
     async def create_budget(self, user_id: UUID, data: BudgetCreate) -> Budget:
         budget = Budget(

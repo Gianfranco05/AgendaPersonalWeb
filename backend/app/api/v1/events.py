@@ -2,6 +2,7 @@ from datetime import date
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -11,6 +12,12 @@ from app.modules.eventos.service import EventosService
 from app.modules.eventos.schemas import EventCreate, EventUpdate, EventResponse
 
 router = APIRouter(prefix="/events", tags=["events"])
+
+
+def _escape_ics(value: str) -> str:
+    if not value:
+        return ""
+    return value.replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,").replace("\n", "\\n")
 
 
 @router.get("", response_model=list[EventResponse])
@@ -68,3 +75,48 @@ async def delete_event(
         raise HTTPException(status_code=404, detail="Evento no encontrado")
 
     await service.delete_event(event)
+
+
+@router.get("/export/ics")
+async def export_events_ics(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Exporta los eventos del usuario como .ics. Portado de la ruta HTML
+    legacy `/eventos/exportar/ics`."""
+    service = EventosService(db)
+    events = await service.get_events(user_id=current_user.id)
+    events = sorted(events, key=lambda e: e.start_datetime)
+
+    lines = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "PRODID:-//Vida Personal//ES",
+        "CALSCALE:GREGORIAN",
+        "METHOD:PUBLISH",
+    ]
+
+    for event in events:
+        start_str = event.start_datetime.strftime("%Y%m%dT%H%M%SZ")
+        end_str = event.end_datetime.strftime("%Y%m%dT%H%M%SZ") if event.end_datetime else start_str
+
+        lines.append("BEGIN:VEVENT")
+        lines.append(f"UID:{event.id}@vidapersonal")
+        lines.append(f"SUMMARY:{_escape_ics(event.title)}")
+        lines.append(f"DTSTART:{start_str}")
+        lines.append(f"DTEND:{end_str}")
+        if event.description:
+            lines.append(f"DESCRIPTION:{_escape_ics(event.description)}")
+        if event.location:
+            lines.append(f"LOCATION:{_escape_ics(event.location)}")
+        lines.append(f"DTSTAMP:{event.created_at.strftime('%Y%m%dT%H%M%SZ') if event.created_at else start_str}")
+        lines.append("END:VEVENT")
+
+    lines.append("END:VCALENDAR")
+    ics_content = "\r\n".join(lines) + "\r\n"
+
+    return StreamingResponse(
+        iter([ics_content.encode("utf-8")]),
+        media_type="text/calendar",
+        headers={"Content-Disposition": "attachment; filename=eventos.ics"},
+    )
