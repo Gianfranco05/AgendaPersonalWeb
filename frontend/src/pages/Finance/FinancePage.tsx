@@ -9,6 +9,8 @@ import TransactionFilters from './TransactionFilters';
 import BudgetsSection from './BudgetsSection';
 import SavingsGoalsSection from './SavingsGoalsSection';
 import CategoriesSection from './CategoriesSection';
+import ReportsSection from './ReportsSection';
+import AccountsSection from './AccountsSection';
 
 const FinanceCharts = lazy(() => import('./FinanceCharts'));
 
@@ -21,7 +23,7 @@ interface Filters {
 
 const PER_PAGE = 20;
 
-type Tab = 'transacciones' | 'presupuestos' | 'ahorro' | 'categorias';
+type Tab = 'transacciones' | 'presupuestos' | 'ahorro' | 'categorias' | 'reportes' | 'cuentas';
 
 export default function FinancePage() {
   const [tab, setTab] = useState<Tab>('transacciones');
@@ -96,6 +98,8 @@ export default function FinancePage() {
           ['presupuestos', 'Presupuestos'],
           ['ahorro', 'Ahorro'],
           ['categorias', 'Categorías'],
+          ['reportes', 'Reportes'],
+          ['cuentas', 'Cuentas'],
         ] as const).map(([value, label]) => (
           <button
             key={value}
@@ -114,6 +118,8 @@ export default function FinancePage() {
       {tab === 'presupuestos' && <BudgetsSection />}
       {tab === 'ahorro' && <SavingsGoalsSection />}
       {tab === 'categorias' && <CategoriesSection />}
+      {tab === 'reportes' && <ReportsSection />}
+      {tab === 'cuentas' && <AccountsSection />}
 
       {tab === 'transacciones' && (
       <>

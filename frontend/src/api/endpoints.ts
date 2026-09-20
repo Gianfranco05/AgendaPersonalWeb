@@ -17,6 +17,8 @@ import type {
   MonthlySummaryItem,
   Budget,
   BudgetProgress,
+  FinanceReports,
+  BankAccount,
   Settings,
   Session,
   Reminder,
@@ -230,6 +232,20 @@ export async function deleteNote(id: string): Promise<void> {
   await apiClient.delete(`/api/v1/notes/${id}`);
 }
 
+export async function exportNotesJson(): Promise<Blob> {
+  if (MOCK_ENABLED) {
+    return mockDelay(
+      new Blob([JSON.stringify({ notes: [], format_version: 1 }, null, 2)], {
+        type: 'application/json',
+      }),
+    );
+  }
+  const { data } = await apiClient.get<Blob>('/api/v1/notes/export/json', {
+    responseType: 'blob',
+  });
+  return data;
+}
+
 // ── Events ──
 
 export async function fetchEvents(): Promise<CalendarEvent[]> {
@@ -288,6 +304,18 @@ export async function deleteEvent(id: string): Promise<void> {
     return mockDelay(undefined);
   }
   await apiClient.delete(`/api/v1/events/${id}`);
+}
+
+export async function exportEventsIcs(): Promise<Blob> {
+  if (MOCK_ENABLED) {
+    return mockDelay(
+      new Blob(['BEGIN:VCALENDAR\nVERSION:2.0\nEND:VCALENDAR\n'], { type: 'text/calendar' }),
+    );
+  }
+  const { data } = await apiClient.get<Blob>('/api/v1/events/export/ics', {
+    responseType: 'blob',
+  });
+  return data;
 }
 
 // ── Goals ──
@@ -776,6 +804,102 @@ export async function deleteBudget(id: string): Promise<void> {
     return mockDelay(undefined);
   }
   await apiClient.delete(`/api/v1/finance/budgets/${id}`);
+}
+
+// ── Finance Reports ──
+
+export async function fetchFinanceReports(): Promise<FinanceReports> {
+  if (MOCK_ENABLED) {
+    const now = new Date();
+    const monthly = Array.from({ length: 6 }).map((_, i) => {
+      const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
+      return {
+        month: d.toISOString().slice(0, 10),
+        income: 200000 + i * 15000,
+        expense: 120000 + i * 9000,
+      };
+    });
+    const byCategory = [
+      { name: 'Alimentos', color: '#10B981', total: 85000 },
+      { name: 'Transporte', color: '#F59E0B', total: 32000 },
+      { name: 'Vivienda', color: '#7C3AED', total: 150000 },
+      { name: 'Entretenimiento', color: '#EF4444', total: 21000 },
+    ];
+    return mockDelay({
+      by_category: byCategory,
+      monthly,
+      total_expenses: byCategory.reduce((sum, c) => sum + c.total, 0),
+    });
+  }
+  const { data } = await apiClient.get<FinanceReports>('/api/v1/finance/reports');
+  return data;
+}
+
+// ── Bank Accounts ──
+
+export async function fetchBankAccounts(): Promise<BankAccount[]> {
+  if (MOCK_ENABLED) {
+    const accounts: BankAccount[] = [
+      {
+        id: 'a1',
+        user_id: 'u1',
+        created_at: new Date().toISOString(),
+        name: 'Cuenta sueldo',
+        bank_name: 'Banco Nación',
+        account_type: 'checking',
+        last4: '4821',
+        currency: 'ARS',
+        balance: 350000,
+      },
+      {
+        id: 'a2',
+        user_id: 'u1',
+        created_at: new Date().toISOString(),
+        name: 'Caja de ahorro',
+        bank_name: 'Banco Galicia',
+        account_type: 'savings',
+        last4: '1092',
+        currency: 'ARS',
+        balance: 120000,
+      },
+    ];
+    return mockDelay(accounts);
+  }
+  const { data } = await apiClient.get<BankAccount[]>('/api/v1/finance/accounts');
+  return data;
+}
+
+export async function createBankAccount(
+  account: Omit<BankAccount, 'id' | 'user_id' | 'created_at'>,
+): Promise<BankAccount> {
+  if (MOCK_ENABLED) {
+    return mockDelay({
+      ...account,
+      id: generateId(),
+      user_id: 'u1',
+      created_at: new Date().toISOString(),
+    });
+  }
+  const { data } = await apiClient.post<BankAccount>('/api/v1/finance/accounts', account);
+  return data;
+}
+
+export async function updateBankAccount(
+  id: string,
+  account: Partial<BankAccount>,
+): Promise<BankAccount> {
+  if (MOCK_ENABLED) {
+    return mockDelay({ ...account, id } as BankAccount);
+  }
+  const { data } = await apiClient.put<BankAccount>(`/api/v1/finance/accounts/${id}`, account);
+  return data;
+}
+
+export async function deleteBankAccount(id: string): Promise<void> {
+  if (MOCK_ENABLED) {
+    return mockDelay(undefined);
+  }
+  await apiClient.delete(`/api/v1/finance/accounts/${id}`);
 }
 
 // ── Settings ──

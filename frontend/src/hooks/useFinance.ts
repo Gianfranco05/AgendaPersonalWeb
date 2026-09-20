@@ -14,11 +14,18 @@ import {
   createCategory,
   updateCategory,
   deleteCategory,
+  fetchFinanceReports,
+  fetchBankAccounts,
+  createBankAccount,
+  updateBankAccount,
+  deleteBankAccount,
 } from '../api/endpoints';
-import type { Transaction, Budget, Category } from '../types';
+import type { Transaction, Budget, Category, BankAccount } from '../types';
 
 const SUMMARY_KEY = 'finance/summary';
 const CATEGORIES_KEY = 'finance/categories';
+const REPORTS_KEY = 'finance/reports';
+const ACCOUNTS_KEY = 'finance/accounts';
 
 function budgetsKey(year: number, month: number) {
   return ['finance/budgets', year, month] as const;
@@ -103,4 +110,29 @@ export async function saveCategory(existing: Category | null, data: Omit<Categor
 export async function removeCategory(id: string) {
   await deleteCategory(id);
   await globalMutate(CATEGORIES_KEY);
+}
+
+export function useFinanceReports() {
+  return useApiSWR(REPORTS_KEY, fetchFinanceReports);
+}
+
+export function useBankAccounts() {
+  return useApiSWR(ACCOUNTS_KEY, fetchBankAccounts);
+}
+
+export async function saveBankAccount(
+  existing: BankAccount | null,
+  data: Omit<BankAccount, 'id' | 'user_id' | 'created_at'>,
+) {
+  if (existing) {
+    await updateBankAccount(existing.id, data);
+  } else {
+    await createBankAccount(data);
+  }
+  await globalMutate(ACCOUNTS_KEY);
+}
+
+export async function removeBankAccount(id: string) {
+  await deleteBankAccount(id);
+  await globalMutate(ACCOUNTS_KEY);
 }

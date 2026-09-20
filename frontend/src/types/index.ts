@@ -92,6 +92,39 @@ export interface BudgetProgress extends Budget {
   percentage: number;
 }
 
+export interface CategoryExpenseTotal {
+  name: string;
+  color: string;
+  total: number;
+}
+
+export interface MonthlyTotal {
+  month: string;
+  income: number;
+  expense: number;
+}
+
+export interface FinanceReports {
+  by_category: CategoryExpenseTotal[];
+  monthly: MonthlyTotal[];
+  total_expenses: number;
+}
+
+export type BankAccountType = 'checking' | 'savings' | 'credit' | 'cash' | 'investment';
+
+export interface BankAccount {
+  id: string;
+  user_id: string;
+  created_at: string;
+  name: string;
+  bank_name?: string;
+  account_type: BankAccountType;
+  account_number?: string;
+  last4?: string;
+  currency: string;
+  balance: number;
+}
+
 export interface Settings {
   currency: string;
   theme_color: string;

@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Plus } from 'lucide-react';
 import { LoadingSkeleton } from '../../components/LoadingSkeleton';
-import { fetchNotes, createNote, updateNote, deleteNote } from '../../api/endpoints';
+import { fetchNotes, createNote, updateNote, deleteNote, exportNotesJson } from '../../api/endpoints';
 import type { Note } from '../../types';
 import NotesSidebar from './NotesSidebar';
 import NoteEditor from './NoteEditor';
@@ -12,6 +12,24 @@ export default function NotesPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [activeTag, setActiveTag] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
+
+  async function handleExport() {
+    setExporting(true);
+    try {
+      const blob = await exportNotesJson();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'notas.json';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } finally {
+      setExporting(false);
+    }
+  }
 
   const loadNotes = useCallback(async () => {
     setLoading(true);
@@ -120,12 +138,14 @@ export default function NotesPage() {
         search={search}
         activeTag={activeTag}
         loading={loading}
+        exporting={exporting}
         onSelect={setSelectedId}
         onSearchChange={setSearch}
         onTagSelect={setActiveTag}
         onPin={handlePin}
         onDelete={handleDelete}
         onNew={handleNew}
+        onExport={handleExport}
       />
 
       {/* Editor */}
