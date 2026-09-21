@@ -54,6 +54,7 @@ async def test_user(db_session):
         password_hash=hash_password("test123"),
         full_name="Test User",
         is_active=True,
+        is_verified=True,
     )
     db_session.add(user)
     await db_session.commit()

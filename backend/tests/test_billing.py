@@ -157,6 +157,25 @@ async def test_checkout_is_rate_limited_per_user(api_auth_client, test_user, bil
     assert resp.status_code == 429
 
 
+async def test_checkout_blocked_for_unverified_email(client, db_session, billing_enabled):
+    from app.core.security import hash_password
+    from app.modules.auth.models import User
+
+    user = User(
+        email="sinverificar@test.com",
+        password_hash=hash_password("test123"),
+        full_name="Sin Verificar",
+        is_active=True,
+        is_verified=False,
+    )
+    db_session.add(user)
+    await db_session.commit()
+    await client.post("/auth/api/login", json={"email": "sinverificar@test.com", "password": "test123"})
+
+    resp = await client.post("/api/v1/billing/checkout", params={"module": "study"})
+    assert resp.status_code == 403
+
+
 async def test_checkout_rejects_an_invalid_app_redirect(api_auth_client, billing_enabled):
     resp = await api_auth_client.post(
         "/api/v1/billing/checkout",

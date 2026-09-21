@@ -76,6 +76,7 @@ function StoreTile({
 export default function StorePage() {
   const { data: store, isLoading } = useStore();
   const [busyKey, setBusyKey] = useState<string | null>(null);
+  const [buyError, setBuyError] = useState<string | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const checkoutStatus = searchParams.get('checkout');
 
@@ -97,11 +98,17 @@ export default function StorePage() {
 
   async function handleBuy(item: StoreItem) {
     setBusyKey(item.key);
+    setBuyError(null);
     try {
       await startCheckout(item.key);
       // No hace falta limpiar busyKey en éxito: la página navega afuera
       // (Stripe Checkout) antes de que el usuario vea el botón de nuevo.
-    } catch {
+    } catch (err: unknown) {
+      const msg =
+        err && typeof err === 'object' && 'response' in err
+          ? String((err as { response: { data: { detail: string } } }).response.data.detail)
+          : 'No se pudo iniciar el pago';
+      setBuyError(msg);
       setBusyKey(null);
     }
   }
@@ -146,6 +153,17 @@ export default function StorePage() {
             El pago se canceló. No se te cobró nada.
           </div>
           <button onClick={dismissBanner} aria-label="Cerrar aviso">
+            <X size={16} />
+          </button>
+        </div>
+      )}
+      {buyError && (
+        <div className="flex items-center justify-between gap-3 rounded-xl bg-rose-50 dark:bg-rose-900/30 p-4 text-rose-800 dark:text-rose-300">
+          <div className="flex items-center gap-2 text-sm">
+            <CircleAlert size={18} />
+            {buyError}
+          </div>
+          <button onClick={() => setBuyError(null)} aria-label="Cerrar aviso">
             <X size={16} />
           </button>
         </div>

@@ -117,6 +117,12 @@ async def create_checkout_session(
 ):
     _require_billing_configured()
 
+    if not current_user.is_verified:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Tenés que verificar tu email antes de comprar una plantilla",
+        )
+
     module_def = MODULE_BY_KEY.get(module)
     if module_def is None or module_def.is_base:
         raise HTTPException(status_code=400, detail="Plantilla inválida")
