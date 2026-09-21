@@ -1,3 +1,5 @@
+from typing import Optional
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -30,6 +32,7 @@ class ReminderService:
         minute: int = 0,
         icon: str = "🔔",
         enabled: bool = True,
+        timezone_offset_minutes: Optional[int] = None,
     ) -> Reminder:
         reminder = Reminder(
             user_id=user_id,
@@ -38,6 +41,7 @@ class ReminderService:
             hour=hour,
             minute=minute,
             enabled=enabled,
+            timezone_offset_minutes=timezone_offset_minutes,
         )
         self.db.add(reminder)
         await self.db.commit()

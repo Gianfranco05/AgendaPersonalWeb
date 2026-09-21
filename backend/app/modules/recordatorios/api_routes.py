@@ -29,6 +29,9 @@ class ReminderCreate(BaseModel):
     hour: int = Field(ge=0, le=23)
     minute: int = Field(default=0, ge=0, le=59)
     enabled: bool = True
+    # Minutos al este de UTC del dispositivo (mismo signo que tz_offset_minutes
+    # en /api/v1/focus/summary). Opcional para no romper clientes viejos.
+    timezone_offset_minutes: Optional[int] = Field(default=None, ge=-840, le=840)
 
 
 class ReminderUpdate(BaseModel):
@@ -37,6 +40,7 @@ class ReminderUpdate(BaseModel):
     hour: Optional[int] = Field(default=None, ge=0, le=23)
     minute: Optional[int] = Field(default=None, ge=0, le=59)
     enabled: Optional[bool] = None
+    timezone_offset_minutes: Optional[int] = Field(default=None, ge=-840, le=840)
 
 
 @router.get("", response_model=list[ReminderOut])
@@ -54,7 +58,13 @@ async def create_reminder(
     db: AsyncSession = Depends(get_db),
 ):
     return await ReminderService(db).create_reminder(
-        str(current_user.id), body.message, body.hour, body.minute, body.icon, body.enabled
+        str(current_user.id),
+        body.message,
+        body.hour,
+        body.minute,
+        body.icon,
+        body.enabled,
+        body.timezone_offset_minutes,
     )
 
 

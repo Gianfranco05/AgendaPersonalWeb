@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -21,6 +22,7 @@ from app.core.metrics import PrometheusMiddleware
 from app.core.http_security import BodySizeLimitMiddleware, SecurityHeadersMiddleware
 from app.core.logging_config import setup_logging
 from app.core.health import health_router
+from app.modules.recordatorios.scheduler import run_reminder_scheduler
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +43,9 @@ async def lifespan(app: FastAPI):
     setup_logging()
     init_sentry()
     logger.info("Sentry initialized")
+    scheduler_task = asyncio.create_task(run_reminder_scheduler())
     yield
+    scheduler_task.cancel()
     await engine.dispose()
 
 

@@ -36,6 +36,7 @@ from app.modules.recordatorios.models import Reminder
 from app.modules.metas.models import Goal, HabitRecord
 from app.modules.modulos.models import EnabledModule, ModulePurchase
 from app.modules.nutricion.models import Meal
+from app.modules.push.models import PushToken
 from app.modules.tareas.models import Task
 
 logger = logging.getLogger(__name__)
@@ -80,14 +81,14 @@ OWNED_TABLES: list[tuple[str, Any]] = [
     ("enabled_modules", EnabledModule),
     ("focus_sessions", FocusSession),
     ("reminders", Reminder),
+    ("push_tokens", PushToken),
     ("refresh_tokens", RefreshToken),
     ("verification_tokens", VerificationToken),
 ]
 
-# Nunca salen en el export: son credenciales o material de sesion. Exportar el
-# hash de un refresh token no le sirve a nadie y agranda la superficie si el
-# archivo se filtra.
-NEVER_EXPORTED: set[str] = {"refresh_tokens", "verification_tokens"}
+# Nunca salen en el export: son credenciales, material de sesion, o
+# identificadores de dispositivo sin valor para el usuario fuera de la app.
+NEVER_EXPORTED: set[str] = {"refresh_tokens", "verification_tokens", "push_tokens"}
 
 # Columnas que se omiten aunque su tabla se exporte.
 REDACTED_COLUMNS: dict[str, set[str]] = {
