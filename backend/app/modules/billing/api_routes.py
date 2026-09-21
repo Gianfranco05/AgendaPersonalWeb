@@ -148,11 +148,15 @@ async def create_checkout_session(
     billing = BillingService(db)
     customer_id = await billing.get_customer_id(str(current_user.id))
     if not customer_id:
-        customer = stripe.Customer.create(
-            email=current_user.email,
-            name=current_user.full_name,
-            metadata={"user_id": str(current_user.id)},
-        )
+        try:
+            customer = stripe.Customer.create(
+                email=current_user.email,
+                name=current_user.full_name,
+                metadata={"user_id": str(current_user.id)},
+            )
+        except Exception:
+            logger.exception("Fallo creando el Customer de Stripe")
+            raise HTTPException(status_code=502, detail="No se pudo iniciar el pago")
         customer_id = await billing.link_customer(str(current_user.id), customer.id)
 
     try:
