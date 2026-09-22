@@ -518,3 +518,77 @@ async def test_api_delete_bank_account_not_found(api_auth_client):
 async def test_api_accounts_requires_auth(client):
     response = await client.get("/api/v1/finance/accounts")
     assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_api_create_transaction_rejects_invalid_payment_method(api_auth_client):
+    # La web mandaba la etiqueta en español ("Efectivo") en vez del valor del
+    # enum: antes esto rompia con 500 (ValueError en el service), ahora es 422.
+    response = await api_auth_client.post("/api/v1/finance/transactions", json={
+        "amount": "100",
+        "type": "expense",
+        "transaction_date": "2026-09-22",
+        "product_name": "Super",
+        "account_type": "cash",
+        "payment_method": "Efectivo",
+    })
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_api_update_transaction_rejects_invalid_enum(api_auth_client):
+    create_resp = await api_auth_client.post("/api/v1/finance/transactions", json={
+        "amount": "100",
+        "type": "expense",
+        "transaction_date": "2026-09-22",
+        "product_name": "Super",
+        "account_type": "cash",
+        "payment_method": "cash",
+    })
+    txn_id = create_resp.json()["id"]
+
+    # Antes el update hacia setattr sin validar y guardaba el valor invalido.
+    response = await api_auth_client.put(f"/api/v1/finance/transactions/{txn_id}", json={
+        "payment_method": "Tarjeta",
+    })
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_api_create_transaction_with_category_id(api_auth_client, test_category):
+    response = await api_auth_client.post("/api/v1/finance/transactions", json={
+        "amount": "100",
+        "type": "expense",
+        "transaction_date": "2026-09-22",
+        "product_name": "Super",
+        "account_type": "cash",
+        "payment_method": "debit_card",
+        "category_id": test_category.id,
+    })
+    assert response.status_code == 201
+    assert response.json()["category_id"] == test_category.id
+
+
+@pytest.mark.asyncio
+async def test_api_update_transaction_can_clear_category(api_auth_client, test_category):
+    create_resp = await api_auth_client.post("/api/v1/finance/transactions", json={
+        "amount": "100",
+        "type": "expense",
+        "transaction_date": "2026-09-22",
+        "product_name": "Super",
+        "account_type": "cash",
+        "payment_method": "cash",
+        "category_id": test_category.id,
+        "notes": "nota cargada desde mobile",
+    })
+    txn_id = create_resp.json()["id"]
+
+    # null explicito = "Sin categoria". Antes el service ignoraba cualquier
+    # None y la categoria no se podia quitar nunca.
+    response = await api_auth_client.put(f"/api/v1/finance/transactions/{txn_id}", json={
+        "category_id": None,
+    })
+    assert response.status_code == 200
+    assert response.json()["category_id"] is None
+    # Lo que no se mando no se toca.
+    assert response.json()["notes"] == "nota cargada desde mobile"

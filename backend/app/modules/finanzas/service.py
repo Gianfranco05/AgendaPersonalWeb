@@ -34,6 +34,16 @@ from app.modules.finanzas.schemas import (
 )
 
 
+_NULLABLE_TRANSACTION_FIELDS = {
+    "category_id",
+    "notes",
+    "transaction_time",
+    "product_description",
+    "quantity",
+    "unit_price",
+}
+
+
 class FinanzasService:
     def __init__(self, db: AsyncSession):
         self.db = db
@@ -103,11 +113,18 @@ class FinanzasService:
         return await self.transaction_repo.get_by_id(transaction_id, user_id)
 
     async def update_transaction(self, transaction: Transaction, data: dict):
+        # `data` viene con exclude_unset, asi que un None es un null mandado a
+        # proposito ("quitar la categoria"), no un campo omitido. Se respeta
+        # solo en columnas que aceptan vacio; en el resto (amount, type...)
+        # un null romperia el NOT NULL, asi que se ignora como antes.
         for key, value in data.items():
-            if value is not None and hasattr(transaction, key):
-                if key == "category_id":
-                    value = str(value)
-                setattr(transaction, key, value)
+            if not hasattr(transaction, key):
+                continue
+            if value is None and key not in _NULLABLE_TRANSACTION_FIELDS:
+                continue
+            if key == "category_id" and value is not None:
+                value = str(value)
+            setattr(transaction, key, value)
         return await self.transaction_repo.update(transaction)
 
     async def delete_transaction(self, transaction: Transaction):

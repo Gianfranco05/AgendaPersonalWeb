@@ -5,7 +5,27 @@ from typing import Optional
 
 from pydantic import BaseModel, field_validator
 
-from app.modules.finanzas.enums import AccountType
+from app.modules.finanzas.enums import (
+    AccountType,
+    MerchantCategory,
+    PaymentMethod,
+    TransactionType,
+)
+
+_TRANSACTION_ENUM_FIELDS = {
+    "type": TransactionType,
+    "account_type": AccountType,
+    "payment_method": PaymentMethod,
+    "merchant_category": MerchantCategory,
+}
+
+
+def _check_enum(field: str, value: Optional[str]) -> Optional[str]:
+    enum_cls = _TRANSACTION_ENUM_FIELDS[field]
+    if value is not None and value not in enum_cls._value2member_map_:
+        allowed = ", ".join(enum_cls._value2member_map_)
+        raise ValueError(f"{field} invalido: {value!r} (valores validos: {allowed})")
+    return value
 
 
 class TransactionBase(BaseModel):
@@ -28,6 +48,10 @@ class TransactionBase(BaseModel):
     category_id: Optional[UUID] = None
 
 
+# Los enums se validan en Create/Update y no en TransactionBase a proposito:
+# TransactionResponse hereda de Base, y el camino de update no validaba nada
+# antes, asi que puede haber filas guardadas con valores fuera del enum
+# (ej. "Efectivo" desde la web). Validarlas al serializar rompería el listado.
 class TransactionCreate(TransactionBase):
     @field_validator("amount")
     @classmethod
@@ -35,6 +59,11 @@ class TransactionCreate(TransactionBase):
         if v <= 0:
             raise ValueError("El monto debe ser mayor a 0")
         return v
+
+    @field_validator("type", "account_type", "payment_method", "merchant_category")
+    @classmethod
+    def enum_values(cls, v, info):
+        return _check_enum(info.field_name, v)
 
 
 class TransactionUpdate(BaseModel):
@@ -55,6 +84,11 @@ class TransactionUpdate(BaseModel):
     merchant_category: Optional[str] = None
     notes: Optional[str] = None
     category_id: Optional[UUID] = None
+
+    @field_validator("type", "account_type", "payment_method", "merchant_category")
+    @classmethod
+    def enum_values(cls, v, info):
+        return _check_enum(info.field_name, v)
 
 
 class TransactionResponse(TransactionBase):
