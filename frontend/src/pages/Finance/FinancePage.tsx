@@ -52,7 +52,6 @@ export default function FinancePage() {
   const transactions = txData?.items ?? [];
   const total = txData?.total ?? 0;
   const totalPages = Math.ceil(total / PER_PAGE);
-  const loading = summaryLoading || txLoading;
 
   function handleNew() {
     setEditingTx(null);
@@ -167,7 +166,7 @@ export default function FinancePage() {
       ) : null}
 
       <Suspense fallback={<LoadingSkeleton type="card" />}>
-        <FinanceCharts transactions={transactions} loading={loading} />
+        <FinanceCharts />
       </Suspense>
 
       <TransactionFilters filters={filters} onChange={handleFiltersChange} />

@@ -1,16 +1,21 @@
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { LoadingSkeleton } from '../../components/LoadingSkeleton';
 import { useTheme } from '../../context/ThemeContext';
-import type { Transaction } from '../../types';
+import { useFinanceReports } from '../../hooks/useFinance';
 
-const COLORS = ['#0f172a', '#10B981', '#F59E0B', '#EF4444', '#3B82F6', '#EC4899', '#6366f1', '#14B8A6'];
+const FALLBACK_COLORS = ['#0f172a', '#10B981', '#F59E0B', '#EF4444', '#3B82F6', '#EC4899', '#6366f1', '#14B8A6'];
 
-interface FinanceChartsProps {
-  transactions: Transaction[];
-  loading: boolean;
-}
-
-export default function FinanceCharts({ transactions, loading }: FinanceChartsProps) {
+/**
+ * Gastos por categoría + ingresos/egresos de los últimos 6 meses.
+ *
+ * Los datos vienen agregados por el backend (/api/v1/finance/reports) sobre
+ * todo el historial. Antes se calculaban en el cliente con la página de
+ * transacciones visible (máximo 20), así que con más movimientos los
+ * gráficos mentían; y como la API no devuelve category_name, en modo real
+ * todo caía en "Sin categoría".
+ */
+export default function FinanceCharts() {
+  const { data: reports, isLoading } = useFinanceReports();
   const { theme } = useTheme();
   const isDark = theme === 'dark';
   const gridColor = isDark ? '#2c3237' : '#f0f0f0';
@@ -19,7 +24,7 @@ export default function FinanceCharts({ transactions, loading }: FinanceChartsPr
     ? { backgroundColor: '#1b2126', border: '1px solid #2c3237', borderRadius: 8, color: '#e2e8f0' }
     : undefined;
 
-  if (loading) {
+  if (isLoading && !reports) {
     return (
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <LoadingSkeleton type="card" />
@@ -28,47 +33,16 @@ export default function FinanceCharts({ transactions, loading }: FinanceChartsPr
     );
   }
 
-  // Spending by category (expenses only)
-  const expensesByCategory: Record<string, number> = {};
-  transactions
-    .filter((t) => t.type === 'expense')
-    .forEach((t) => {
-      const cat = t.category_name || 'Sin categoría';
-      expensesByCategory[cat] = (expensesByCategory[cat] || 0) + t.amount;
-    });
-
-  const pieData = Object.entries(expensesByCategory).map(([name, value]) => ({
-    name,
-    value,
-  }));
-
-  // Monthly income vs expense (last 6 months)
-  const months: Record<string, { income: number; expense: number }> = {};
-  const now = new Date();
-  for (let i = 5; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const key = d.toLocaleDateString('es-AR', { month: 'short', year: '2-digit' });
-    months[key] = { income: 0, expense: 0 };
-  }
-
-  transactions.forEach((t) => {
-    const d = new Date(t.transaction_date);
-    const key = d.toLocaleDateString('es-AR', { month: 'short', year: '2-digit' });
-    if (months[key]) {
-      if (t.type === 'income') months[key].income += t.amount;
-      else months[key].expense += t.amount;
-    }
-  });
-
-  const barData = Object.entries(months).map(([name, values]) => ({
-    name,
-    Ingresos: values.income,
-    Egresos: values.expense,
+  const pieData = (reports?.by_category ?? []).map((c) => ({ name: c.name, value: c.total, color: c.color }));
+  const barData = (reports?.monthly ?? []).map((m) => ({
+    // T12:00 evita que la zona horaria corra "2026-09-01" al 31 de agosto.
+    name: new Date(`${m.month}T12:00:00`).toLocaleDateString('es-AR', { month: 'short', year: '2-digit' }),
+    Ingresos: m.income,
+    Egresos: m.expense,
   }));
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-      {/* Pie Chart */}
       <div className="rounded-xl bg-white dark:bg-slate-800 p-5 shadow-sm">
         <h3 className="mb-4 text-sm font-semibold text-gray-700 dark:text-slate-200">Gastos por categoría</h3>
         {pieData.length === 0 ? (
@@ -85,8 +59,8 @@ export default function FinanceCharts({ transactions, loading }: FinanceChartsPr
                 paddingAngle={2}
                 dataKey="value"
               >
-                {pieData.map((_, i) => (
-                  <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                {pieData.map((entry, i) => (
+                  <Cell key={i} fill={entry.color || FALLBACK_COLORS[i % FALLBACK_COLORS.length]} />
                 ))}
               </Pie>
               <Tooltip
@@ -99,7 +73,6 @@ export default function FinanceCharts({ transactions, loading }: FinanceChartsPr
         )}
       </div>
 
-      {/* Bar Chart */}
       <div className="rounded-xl bg-white dark:bg-slate-800 p-5 shadow-sm">
         <h3 className="mb-4 text-sm font-semibold text-gray-700 dark:text-slate-200">Ingresos vs Egresos (6 meses)</h3>
         {barData.every((d) => d.Ingresos === 0 && d.Egresos === 0) ? (

@@ -85,6 +85,9 @@ export async function fetchTransactions(params?: {
   date_to?: string;
 }): Promise<TransactionsResponse> {
   if (MOCK_ENABLED) {
+    // Misma forma que la API real (category_id + valores del enum de
+    // payment_method): un mock que devolvia category_name y etiquetas en
+    // español escondio durante meses que el formulario real rompia con 500.
     const mockTransactions: Transaction[] = Array.from({ length: 25 }, (_, i) => ({
       id: generateId(),
       amount: Math.round(Math.random() * 500000) / 100,
@@ -93,9 +96,8 @@ export async function fetchTransactions(params?: {
       transaction_date: new Date(2025, 5, 20 - i).toISOString().split('T')[0],
       product_name: `Transacción ${i + 1}`,
       merchant_name: ['Supermercado', 'Restaurante', 'Servicios', 'Freelance', 'Tienda'][i % 5],
-      payment_method: ['Efectivo', 'Transferencia', 'Tarjeta', 'Débito'][i % 4],
-      category_name: ['Alimentos', 'Transporte', 'Vivienda', 'Entretenimiento', 'Ingresos'][i % 5],
-      category_color: ['#10B981', '#F59E0B', '#7C3AED', '#EF4444', '#3B82F6'][i % 5],
+      payment_method: ['cash', 'transfer', 'credit_card', 'debit_card'][i % 4],
+      category_id: ['c1', 'c2', 'c3', 'c4', 'c5'][i % 5],
     }));
     return mockDelay({
       items: mockTransactions,
@@ -110,6 +112,8 @@ export async function fetchTransactions(params?: {
       limit: params?.per_page ?? 20,
       ...(params?.type && { transaction_type: params.type }),
       ...(params?.category && { category_id: params.category }),
+      ...(params?.date_from && { date_from: params.date_from }),
+      ...(params?.date_to && { date_to: params.date_to }),
     },
   });
   return data;
@@ -128,7 +132,9 @@ export async function createTransaction(transaction: Record<string, unknown>): P
     merchant_name: transaction.merchant_name ?? '',
     payment_method: transaction.payment_method ?? 'cash',
     account_type: 'cash',
-    category_id: transaction.category_id ?? null,
+    // `||` y no `??`: "Sin categoría" en el select es '' y la API espera
+    // un UUID o null, no un string vacío.
+    category_id: transaction.category_id || null,
     notes: transaction.notes ?? null,
   });
   return data;
@@ -146,8 +152,11 @@ export async function updateTransaction(id: string, transaction: Record<string, 
     product_name: transaction.product_name,
     merchant_name: transaction.merchant_name,
     payment_method: transaction.payment_method,
-    category_id: transaction.category_id ?? null,
-    notes: transaction.notes ?? null,
+    // null explícito = quitar la categoría (la API ahora lo respeta).
+    category_id: transaction.category_id || null,
+    // Solo si el llamador lo manda: el formulario web no tiene campo de
+    // notas, y mandar null en cada edición borraría las cargadas desde mobile.
+    ...('notes' in transaction && { notes: transaction.notes ?? null }),
   });
   return data;
 }

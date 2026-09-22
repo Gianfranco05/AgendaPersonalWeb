@@ -6,11 +6,12 @@ export interface Transaction {
   transaction_date: string;
   product_name: string;
   merchant_name: string;
+  // Valor del enum PaymentMethod del backend (cash, debit_card, credit_card,
+  // transfer, check, other), no la etiqueta en español.
   payment_method: string;
+  // La API devuelve solo el id; el nombre/color se resuelven contra
+  // useCategories() donde hacen falta.
   category_id?: string;
-  // Enriquecidos solo por mocks/joins; la API base no los devuelve
-  category_name?: string;
-  category_color?: string;
   notes?: string;
 }
 
