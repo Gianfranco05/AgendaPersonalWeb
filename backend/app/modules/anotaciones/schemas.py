@@ -22,6 +22,9 @@ class NoteUpdate(BaseModel):
     color: Optional[str] = None
     is_pinned: Optional[bool] = None
     is_archived: Optional[bool] = None
+    # None = no tocar los tags; [] = sacarlos todos. Reemplaza la lista
+    # completa (no suma): el cliente manda el estado final que quiere.
+    tag_names: Optional[list[str]] = None
 
 
 class NoteResponse(NoteBase):

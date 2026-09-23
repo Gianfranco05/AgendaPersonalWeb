@@ -76,6 +76,18 @@ class AnotacionesService:
         )
         return await self.tag_repo.create(tag)
 
+    async def set_note_tags(self, note: Note, user_id: UUID, tag_names: list[str]) -> None:
+        """Reemplaza los tags de la nota por exactamente `tag_names`.
+
+        `note` tiene que venir con `tags` ya cargado (selectinload): reasignar
+        una coleccion sin cargar dispara un lazy-load sincrono que en sesion
+        async explota con MissingGreenlet.
+        """
+        # dict.fromkeys: saca vacios y duplicados conservando el orden.
+        names = dict.fromkeys(n.strip() for n in tag_names if n.strip())
+        note.tags = [await self.create_tag(user_id, name) for name in names]
+        await self.db.commit()
+
     async def add_tag_to_note(self, note: Note, tag: Tag) -> None:
         if tag not in note.tags:
             note.tags.append(tag)

@@ -89,8 +89,21 @@ async def update_note(
     if not note:
         raise HTTPException(status_code=404, detail="Nota no encontrada")
 
-    updated = await service.update_note(note, data)
-    return updated
+    await service.update_note(note, data)
+
+    if data.tag_names is not None:
+        # update_note hace refresh: se vuelve a traer con los tags cargados
+        # antes de reasignar la coleccion.
+        note = await service.get_note(note_id, current_user.id)
+        await service.set_note_tags(note, current_user.id, data.tag_names)
+
+    result = await db.execute(
+        select(Note)
+        .where(and_(Note.id == note_id, Note.user_id == current_user.id))
+        .options(selectinload(Note.tags))
+        .execution_options(populate_existing=True)
+    )
+    return result.scalar_one()
 
 
 @router.delete("/{note_id}", status_code=status.HTTP_204_NO_CONTENT)

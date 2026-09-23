@@ -176,3 +176,48 @@ async def test_api_export_notes_json(api_auth_client):
 async def test_api_export_notes_json_requires_auth(client):
     response = await client.get("/api/v1/notes/export/json")
     assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_api_update_note_replaces_tags(api_auth_client):
+    # Antes NoteUpdate no tenia campo de tags: una vez creada la nota, sus
+    # tags no se podian cambiar nunca, ni desde web ni desde mobile.
+    create_resp = await api_auth_client.post("/api/v1/notes", json={
+        "title": "Con tags", "content": "x", "tag_names": ["viejo", "comun"],
+    })
+    note_id = create_resp.json()["id"]
+
+    response = await api_auth_client.put(f"/api/v1/notes/{note_id}", json={
+        "tag_names": ["comun", "nuevo", "nuevo", "  "],
+    })
+    assert response.status_code == 200
+    assert sorted(t["name"] for t in response.json()["tags"]) == ["comun", "nuevo"]
+
+    listed = await api_auth_client.get("/api/v1/notes")
+    note = next(n for n in listed.json() if n["id"] == note_id)
+    assert sorted(t["name"] for t in note["tags"]) == ["comun", "nuevo"]
+
+
+@pytest.mark.asyncio
+async def test_api_update_note_empty_list_clears_tags(api_auth_client):
+    create_resp = await api_auth_client.post("/api/v1/notes", json={
+        "title": "Con tags", "content": "x", "tag_names": ["a"],
+    })
+    note_id = create_resp.json()["id"]
+
+    response = await api_auth_client.put(f"/api/v1/notes/{note_id}", json={"tag_names": []})
+    assert response.status_code == 200
+    assert response.json()["tags"] == []
+
+
+@pytest.mark.asyncio
+async def test_api_update_note_without_tag_names_keeps_tags(api_auth_client):
+    create_resp = await api_auth_client.post("/api/v1/notes", json={
+        "title": "Con tags", "content": "x", "tag_names": ["queda"],
+    })
+    note_id = create_resp.json()["id"]
+
+    response = await api_auth_client.put(f"/api/v1/notes/{note_id}", json={"title": "Otro titulo"})
+    assert response.status_code == 200
+    assert response.json()["title"] == "Otro titulo"
+    assert [t["name"] for t in response.json()["tags"]] == ["queda"]
