@@ -39,7 +39,7 @@ class Settings(BaseSettings):
     LEGACY_HTML_SESSION_EXPIRE_MINUTES: int = 1440  # 24 horas
 
     DEBUG: bool = True
-    APP_NAME: str = "Vida Personal"
+    APP_NAME: str = "Can_cen"
     APP_VERSION: str = "1.0.0"
 
     # Version de Terminos y Condiciones / Politica de Privacidad vigente (ver
@@ -89,7 +89,7 @@ class Settings(BaseSettings):
     # enviarse — asi dev y tests funcionan sin red ni cuenta.
     RESEND_API_KEY: str = ""
     MAIL_FROM: str = "no-reply@localhost"
-    MAIL_FROM_NAME: str = "Vida Personal"
+    MAIL_FROM_NAME: str = "Can_cen"
     # Base publica para armar los links de los mails (verificacion, reset).
     PUBLIC_BASE_URL: str = "http://localhost:5173"
 

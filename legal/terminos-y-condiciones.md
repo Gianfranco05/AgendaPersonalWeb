@@ -1,4 +1,4 @@
-# Términos y Condiciones de Uso — Vida Personal / FocusOS
+# Términos y Condiciones de Uso — Can_cen
 
 **Última actualización:** [FECHA]
 **Versión:** 1.0
@@ -7,7 +7,7 @@
 
 ## 1. Quiénes somos y qué es esto
 
-"Vida Personal" (también identificada como "FocusOS" en algunas pantallas) es una aplicación de gestión personal — hábitos, finanzas, notas, calendario, y módulos adicionales opcionales — operada por **[TU NOMBRE COMPLETO]** ("nosotros", "el operador"), con domicilio en Argentina, contacto en **[TU EMAIL DE CONTACTO]**.
+"Can_cen" es una aplicación de gestión personal — hábitos, finanzas, notas, calendario, y módulos adicionales opcionales — operada por **[TU NOMBRE COMPLETO]** ("nosotros", "el operador"), con domicilio en Argentina, contacto en **[TU EMAIL DE CONTACTO]**.
 
 Estos Términos regulan el uso de la aplicación web y móvil (en conjunto, "la Aplicación" o "el Servicio"). Al crear una cuenta o usar la Aplicación, aceptás estos Términos y nuestra [Política de Privacidad](politica-privacidad.md). Si no estás de acuerdo, no uses el Servicio.
 

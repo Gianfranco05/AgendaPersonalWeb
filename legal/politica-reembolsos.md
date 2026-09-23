@@ -1,4 +1,4 @@
-# Política de Compras y Reembolsos — Vida Personal / FocusOS
+# Política de Compras y Reembolsos — Can_cen
 
 **Última actualización:** [FECHA]
 **Versión:** 1.0

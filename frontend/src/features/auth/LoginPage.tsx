@@ -55,9 +55,9 @@ export default function LoginPage() {
       {/* Panel de marca — oculto en mobile, split-screen desde lg */}
       <div className="hidden w-1/2 flex-col items-center justify-center bg-brand-charcoal px-12 text-center lg:flex">
         <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-white/10">
-          <span className="text-2xl font-bold text-white">VP</span>
+          <span className="text-2xl font-bold text-white">C</span>
         </div>
-        <h1 className="text-3xl font-bold text-white">Vida Personal</h1>
+        <h1 className="text-3xl font-bold text-white">Can_cen</h1>
         <p className="mt-3 max-w-xs text-sm text-white/70">
           Organizá tus finanzas, notas, eventos y metas en un solo lugar.
         </p>
@@ -68,9 +68,9 @@ export default function LoginPage() {
         <div className="animate-scale-in w-full max-w-md">
           <div className="mb-8 text-center lg:hidden">
             <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-charcoal">
-              <span className="text-2xl font-bold text-white">VP</span>
+              <span className="text-2xl font-bold text-white">C</span>
             </div>
-            <h1 className="text-2xl font-bold text-gray-800 dark:text-slate-100">Vida Personal</h1>
+            <h1 className="text-2xl font-bold text-gray-800 dark:text-slate-100">Can_cen</h1>
           </div>
 
           <div className="mb-8 hidden text-left lg:block">

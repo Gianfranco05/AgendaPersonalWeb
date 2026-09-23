@@ -57,7 +57,7 @@ export default function Layout() {
         `}
       >
         <div className="flex h-16 items-center justify-between px-6">
-          <h1 className="text-xl font-bold tracking-tight">Vida Personal</h1>
+          <h1 className="text-xl font-bold tracking-tight">Can_cen</h1>
           <button
             onClick={() => setMobileOpen(false)}
             className="rounded-lg p-1 hover:bg-white/20 lg:hidden"
@@ -129,7 +129,7 @@ export default function Layout() {
           >
             <Menu size={20} />
           </button>
-          <h1 className="text-lg font-bold text-brand-charcoal dark:text-slate-100">Vida Personal</h1>
+          <h1 className="text-lg font-bold text-brand-charcoal dark:text-slate-100">Can_cen</h1>
         </header>
 
         <main className="flex-1 overflow-y-auto p-4 lg:p-6">

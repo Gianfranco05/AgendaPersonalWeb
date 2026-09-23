@@ -91,7 +91,7 @@ async def export_events_ics(
     lines = [
         "BEGIN:VCALENDAR",
         "VERSION:2.0",
-        "PRODID:-//Vida Personal//ES",
+        "PRODID:-//Can_cen//ES",
         "CALSCALE:GREGORIAN",
         "METHOD:PUBLISH",
     ]
@@ -101,7 +101,7 @@ async def export_events_ics(
         end_str = event.end_datetime.strftime("%Y%m%dT%H%M%SZ") if event.end_datetime else start_str
 
         lines.append("BEGIN:VEVENT")
-        lines.append(f"UID:{event.id}@vidapersonal")
+        lines.append(f"UID:{event.id}@cancen")
         lines.append(f"SUMMARY:{_escape_ics(event.title)}")
         lines.append(f"DTSTART:{start_str}")
         lines.append(f"DTEND:{end_str}")

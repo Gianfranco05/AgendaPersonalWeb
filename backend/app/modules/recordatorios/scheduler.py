@@ -62,7 +62,7 @@ async def _tick() -> None:
             try:
                 await push.send_to_user(
                     reminder.user_id,
-                    f"{reminder.icon} Vida Personal",
+                    f"{reminder.icon} Can_cen",
                     reminder.message,
                     data={"type": "reminder", "reminder_id": reminder.id},
                 )

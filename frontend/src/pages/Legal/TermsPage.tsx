@@ -16,7 +16,7 @@ export default function TermsPage() {
       <section>
         <h2>1. Qué es este servicio</h2>
         <p>
-          Vida Personal es una aplicación para organizar información personal:
+          Can_cen es una aplicación para organizar información personal:
           finanzas, tareas, notas, eventos, metas, entrenamientos y comidas. La
           presta [NOMBRE O RAZÓN SOCIAL]. Al crear una cuenta aceptás estos
           términos.

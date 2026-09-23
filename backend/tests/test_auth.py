@@ -108,7 +108,7 @@ async def test_protected_route_without_auth(client):
 async def test_dashboard_with_auth(auth_client):
     response = await auth_client.get("/finanzas/")
     assert response.status_code == 200
-    assert "Dashboard" in response.text or "Vida Personal" in response.text
+    assert "Dashboard" in response.text or "Can_cen" in response.text
 
 
 @pytest.mark.asyncio

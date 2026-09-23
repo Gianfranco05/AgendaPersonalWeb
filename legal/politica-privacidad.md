@@ -1,4 +1,4 @@
-# Política de Privacidad — Vida Personal / FocusOS
+# Política de Privacidad — Can_cen
 
 **Última actualización:** [FECHA]
 **Versión:** 1.0

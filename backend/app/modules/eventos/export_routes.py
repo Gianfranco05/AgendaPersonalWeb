@@ -34,7 +34,7 @@ async def exportar_eventos_ics(request: Request, db: AsyncSession = Depends(get_
     lines = [
         "BEGIN:VCALENDAR",
         "VERSION:2.0",
-        "PRODID:-//Vida Personal//ES",
+        "PRODID:-//Can_cen//ES",
         "CALSCALE:GREGORIAN",
         "METHOD:PUBLISH",
     ]
@@ -47,7 +47,7 @@ async def exportar_eventos_ics(request: Request, db: AsyncSession = Depends(get_
             end_str = start_str
 
         lines.append("BEGIN:VEVENT")
-        lines.append(f"UID:{event.id}@vidapersonal")
+        lines.append(f"UID:{event.id}@cancen")
         lines.append(f"SUMMARY:{_escape_ics(event.title)}")
         lines.append(f"DTSTART:{start_str}")
         lines.append(f"DTEND:{end_str}")

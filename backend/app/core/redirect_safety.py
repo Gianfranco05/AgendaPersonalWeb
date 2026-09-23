@@ -15,7 +15,7 @@ from app.config import settings
 # propio en un build real) y localhost para probar la web en desarrollo.
 _STATIC_ALLOWED_SCHEMES = (
     "exp://",
-    "vidapersonal://",
+    "cancen://",
     "http://localhost",
     "http://127.0.0.1",
     # La web de desarrollo (Vite, puerto 5173) ya queda cubierta por el

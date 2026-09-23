@@ -41,7 +41,7 @@ export default function AcceptTermsPage() {
           Actualizamos nuestros Términos
         </h1>
         <p className="mt-2 text-sm text-gray-500 dark:text-slate-400">
-          Antes de seguir usando Vida Personal, necesitamos que confirmes que leíste y
+          Antes de seguir usando Can_cen, necesitamos que confirmes que leíste y
           aceptás los Términos y Condiciones y la Política de Privacidad vigentes.
         </p>
 
