@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import Optional, Sequence
 
@@ -105,7 +105,9 @@ class TransactionRepository:
 
     async def delete(self, transaction: Transaction) -> None:
         transaction.is_deleted = True
-        transaction.deleted_at = datetime.utcnow()
+        # Aware y en UTC: la columna es timestamptz y asyncpg interpreta un
+        # datetime naive como hora LOCAL del servidor, no como UTC.
+        transaction.deleted_at = datetime.now(timezone.utc)
         await self.db.commit()
 
     async def get_balance(self, user_id: str) -> dict:
