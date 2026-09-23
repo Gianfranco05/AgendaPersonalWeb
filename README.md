@@ -1,4 +1,4 @@
-# Vida Personal (LifeOS)
+# Can_cen
 
 Aplicación de gestión personal — finanzas, anotaciones, eventos, metas y más.
 
