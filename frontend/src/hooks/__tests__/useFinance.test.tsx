@@ -29,12 +29,12 @@ const mockSummary = {
 }
 
 const mockTxResponse = {
-  transactions: [
-    { id: '1', amount: 100, type: 'expense', product_name: 'Test', transaction_date: '2025-06-01', currency: 'ARS', merchant_name: 'Store', payment_method: 'Cash' },
+  items: [
+    { id: '1', amount: 100, type: 'expense' as const, product_name: 'Test', transaction_date: '2025-06-01', currency: 'ARS', merchant_name: 'Store', payment_method: 'Cash' },
   ],
   total: 1,
   page: 1,
-  per_page: 20,
+  page_size: 20,
 }
 
 function createWrapper(fallback: Record<string, unknown> = {}) {

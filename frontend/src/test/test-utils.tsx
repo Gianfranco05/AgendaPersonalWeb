@@ -1,4 +1,5 @@
 import { type ReactElement } from 'react'
+import { vi } from 'vitest'
 import { render, type RenderOptions } from '@testing-library/react'
 import { MemoryRouter, type MemoryRouterProps } from 'react-router-dom'
 import { SWRConfig } from 'swr'

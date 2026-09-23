@@ -12,15 +12,14 @@ import { fetchFinanceSummary, fetchTransactions } from '../../../api/endpoints'
 
 const mockSummary = {
   total_income: 1250000,
-  total_expense: 870000,
+  total_expenses: 870000,
   balance: 380000,
-  currency: 'ARS',
 }
 
 const mockTransactions = {
   items: [
-    { id: '1', amount: 50000, type: 'income', product_name: 'Freelance', transaction_date: '2025-06-28', currency: 'ARS', merchant_name: 'Cliente', payment_method: 'Transferencia' },
-    { id: '2', amount: 15000, type: 'expense', product_name: 'Supermercado', transaction_date: '2025-06-27', currency: 'ARS', merchant_name: 'Coto', payment_method: 'Tarjeta' },
+    { id: '1', amount: 50000, type: 'income' as const, product_name: 'Freelance', transaction_date: '2025-06-28', currency: 'ARS', merchant_name: 'Cliente', payment_method: 'Transferencia' },
+    { id: '2', amount: 15000, type: 'expense' as const, product_name: 'Supermercado', transaction_date: '2025-06-27', currency: 'ARS', merchant_name: 'Coto', payment_method: 'Tarjeta' },
   ],
   total: 2,
   page: 1,
