@@ -98,10 +98,16 @@ export default function NotesPage() {
     }
   }
 
-  function handlePin(id: string) {
-    setNotes((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, is_pinned: !n.is_pinned } : n))
-    );
+  async function handlePin(id: string) {
+    const target = notes.find((n) => n.id === id);
+    if (!target) return;
+    const isPinned = !target.is_pinned;
+    setNotes((prev) => prev.map((n) => (n.id === id ? { ...n, is_pinned: isPinned } : n)));
+    // Antes solo cambiaba el estado local: fijar desde la lista una nota que
+    // no estaba abierta en el editor se perdía al recargar.
+    if (!id.startsWith('temp-')) {
+      await updateNote(id, { is_pinned: isPinned });
+    }
   }
 
   function handleColorChange(id: string, color: string) {

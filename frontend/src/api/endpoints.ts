@@ -222,7 +222,15 @@ export async function createNote(note: Omit<Note, 'id' | 'created_at' | 'updated
       updated_at: new Date().toISOString(),
     });
   }
-  const { data } = await apiClient.post<Note>('/api/v1/notes', note);
+  // La API recibe los tags como `tag_names: string[]`, no como objetos Tag:
+  // mandar `tags` los descartaba en silencio.
+  const { data } = await apiClient.post<Note>('/api/v1/notes', {
+    title: note.title,
+    content: note.content,
+    color: note.color,
+    is_pinned: note.is_pinned,
+    tag_names: note.tags.map((t) => t.name),
+  });
   return data;
 }
 
@@ -230,7 +238,17 @@ export async function updateNote(id: string, note: Partial<Note>): Promise<Note>
   if (MOCK_ENABLED) {
     return mockDelay({ ...note, id } as Note);
   }
-  const { data } = await apiClient.put<Note>(`/api/v1/notes/${id}`, note);
+  const { tags, ...rest } = note;
+  const { data } = await apiClient.put<Note>(`/api/v1/notes/${id}`, {
+    title: rest.title,
+    content: rest.content,
+    color: rest.color,
+    is_pinned: rest.is_pinned,
+    is_archived: rest.is_archived,
+    // Sin `tags` en la llamada, no se tocan (la API reemplaza la lista entera
+    // cuando llega tag_names).
+    ...(tags && { tag_names: tags.map((t) => t.name) }),
+  });
   return data;
 }
 
