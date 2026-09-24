@@ -12,7 +12,8 @@ class ModulePurchase(Base):
     """Compra unica de una plantilla: no vence y no se renueva.
 
     Es la fuente de verdad de "esta plantilla es mia". Se crea solo desde el
-    webhook de Stripe (checkout.session.completed), nunca desde el cliente.
+    webhook del proveedor de pago (Stripe o Mercado Pago), nunca desde el
+    cliente.
     Se guarda el importe pagado porque el precio de la plantilla puede cambiar
     despues, y el comprobante tiene que reflejar lo que la persona pago.
     """
@@ -28,6 +29,10 @@ class ModulePurchase(Base):
     #: En la unidad minima de la moneda (centavos), como lo devuelve Stripe.
     amount_paid: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     currency: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
+    #: Referencia de la compra en el proveedor de pago: id de la Checkout
+    #: Session (Stripe) o id del pago (Mercado Pago). Conserva el nombre de
+    #: cuando solo existia Stripe: renombrarla costaria una migracion sin
+    #: cambiar nada de lo que guarda.
     stripe_session_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(

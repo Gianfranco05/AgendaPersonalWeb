@@ -20,6 +20,8 @@ WEBHOOK_SECRET = "whsec_test_secret"
 
 @pytest_asyncio.fixture
 async def billing_enabled(monkeypatch):
+    # Estos tests cubren el camino de Stripe; el default es Mercado Pago.
+    monkeypatch.setattr(settings, "BILLING_PROVIDER", "stripe")
     monkeypatch.setattr(settings, "STRIPE_SECRET_KEY", "sk_test_fake")
     monkeypatch.setattr(settings, "STRIPE_PRICE_ID_MODULE_STUDY", "price_study")
     monkeypatch.setattr(settings, "STRIPE_WEBHOOK_SECRET", WEBHOOK_SECRET)

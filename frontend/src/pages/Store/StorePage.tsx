@@ -31,7 +31,13 @@ const ICONS: Record<string, typeof Package> = {
 function formatPrice(item: StoreItem): string {
   if (item.amount === null) return '';
   const amount = item.amount / 100;
-  return amount % 1 === 0 ? `$${amount}` : `$${amount.toFixed(2)}`;
+  // Separador de miles es-AR: en pesos los montos tienen 4-5 cifras y
+  // "$15000" se lee peor que "$15.000".
+  const formatted = amount.toLocaleString('es-AR', {
+    minimumFractionDigits: amount % 1 === 0 ? 0 : 2,
+    maximumFractionDigits: 2,
+  });
+  return `$${formatted}`;
 }
 
 function StoreTile({
@@ -102,7 +108,7 @@ export default function StorePage() {
     try {
       await startCheckout(item.key);
       // No hace falta limpiar busyKey en éxito: la página navega afuera
-      // (Stripe Checkout) antes de que el usuario vea el botón de nuevo.
+      // (checkout del proveedor de pago) antes de que el usuario vea el botón de nuevo.
     } catch (err: unknown) {
       const msg =
         err && typeof err === 'object' && 'response' in err
@@ -151,6 +157,17 @@ export default function StorePage() {
           <div className="flex items-center gap-2 text-sm">
             <CircleAlert size={18} />
             El pago se canceló. No se te cobró nada.
+          </div>
+          <button onClick={dismissBanner} aria-label="Cerrar aviso">
+            <X size={16} />
+          </button>
+        </div>
+      )}
+      {checkoutStatus === 'pending' && (
+        <div className="flex items-center justify-between gap-3 rounded-xl bg-sky-50 dark:bg-sky-900/30 p-4 text-sky-800 dark:text-sky-300">
+          <div className="flex items-center gap-2 text-sm">
+            <CircleAlert size={18} />
+            Tu pago está pendiente de acreditación. La plantilla aparece en tu cuenta apenas se confirme.
           </div>
           <button onClick={dismissBanner} aria-label="Cerrar aviso">
             <X size={16} />

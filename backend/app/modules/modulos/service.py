@@ -19,6 +19,21 @@ def price_id_for(module: ModuleDef) -> Optional[str]:
     return getattr(settings, module.price_setting, "") or None
 
 
+def mp_price_for(module: ModuleDef) -> Optional[int]:
+    """Precio (centavos) de Mercado Pago de una plantilla, o None si no se vende."""
+    if module.is_base or not module.mp_price_setting:
+        return None
+    price = getattr(settings, module.mp_price_setting, None)
+    return price if price and price > 0 else None
+
+
+def is_for_sale(module: ModuleDef) -> bool:
+    """Si la plantilla se puede comprar con el proveedor de pago activo."""
+    if settings.BILLING_PROVIDER == "stripe":
+        return price_id_for(module) is not None
+    return mp_price_for(module) is not None
+
+
 class ModulesService:
     def __init__(self, db: AsyncSession):
         self.db = db
@@ -50,7 +65,7 @@ class ModulesService:
                     # Las base estan siempre activas. Una plantilla comprada
                     # arranca activa: pagar y no verla no tendria sentido.
                     "enabled": True if m.is_base else (is_owned and overrides.get(m.key, True)),
-                    "for_sale": price_id_for(m) is not None,
+                    "for_sale": is_for_sale(m),
                 }
             )
         return modules
@@ -88,7 +103,7 @@ class ModulesService:
             "is_base": module.is_base,
             "owned": True,
             "enabled": enabled,
-            "for_sale": price_id_for(module) is not None,
+            "for_sale": is_for_sale(module),
         }
 
     async def grant(
@@ -99,10 +114,14 @@ class ModulesService:
         currency: Optional[str] = None,
         stripe_session_id: Optional[str] = None,
     ) -> bool:
-        """Registra la compra de una plantilla. Solo lo llama el webhook.
+        """Registra la compra de una plantilla. Solo lo llama un webhook.
 
-        Idempotente: Stripe reintenta los webhooks, y una segunda entrega del
-        mismo evento no tiene que duplicar la compra ni fallar.
+        Idempotente: Stripe y Mercado Pago reintentan los webhooks, y una
+        segunda entrega del mismo evento no tiene que duplicar la compra ni
+        fallar.
+
+        stripe_session_id es la referencia de la compra en el proveedor: el id
+        de la Checkout Session en Stripe o el id del pago en Mercado Pago.
         """
         if module_key not in MODULE_BY_KEY:
             logger.warning("Compra de una plantilla desconocida: %s", module_key)

@@ -1,7 +1,7 @@
 """Catalogo de plantillas de la app.
 
 Es codigo, no datos: que plantillas existen, cuales vienen incluidas y cual es
-el Price ID de las que se compran lo decide el backend, no el usuario.
+el precio de las que se compran lo decide el backend, no el usuario.
 
 Modelo de negocio: no hay suscripcion. Las plantillas base vienen incluidas y
 siempre activas; las demas se compran una vez (pago unico) y quedan en la
@@ -26,6 +26,9 @@ class ModuleDef:
     #: vacio, la plantilla existe en el catalogo pero todavia no se puede
     #: comprar (se muestra como "proximamente" en vez de romper el checkout).
     price_setting: Optional[str] = None
+    #: Lo mismo para Mercado Pago: nombre del setting con el precio en
+    #: centavos (MP no tiene Price IDs, el monto viaja en cada preferencia).
+    mp_price_setting: Optional[str] = None
 
 
 MODULE_REGISTRY: list[ModuleDef] = [
@@ -44,6 +47,7 @@ MODULE_REGISTRY: list[ModuleDef] = [
         "school",
         False,
         "STRIPE_PRICE_ID_MODULE_STUDY",
+        "MP_PRICE_MODULE_STUDY",
     ),
     ModuleDef(
         "library",
@@ -52,6 +56,7 @@ MODULE_REGISTRY: list[ModuleDef] = [
         "menu_book",
         False,
         "STRIPE_PRICE_ID_MODULE_LIBRARY",
+        "MP_PRICE_MODULE_LIBRARY",
     ),
     ModuleDef(
         "media",
@@ -60,6 +65,7 @@ MODULE_REGISTRY: list[ModuleDef] = [
         "movie",
         False,
         "STRIPE_PRICE_ID_MODULE_MEDIA",
+        "MP_PRICE_MODULE_MEDIA",
     ),
     ModuleDef(
         "work",
@@ -68,6 +74,7 @@ MODULE_REGISTRY: list[ModuleDef] = [
         "work",
         False,
         "STRIPE_PRICE_ID_MODULE_WORK",
+        "MP_PRICE_MODULE_WORK",
     ),
     ModuleDef(
         "travel",
@@ -76,6 +83,7 @@ MODULE_REGISTRY: list[ModuleDef] = [
         "flight",
         False,
         "STRIPE_PRICE_ID_MODULE_TRAVEL",
+        "MP_PRICE_MODULE_TRAVEL",
     ),
     ModuleDef(
         "vehicle",
@@ -84,6 +92,7 @@ MODULE_REGISTRY: list[ModuleDef] = [
         "directions_car",
         False,
         "STRIPE_PRICE_ID_MODULE_VEHICLE",
+        "MP_PRICE_MODULE_VEHICLE",
     ),
     ModuleDef(
         "projects",
@@ -92,6 +101,7 @@ MODULE_REGISTRY: list[ModuleDef] = [
         "view_kanban",
         False,
         "STRIPE_PRICE_ID_MODULE_PROJECTS",
+        "MP_PRICE_MODULE_PROJECTS",
     ),
 ]
 

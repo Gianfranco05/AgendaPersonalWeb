@@ -81,7 +81,16 @@ async def test_for_sale_reflects_whether_the_price_is_configured(
     modules = {m["key"]: m for m in (await api_auth_client.get("/api/v1/modules")).json()}
     assert modules["study"]["for_sale"] is False
 
+    monkeypatch.setattr(settings, "BILLING_PROVIDER", "stripe")
     monkeypatch.setattr(settings, "STRIPE_PRICE_ID_MODULE_STUDY", "price_123")
+    modules = {m["key"]: m for m in (await api_auth_client.get("/api/v1/modules")).json()}
+    assert modules["study"]["for_sale"] is True
+
+    # Con Mercado Pago lo que cuenta es su precio, no el Price ID de Stripe.
+    monkeypatch.setattr(settings, "BILLING_PROVIDER", "mercadopago")
+    modules = {m["key"]: m for m in (await api_auth_client.get("/api/v1/modules")).json()}
+    assert modules["study"]["for_sale"] is False
+    monkeypatch.setattr(settings, "MP_PRICE_MODULE_STUDY", 299900)
     modules = {m["key"]: m for m in (await api_auth_client.get("/api/v1/modules")).json()}
     assert modules["study"]["for_sale"] is True
     # Las incluidas nunca estan a la venta.

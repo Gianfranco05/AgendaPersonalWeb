@@ -34,6 +34,7 @@ async def test_media_endpoints_are_blocked_without_the_purchase(
     from app.modules.modulos.models import ModulePurchase
     from sqlalchemy import delete
 
+    monkeypatch.setattr(settings, "BILLING_PROVIDER", "stripe")
     monkeypatch.setattr(settings, "STRIPE_SECRET_KEY", "sk_test_fake")
     await db_session.execute(
         delete(ModulePurchase).where(

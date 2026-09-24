@@ -1,4 +1,6 @@
-from pydantic import model_validator
+from typing import Optional
+
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _INSECURE_SECRETS = {
@@ -96,6 +98,11 @@ class Settings(BaseSettings):
     EMAIL_VERIFY_TOKEN_EXPIRE_HOURS: int = 24
     PASSWORD_RESET_TOKEN_EXPIRE_HOURS: int = 1
 
+    # Con que se cobra: "mercadopago" (Checkout Pro) o "stripe". Stripe no
+    # acepta cuentas de Argentina, por eso el default es Mercado Pago; el codigo
+    # de Stripe queda para una instancia que si pueda usarlo.
+    BILLING_PROVIDER: str = "mercadopago"
+
     # Billing (Stripe). Vacio = billing deshabilitado: todos quedan en plan free
     # y los endpoints de checkout/portal devuelven 503 en vez de romper.
     STRIPE_SECRET_KEY: str = ""
@@ -113,18 +120,68 @@ class Settings(BaseSettings):
     STRIPE_PRICE_ID_MODULE_VEHICLE: str = ""
     STRIPE_PRICE_ID_MODULE_PROJECTS: str = ""
 
+    # Billing (Mercado Pago, Checkout Pro). Sin access token = billing
+    # deshabilitado, igual que STRIPE_SECRET_KEY con el otro proveedor.
+    MERCADOPAGO_ACCESS_TOKEN: str = ""
+    # Clave secreta de los webhooks (Tus integraciones > Webhooks): sin ella el
+    # webhook devuelve 503 y las compras nunca se acreditan.
+    MERCADOPAGO_WEBHOOK_SECRET: str = ""
+    BILLING_CURRENCY: str = "ARS"
+
+    # Precio de cada plantilla en la unidad minima de la moneda (centavos), el
+    # mismo formato que devuelve Stripe, asi la tienda no cambia. None = esa
+    # plantilla todavia no se vende ("proximamente"). Los nombres los
+    # referencia modulos/registry.py via ModuleDef.mp_price_setting.
+    MP_PRICE_MODULE_STUDY: Optional[int] = None
+    MP_PRICE_MODULE_LIBRARY: Optional[int] = None
+    MP_PRICE_MODULE_MEDIA: Optional[int] = None
+    MP_PRICE_MODULE_WORK: Optional[int] = None
+    MP_PRICE_MODULE_TRAVEL: Optional[int] = None
+    MP_PRICE_MODULE_VEHICLE: Optional[int] = None
+    MP_PRICE_MODULE_PROJECTS: Optional[int] = None
+
     # A donde vuelve el usuario despues de pagar.
     BILLING_SUCCESS_URL: str = ""
     BILLING_CANCEL_URL: str = ""
 
+    @field_validator("BILLING_PROVIDER", mode="before")
+    @classmethod
+    def _normalize_provider(cls, v: str) -> str:
+        v = (v or "mercadopago").strip().lower()
+        if v not in ("mercadopago", "stripe"):
+            raise ValueError('BILLING_PROVIDER tiene que ser "mercadopago" o "stripe".')
+        return v
+
+    @field_validator(
+        "MP_PRICE_MODULE_STUDY",
+        "MP_PRICE_MODULE_LIBRARY",
+        "MP_PRICE_MODULE_MEDIA",
+        "MP_PRICE_MODULE_WORK",
+        "MP_PRICE_MODULE_TRAVEL",
+        "MP_PRICE_MODULE_VEHICLE",
+        "MP_PRICE_MODULE_PROJECTS",
+        mode="before",
+    )
+    @classmethod
+    def _empty_price_is_none(cls, v):
+        # docker-compose pasa `${VAR:-}` como string vacio: sin esto, dejar un
+        # precio sin cargar tiraria abajo el arranque en vez de significar
+        # "todavia no se vende".
+        if isinstance(v, str) and not v.strip():
+            return None
+        return v
+
     @property
     def billing_enabled(self) -> bool:
-        """Se puede cobrar. Sin esto la tienda queda en solo lectura.
+        """Se puede cobrar con el proveedor activo. Sin esto la tienda queda en
+        solo lectura.
 
         No exige que haya precios cargados: una instancia self-hosted puede
-        tener Stripe configurado y todavia ninguna plantilla a la venta.
+        tener el proveedor configurado y todavia ninguna plantilla a la venta.
         """
-        return bool(self.STRIPE_SECRET_KEY)
+        if self.BILLING_PROVIDER == "stripe":
+            return bool(self.STRIPE_SECRET_KEY)
+        return bool(self.MERCADOPAGO_ACCESS_TOKEN)
 
     # Google OAuth (optional — leave empty to disable Google Calendar integration)
     GOOGLE_CLIENT_ID: str = ""

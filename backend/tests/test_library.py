@@ -34,6 +34,7 @@ async def test_library_endpoints_are_blocked_without_the_purchase(
     from app.modules.modulos.models import ModulePurchase
     from sqlalchemy import delete
 
+    monkeypatch.setattr(settings, "BILLING_PROVIDER", "stripe")
     monkeypatch.setattr(settings, "STRIPE_SECRET_KEY", "sk_test_fake")
     # El fixture de arriba ya compro "library" para este usuario; se revierte
     # solo eso, sin tocar el resto de la fixture.
