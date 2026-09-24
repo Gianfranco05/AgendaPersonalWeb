@@ -1,13 +1,13 @@
 # Términos y Condiciones de Uso — Can_cen
 
-**Última actualización:** [FECHA]
+**Última actualización:** 24 de septiembre de 2026
 **Versión:** 1.0
 
 > Este documento es un borrador técnico, redactado a partir del funcionamiento real de la aplicación. No reemplaza el asesoramiento de un abogado — revisalo con uno antes de publicarlo como vinculante, especialmente por el manejo de datos de salud/financieros y de pagos reales.
 
 ## 1. Quiénes somos y qué es esto
 
-"Can_cen" es una aplicación de gestión personal — hábitos, finanzas, notas, calendario, y módulos adicionales opcionales — operada por **[TU NOMBRE COMPLETO]** ("nosotros", "el operador"), con domicilio en Argentina, contacto en **[TU EMAIL DE CONTACTO]**.
+"Can_cen" es una aplicación de gestión personal — hábitos, finanzas, notas, calendario, y módulos adicionales opcionales — operada por **Gianfranco Canciani** ("nosotros", "el operador"), con domicilio en la Provincia de Mendoza, Argentina, contacto en **[EMAIL DE CONTACTO]**.
 
 Estos Términos regulan el uso de la aplicación web y móvil (en conjunto, "la Aplicación" o "el Servicio"). Al crear una cuenta o usar la Aplicación, aceptás estos Términos y nuestra [Política de Privacidad](politica-privacidad.md). Si no estás de acuerdo, no uses el Servicio.
 
@@ -21,7 +21,7 @@ Sos responsable de que la información que nos das al registrarte sea verdadera,
 
 - Podés crear una cuenta con email y contraseña, o iniciar sesión con tu cuenta de Google.
 - Sos responsable de mantener la confidencialidad de tu contraseña y de toda actividad que ocurra en tu cuenta.
-- Avisanos de inmediato a **[TU EMAIL DE CONTACTO]** si sospechás un uso no autorizado de tu cuenta.
+- Avisanos de inmediato a **[EMAIL DE CONTACTO]** si sospechás un uso no autorizado de tu cuenta.
 - Podés cerrar tu cuenta y borrar todos tus datos en cualquier momento desde Ajustes → Mis datos → Eliminar cuenta. El borrado es permanente e inmediato — no hay período de gracia para arrepentirse.
 
 ## 4. Qué incluye el Servicio
@@ -33,11 +33,11 @@ Hábitos, Tareas, Notas, Finanzas Personales, Rutinas y Dietas, Calendario y Eve
 Estudio, Biblioteca, Películas y Series, Trabajo, Viajes, Vehículo, y Gestión de Proyectos se compran por separado, **cada uno con un pago único** — no hay suscripción ni cobro recurrente de ningún tipo. Una vez comprado, el módulo queda asociado a tu cuenta de forma indefinida, y podés activarlo o desactivarlo cuando quieras sin perder el acceso ni los datos que cargaste en él.
 
 ### 4.3 Precios y moneda
-Los precios se muestran en la moneda y el monto que fija Stripe (nuestro procesador de pagos) al momento de la compra. Podemos cambiar los precios de módulos que todavía no compraste; una compra ya realizada no se ve afectada por cambios de precio posteriores.
+Los precios se muestran en la moneda y el monto que fija Mercado Pago (nuestro procesador de pagos) al momento de la compra. Podemos cambiar los precios de módulos que todavía no compraste; una compra ya realizada no se ve afectada por cambios de precio posteriores.
 
 ## 5. Pagos
 
-Los pagos se procesan a través de **Stripe, Inc.**, un procesador de pagos externo. No almacenamos ni tenemos acceso al número de tu tarjeta — esa información va directo a Stripe. Ver la [Política de Compras y Reembolsos](politica-reembolsos.md) para plazos de reembolso y cómo pedirlo.
+Los pagos se procesan a través de **Mercado Pago**, un procesador de pagos externo. No almacenamos ni tenemos acceso al número de tu tarjeta — esa información va directo a Mercado Pago. Ver la [Política de Compras y Reembolsos](politica-reembolsos.md) para plazos de reembolso y cómo pedirlo.
 
 ## 6. Sincronización y funcionamiento sin conexión
 
@@ -67,7 +67,7 @@ Este es un proyecto en desarrollo activo — funcionalidades pueden agregarse, c
 
 ## 10. Propiedad intelectual
 
-El código, diseño, marca y contenido de la Aplicación (fuera de los datos que vos cargás) son propiedad de **[TU NOMBRE COMPLETO]**. Estos Términos no te otorgan ningún derecho sobre ellos más allá del uso de la Aplicación conforme a lo aquí descripto.
+El código, diseño, marca y contenido de la Aplicación (fuera de los datos que vos cargás) son propiedad de **Gianfranco Canciani**. Estos Términos no te otorgan ningún derecho sobre ellos más allá del uso de la Aplicación conforme a lo aquí descripto.
 
 ## 11. Exclusión de garantías
 
@@ -78,7 +78,7 @@ El Servicio se ofrece "tal cual" ("as is"), sin garantías de ningún tipo, expr
 
 ## 12. Limitación de responsabilidad
 
-En la máxima medida permitida por la ley aplicable, **[TU NOMBRE COMPLETO]** no será responsable por daños indirectos, incidentales o consecuentes derivados del uso o la imposibilidad de uso del Servicio, incluyendo pérdida de datos por causas fuera de nuestro control razonable (fallas de tu dispositivo, pérdida de conexión, etc.).
+En la máxima medida permitida por la ley aplicable, **Gianfranco Canciani** no será responsable por daños indirectos, incidentales o consecuentes derivados del uso o la imposibilidad de uso del Servicio, incluyendo pérdida de datos por causas fuera de nuestro control razonable (fallas de tu dispositivo, pérdida de conexión, etc.).
 
 Nada en esta sección limita responsabilidad por dolo, fraude, o cualquier otra responsabilidad que no pueda excluirse por ley.
 
@@ -88,8 +88,8 @@ Podemos actualizar estos Términos. Si el cambio es significativo, te avisaremos
 
 ## 14. Ley aplicable y jurisdicción
 
-Estos Términos se rigen por las leyes de la **República Argentina**. Cualquier disputa se someterá a los tribunales ordinarios competentes de [TU CIUDAD/PROVINCIA], Argentina, con renuncia a cualquier otro fuero.
+Estos Términos se rigen por las leyes de la **República Argentina**. Cualquier disputa se someterá a los tribunales ordinarios competentes de la Ciudad de Mendoza, Provincia de Mendoza, Argentina, con renuncia a cualquier otro fuero.
 
 ## 15. Contacto
 
-Para consultas sobre estos Términos: **[TU EMAIL DE CONTACTO]**.
+Para consultas sobre estos Términos: **[EMAIL DE CONTACTO]**.

@@ -2,10 +2,10 @@ import LegalLayout from './LegalLayout';
 
 /**
  * BORRADOR. Describe lo que la app hace hoy, pero no fue revisado por nadie con
- * matrícula. Los marcadores [ENTRE CORCHETES] hay que completarlos y el texto
- * hay que hacerlo revisar antes de abrir el registro al público — la app maneja
- * datos financieros y de salud, que en la mayoría de las jurisdicciones son
- * categorías especiales con obligaciones extra.
+ * matrícula. Faltan completar [EMAIL DE CONTACTO] y [PROVEEDOR DE HOSTING], y
+ * el texto hay que hacerlo revisar antes de abrir el registro al público — la
+ * app maneja datos financieros y de salud, que en la mayoría de las
+ * jurisdicciones son categorías especiales con obligaciones extra.
  */
 export default function PrivacyPage() {
   return (
@@ -18,9 +18,9 @@ export default function PrivacyPage() {
       <section>
         <h2>Quién es responsable de tus datos</h2>
         <p>
-          El responsable del tratamiento es [NOMBRE O RAZÓN SOCIAL], con domicilio
-          en [DOMICILIO]. Para cualquier consulta sobre esta política podés
-          escribir a [EMAIL DE CONTACTO].
+          El responsable del tratamiento es Gianfranco Canciani, con
+          domicilio en la Provincia de Mendoza, Argentina. Para cualquier
+          consulta sobre esta política podés escribir a [EMAIL DE CONTACTO].
         </p>
       </section>
 
@@ -43,10 +43,10 @@ export default function PrivacyPage() {
             cerrarla en forma remota.
           </li>
           <li>
-            <strong>Datos de suscripción:</strong> si contratás el plan Pro,
-            guardamos tu plan, su estado y los identificadores de la suscripción.
-            Los datos de tu tarjeta los procesa Stripe: no pasan por nuestros
-            servidores ni los almacenamos.
+            <strong>Datos de compras:</strong> qué módulo comprás, cuánto
+            pagás y cuándo, y un identificador de cliente de Mercado Pago. Los
+            datos de tu tarjeta los procesa Mercado Pago: no pasan por
+            nuestros servidores ni los almacenamos.
           </li>
         </ul>
       </section>
@@ -66,8 +66,8 @@ export default function PrivacyPage() {
         <h2>Con quién los compartimos</h2>
         <ul>
           <li>
-            <strong>Stripe</strong> — procesamiento de pagos, si contratás el plan
-            Pro.
+            <strong>Mercado Pago</strong> — procesamiento de pagos de los
+            módulos que comprás.
           </li>
           <li>
             <strong>Resend</strong> — envío de los emails transaccionales.
@@ -106,7 +106,8 @@ export default function PrivacyPage() {
         </ul>
         <p>
           Para rectificar datos, oponerte al tratamiento o limitarlo, escribinos a
-          [EMAIL DE CONTACTO]. También podés reclamar ante [AUTORIDAD DE CONTROL].
+          [EMAIL DE CONTACTO]. También podés reclamar ante la Agencia de Acceso
+          a la Información Pública (AAIP), órgano de control de la Ley 25.326.
         </p>
       </section>
 

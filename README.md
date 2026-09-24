@@ -263,7 +263,7 @@ cd frontend && npm run test:coverage
 
 ## License
 
-Copyright (c) 2026 Gianfranco. Este proyecto **no es open source**: se publica bajo una licencia propia de uso no comercial y sin distribución. El texto completo, que es el que vale legalmente, está en [`LICENSE`](LICENSE).
+Copyright (c) 2026 Gianfranco Canciani. Este proyecto **no es open source**: se publica bajo una licencia propia de uso no comercial y sin distribución. El texto completo, que es el que vale legalmente, está en [`LICENSE`](LICENSE).
 
 - **Permitido**: ver, descargar, ejecutar localmente, estudiar y **modificar** el código, **solo** para uso personal, educativo o de investigación y sin fines comerciales. También podés compartir el enlace a este repositorio.
 - **No permitido sin autorización expresa y por escrito del autor**: redistribuir o compartir copias (originales o modificadas) con terceros, publicar forks o versiones modificadas como proyectos propios, vender el código, sublicenciarlo, ofrecerlo como SaaS o servicio (pago o gratuito), incorporarlo en productos comerciales o usarlo con cualquier fin comercial.

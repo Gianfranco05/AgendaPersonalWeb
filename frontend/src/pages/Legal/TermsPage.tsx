@@ -1,9 +1,8 @@
 import LegalLayout from './LegalLayout';
 
 /**
- * BORRADOR. Ver la nota de PrivacyPage: los marcadores [ENTRE CORCHETES] hay que
- * completarlos y el texto hay que hacerlo revisar antes de abrir el registro al
- * público.
+ * BORRADOR. Falta completar [EMAIL DE CONTACTO] y el texto hay que hacerlo
+ * revisar antes de abrir el registro al público.
  */
 export default function TermsPage() {
   return (
@@ -18,15 +17,19 @@ export default function TermsPage() {
         <p>
           Can_cen es una aplicación para organizar información personal:
           finanzas, tareas, notas, eventos, metas, entrenamientos y comidas. La
-          presta [NOMBRE O RAZÓN SOCIAL]. Al crear una cuenta aceptás estos
-          términos.
+          presta Gianfranco Canciani, con domicilio en la Provincia de
+          Mendoza, Argentina. Al crear una cuenta aceptás estos términos.
         </p>
       </section>
 
       <section>
         <h2>2. Tu cuenta</h2>
         <ul>
-          <li>Necesitás una dirección de email válida y ser mayor de [EDAD MÍNIMA] años.</li>
+          <li>
+            Necesitás una dirección de email válida y tener al menos 16 años.
+            Si sos menor de 18, necesitás el consentimiento de tu madre, padre
+            o tutor legal.
+          </li>
           <li>
             Sos responsable de mantener tu contraseña en secreto y de la actividad
             que ocurra en tu cuenta. Si sospechás un acceso no autorizado, podés
@@ -50,17 +53,27 @@ export default function TermsPage() {
       <section>
         <h2>4. Planes y pagos</h2>
         <ul>
-          <li>Hay un plan gratuito y un plan Pro de suscripción periódica.</li>
           <li>
-            Los pagos los procesa Stripe. Los precios y el período de facturación
-            se muestran antes de confirmar la compra.
+            Los módulos incluidos (Hábitos, Tareas, Notas, Finanzas Personales,
+            Rutinas y Dietas, Calendario y Eventos) no tienen costo. Los
+            módulos opcionales se compran por separado, cada uno con un pago
+            único — no hay suscripción ni cobro recurrente de ningún tipo.
           </li>
           <li>
-            La suscripción se renueva automáticamente hasta que la canceles. Podés
-            cancelarla cuando quieras: conservás el acceso Pro hasta el final del
-            período ya pagado.
+            Los pagos los procesa Mercado Pago. Los precios se muestran antes
+            de confirmar la compra.
           </li>
-          <li>Política de reembolsos: [POLÍTICA DE REEMBOLSOS].</li>
+          <li>
+            Una vez comprado, el módulo queda asociado a tu cuenta de forma
+            indefinida: podés activarlo o desactivarlo cuando quieras sin
+            perder el acceso ni los datos que cargaste en él.
+          </li>
+          <li>
+            Reembolsos: tenés 14 días corridos desde la compra para pedir un
+            reembolso completo, sin necesidad de justificar el motivo,
+            escribiendo a [EMAIL DE CONTACTO]. Ver la Política de Compras y
+            Reembolsos para el detalle.
+          </li>
         </ul>
       </section>
 
@@ -96,8 +109,13 @@ export default function TermsPage() {
           El servicio se ofrece «tal cual», sin garantía de disponibilidad
           ininterrumpida ni de ausencia de errores. No es asesoramiento financiero
           ni médico: la información que ves es la que vos cargaste. Mantené tus
-          propias copias de lo que sea crítico. En la medida en que la ley lo
-          permita, nuestra responsabilidad se limita a [LÍMITE DE RESPONSABILIDAD].
+          propias copias de lo que sea crítico. En la máxima medida permitida
+          por la ley aplicable, no somos responsables por daños indirectos,
+          incidentales o consecuentes derivados del uso o la imposibilidad de
+          uso del servicio, incluyendo pérdida de datos por causas fuera de
+          nuestro control razonable. Nada en esta sección limita
+          responsabilidad por dolo, fraude, o cualquier otra responsabilidad
+          que no pueda excluirse por ley.
         </p>
       </section>
 
@@ -113,9 +131,10 @@ export default function TermsPage() {
       <section>
         <h2>9. Ley aplicable</h2>
         <p>
-          Estos términos se rigen por las leyes de [JURISDICCIÓN], y cualquier
-          disputa se someterá a sus tribunales competentes. Consultas: [EMAIL DE
-          CONTACTO].
+          Estos términos se rigen por las leyes de la República Argentina.
+          Cualquier disputa se someterá a los tribunales ordinarios
+          competentes de la Ciudad de Mendoza, Provincia de Mendoza, con
+          renuncia a cualquier otro fuero. Consultas: [EMAIL DE CONTACTO].
         </p>
       </section>
     </LegalLayout>
