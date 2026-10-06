@@ -128,3 +128,19 @@ async def test_reminders_of_another_user_are_not_reachable(api_auth_client, db_s
         await api_auth_client.patch(f"/api/v1/reminders/{ajeno.id}", json={"message": "Hackeado"})
     ).status_code == 404
     assert (await api_auth_client.delete(f"/api/v1/reminders/{ajeno.id}")).status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_patch_con_null_en_campo_obligatorio_se_ignora(api_auth_client):
+    created = await api_auth_client.post(
+        "/api/v1/reminders", json={"message": "Tomar agua", "hour": 9}
+    )
+    reminder_id = created.json()["id"]
+
+    response = await api_auth_client.patch(
+        f"/api/v1/reminders/{reminder_id}", json={"hour": None, "message": None, "enabled": False}
+    )
+    # Antes: null en una columna NOT NULL daba 500.
+    assert response.status_code == 200
+    body = response.json()
+    assert (body["hour"], body["message"], body["enabled"]) == (9, "Tomar agua", False)

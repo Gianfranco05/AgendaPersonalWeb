@@ -51,5 +51,12 @@ def apply_changes(entity: Any, changes: dict) -> None:
     campo opcional. Filtrar de nuevo por `if value is not None` ignoraria en
     silencio ese borrado.
     """
+    columns = getattr(entity, "__table__", None)
     for field, value in changes.items():
+        # Un null explicito sobre una columna NOT NULL (p. ej. {"hour": null})
+        # no puede borrar nada: iba directo al UPDATE y reventaba con un 500.
+        # Se ignora, como un campo omitido.
+        column = columns.c.get(field) if columns is not None else None
+        if value is None and column is not None and not column.nullable:
+            continue
         setattr(entity, field, value)
