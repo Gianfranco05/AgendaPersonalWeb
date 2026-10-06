@@ -162,6 +162,7 @@ export default function NotesPage() {
           </div>
         ) : selectedNote ? (
           <NoteEditor
+            key={selectedNote.id}
             note={selectedNote}
             onSave={handleSave}
             onDelete={handleDelete}

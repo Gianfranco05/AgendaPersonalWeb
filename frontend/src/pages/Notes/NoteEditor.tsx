@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
+import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
 import { Pin, PinOff, Trash2, Palette } from 'lucide-react';
 import { LoadingSkeleton } from '../../components/LoadingSkeleton';
 import type { Note } from '../../types';
@@ -12,32 +12,60 @@ const NOTE_COLORS = [
 
 interface NoteEditorProps {
   note: Note;
-  onSave: (note: Note) => void;
+  onSave: (note: Note) => void | Promise<void>;
   onDelete: (id: string) => void;
   onColorChange: (id: string, color: string) => void;
 }
 
+// El padre monta este editor con `key={note.id}`: el estado local arranca de la
+// nota recibida y se reinicia solo al cambiar de nota.
 export default function NoteEditor({ note, onSave, onDelete, onColorChange }: NoteEditorProps) {
   const [title, setTitle] = useState(note.title);
   const [content, setContent] = useState(note.content);
   const [showColors, setShowColors] = useState(false);
 
-  useEffect(() => {
-    setTitle(note.title);
-    setContent(note.content);
-  }, [note.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Refs para que el autosave no dependa de `note`/`onSave`: cambian en cada
+  // guardado (el padre reemplaza la nota) y, si fueran dependencias del
+  // efecto, cada guardado programaba el siguiente: un PUT por segundo para siempre.
+  const noteRef = useRef(note);
+  noteRef.current = note;
+  const onSaveRef = useRef(onSave);
+  onSaveRef.current = onSave;
+  const draftRef = useRef({ title, content });
+  draftRef.current = { title, content };
+  const savedRef = useRef({ title: note.title, content: note.content });
+  const deletedRef = useRef(false);
 
-  const save = useCallback(() => {
-    onSave({ ...note, title, content, updated_at: new Date().toISOString() });
-  }, [note, title, content, onSave]);
+  const flush = useCallback(() => {
+    const draft = draftRef.current;
+    const saved = savedRef.current;
+    if (deletedRef.current || (draft.title === saved.title && draft.content === saved.content)) return;
+    savedRef.current = { title: draft.title, content: draft.content };
+    Promise.resolve(
+      onSaveRef.current({ ...noteRef.current, ...draft, updated_at: new Date().toISOString() }),
+    ).catch(() => {
+      // Si falló, se vuelve a intentar con el próximo cambio.
+      savedRef.current = saved;
+    });
+  }, []);
 
   useEffect(() => {
-    const timer = setTimeout(save, 1000);
+    const timer = setTimeout(flush, 1000);
     return () => clearTimeout(timer);
-  }, [title, content, save]);
+  }, [title, content, flush]);
+
+  // Al cambiar de nota (o salir de la página) no se pierde lo editado en el último segundo.
+  useEffect(() => flush, [flush]);
+
+  function handleTogglePin() {
+    // Con el título/contenido en edición: guardar `note` a secas pisaba lo escrito.
+    savedRef.current = { title, content };
+    onSave({ ...note, title, content, is_pinned: !note.is_pinned });
+  }
 
   function handleDelete() {
     if (window.confirm('¿Eliminar esta nota?')) {
+      deletedRef.current = true;
       onDelete(note.id);
     }
   }
@@ -50,7 +78,7 @@ export default function NoteEditor({ note, onSave, onDelete, onColorChange }: No
         style={{ borderLeftColor: note.color, borderLeftWidth: '3px' }}
       >
         <button
-          onClick={() => onSave({ ...note, is_pinned: !note.is_pinned })}
+          onClick={handleTogglePin}
           className="rounded p-1 text-gray-400 dark:text-slate-500 transition-colors hover:bg-gray-100 dark:hover:bg-slate-700 hover:text-brand-indigo"
           title={note.is_pinned ? 'Desfijar' : 'Fijar'}
         >
