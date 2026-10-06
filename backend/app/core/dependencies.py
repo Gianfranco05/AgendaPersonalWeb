@@ -64,6 +64,17 @@ async def get_current_user(
     return user
 
 
+async def require_superuser(user=Depends(get_current_user)):
+    """Solo el operador de la instancia (users.is_superuser). Para endpoints que
+    actuan sobre infraestructura propia y no sobre los datos de un usuario."""
+    if not user.is_superuser:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Requiere permisos de administrador",
+        )
+    return user
+
+
 async def get_current_user_optional(
     request: Request,
     db: AsyncSession = Depends(get_db),

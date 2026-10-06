@@ -30,10 +30,57 @@ def mock_no_dm_config():
 
 
 @pytest_asyncio.fixture
-async def http_client():
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
-        yield ac
+async def http_client(client, db_session, test_user):
+    """Cliente logueado como superusuario: el endpoint solo lo permite al operador."""
+    test_user.is_superuser = True
+    await db_session.commit()
+    await client.post("/auth/api/login", json={"email": "test@test.com", "password": "test123"})
+    return client
+
+
+@pytest.mark.asyncio
+async def test_shutdown_requires_login(client, mock_config):
+    with patch("app.infra.service.DreamMachineService.shutdown", new_callable=AsyncMock) as shutdown:
+        response = await client.post("/api/v1/infra/shutdown")
+    assert response.status_code == 401
+    shutdown.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_shutdown_forbidden_for_regular_user(api_auth_client, mock_config):
+    with patch("app.infra.service.DreamMachineService.shutdown", new_callable=AsyncMock) as shutdown:
+        response = await api_auth_client.post("/api/v1/infra/shutdown")
+    assert response.status_code == 403
+    shutdown.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_no_api_route_is_public_by_accident():
+    """Toda ruta de /api/v1 exige sesion salvo las publicas a proposito."""
+    from fastapi.routing import APIRoute
+
+    from app.core.dependencies import get_current_user
+
+    def deps(dep, acc):
+        acc.add(dep.call)
+        for sub in dep.dependencies:
+            deps(sub, acc)
+
+    public = {
+        "/api/v1/billing/webhook",
+        "/api/v1/billing/webhook/mercadopago",
+        "/api/v1/arrepentimiento",
+    }
+    abiertas = []
+    for route in app.routes:
+        if not isinstance(route, APIRoute) or not route.path.startswith("/api/v1"):
+            continue
+        acc: set = set()
+        deps(route.dependant, acc)
+        names = {getattr(c, "__name__", "") for c in acc}
+        if route.path not in public and not ({"get_current_user", "_require"} & names):
+            abiertas.append(route.path)
+    assert abiertas == []
 
 
 @pytest.mark.asyncio

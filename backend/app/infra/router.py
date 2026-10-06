@@ -1,6 +1,8 @@
 import logging
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
+
+from app.core.dependencies import require_superuser
 
 from app.infra.config import get_infra_config
 from app.infra.led_controller import create_led_controller
@@ -8,7 +10,9 @@ from app.infra.service import DreamMachineService, DreamMachineShutdownError
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/infra", tags=["infra"])
+# Apaga hardware del operador por SSH: sin esto, cualquiera (incluso sin sesion)
+# podia dispararlo en cuanto existiera infra_config.yaml. Solo un superusuario.
+router = APIRouter(prefix="/infra", tags=["infra"], dependencies=[Depends(require_superuser)])
 
 
 @router.post("/shutdown")
