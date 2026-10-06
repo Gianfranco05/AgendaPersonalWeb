@@ -91,7 +91,7 @@ export default function FinancePage() {
         )}
       </div>
 
-      <div className="flex rounded-lg border border-gray-200 dark:border-slate-700 p-0.5 w-fit">
+      <div className="flex max-w-full overflow-x-auto rounded-lg border border-gray-200 dark:border-slate-700 p-0.5 w-fit">
         {([
           ['transacciones', 'Transacciones'],
           ['presupuestos', 'Presupuestos'],
@@ -103,7 +103,7 @@ export default function FinancePage() {
           <button
             key={value}
             onClick={() => setTab(value)}
-            className={`rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${
+            className={`shrink-0 rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${
               tab === value
                 ? 'bg-brand-charcoal text-white'
                 : 'text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-100'

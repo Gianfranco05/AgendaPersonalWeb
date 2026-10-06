@@ -14,6 +14,8 @@ export default function NotesPage() {
   const [search, setSearch] = useState('');
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+  // Solo importa en pantallas chicas (en md+ se ven lista y editor a la vez).
+  const [mobileView, setMobileView] = useState<'list' | 'editor'>('list');
 
   async function handleExport() {
     setExporting(true);
@@ -62,6 +64,12 @@ export default function NotesPage() {
     };
     setNotes((prev) => [newNote, ...prev]);
     setSelectedId(newNote.id);
+    setMobileView('editor');
+  }
+
+  function handleSelect(id: string) {
+    setSelectedId(id);
+    setMobileView('editor');
   }
 
   async function handleSave(note: Note) {
@@ -96,6 +104,7 @@ export default function NotesPage() {
     setNotes((prev) => prev.filter((n) => n.id !== id));
     if (selectedId === id) {
       setSelectedId(null);
+      setMobileView('list');
     }
   }
 
@@ -146,7 +155,8 @@ export default function NotesPage() {
         activeTag={activeTag}
         loading={loading}
         exporting={exporting}
-        onSelect={setSelectedId}
+        hiddenOnMobile={mobileView === 'editor'}
+        onSelect={handleSelect}
         onSearchChange={setSearch}
         onTagSelect={setActiveTag}
         onPin={handlePin}
@@ -156,7 +166,7 @@ export default function NotesPage() {
       />
 
       {/* Editor */}
-      <div className="flex flex-1 flex-col">
+      <div className={`min-w-0 flex-1 flex-col ${mobileView === 'list' ? 'hidden md:flex' : 'flex'}`}>
         {loading ? (
           <div className="flex flex-1 items-center justify-center p-8">
             <LoadingSkeleton type="card" />
@@ -165,6 +175,7 @@ export default function NotesPage() {
           <NoteEditor
             key={selectedNote.id}
             note={selectedNote}
+            onBack={() => setMobileView('list')}
             onSave={handleSave}
             onDelete={handleDelete}
             onColorChange={handleColorChange}

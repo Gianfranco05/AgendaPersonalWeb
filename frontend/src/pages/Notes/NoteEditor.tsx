@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
-import { Pin, PinOff, Trash2, Palette } from 'lucide-react';
+import { Pin, PinOff, Trash2, Palette, ArrowLeft } from 'lucide-react';
 import { LoadingSkeleton } from '../../components/LoadingSkeleton';
 import type { Note } from '../../types';
 import { parseServerTimestamp } from '../../utils/date';
@@ -16,11 +16,13 @@ interface NoteEditorProps {
   onSave: (note: Note) => void | Promise<void>;
   onDelete: (id: string) => void;
   onColorChange: (id: string, color: string) => void;
+  /** Volver a la lista (solo se muestra en pantallas chicas). */
+  onBack?: () => void;
 }
 
 // El padre monta este editor con `key={note.id}`: el estado local arranca de la
 // nota recibida y se reinicia solo al cambiar de nota.
-export default function NoteEditor({ note, onSave, onDelete, onColorChange }: NoteEditorProps) {
+export default function NoteEditor({ note, onSave, onDelete, onColorChange, onBack }: NoteEditorProps) {
   const [title, setTitle] = useState(note.title);
   const [content, setContent] = useState(note.content);
   const [showColors, setShowColors] = useState(false);
@@ -78,6 +80,16 @@ export default function NoteEditor({ note, onSave, onDelete, onColorChange }: No
         className="flex items-center gap-2 border-b px-4 py-2"
         style={{ borderLeftColor: note.color, borderLeftWidth: '3px' }}
       >
+        {onBack && (
+          <button
+            onClick={onBack}
+            className="rounded p-1 text-gray-400 dark:text-slate-500 transition-colors hover:bg-gray-100 dark:hover:bg-slate-700 md:hidden"
+            title="Volver a la lista"
+            aria-label="Volver a la lista"
+          >
+            <ArrowLeft size={16} />
+          </button>
+        )}
         <button
           onClick={handleTogglePin}
           className="rounded p-1 text-gray-400 dark:text-slate-500 transition-colors hover:bg-gray-100 dark:hover:bg-slate-700 hover:text-brand-indigo"
