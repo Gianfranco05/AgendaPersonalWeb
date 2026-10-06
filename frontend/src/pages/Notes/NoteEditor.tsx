@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react'
 import { Pin, PinOff, Trash2, Palette, ArrowLeft } from 'lucide-react';
 import { LoadingSkeleton } from '../../components/LoadingSkeleton';
 import type { Note } from '../../types';
+import { useTheme } from '../../context/ThemeContext';
 import { parseServerTimestamp } from '../../utils/date';
 
 const MDEditor = lazy(() => import('@uiw/react-md-editor'));
@@ -26,6 +27,7 @@ export default function NoteEditor({ note, onSave, onDelete, onColorChange, onBa
   const [title, setTitle] = useState(note.title);
   const [content, setContent] = useState(note.content);
   const [showColors, setShowColors] = useState(false);
+  const { theme } = useTheme();
 
   // Refs para que el autosave no dependa de `note`/`onSave`: cambian en cada
   // guardado (el padre reemplaza la nota) y, si fueran dependencias del
@@ -148,7 +150,7 @@ export default function NoteEditor({ note, onSave, onDelete, onColorChange, onBa
       />
 
       {/* Editor */}
-      <div className="flex-1 overflow-hidden" data-color-mode="light">
+      <div className="flex-1 overflow-hidden" data-color-mode={theme}>
         <Suspense fallback={<LoadingSkeleton type="card" />}>
           <MDEditor
             value={content}
