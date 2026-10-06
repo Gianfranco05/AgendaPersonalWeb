@@ -5,6 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { X } from 'lucide-react';
 import { saveExam } from '../../hooks/useStudy';
 import type { Exam, Subject } from '../../types';
+import { toLocalDateString } from '../../utils/date';
 
 const schema = z.object({
   subject_id: z.string().min(1, 'Elegí una materia'),
@@ -40,7 +41,7 @@ export default function ExamForm({ exam, subjects, onClose, onSaved }: Props) {
     defaultValues: {
       subject_id: subjects[0]?.id ?? '',
       title: '',
-      exam_date: new Date().toISOString().split('T')[0],
+      exam_date: toLocalDateString(),
       grade: undefined,
     },
   });

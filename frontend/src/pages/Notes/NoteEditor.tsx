@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react'
 import { Pin, PinOff, Trash2, Palette } from 'lucide-react';
 import { LoadingSkeleton } from '../../components/LoadingSkeleton';
 import type { Note } from '../../types';
+import { parseServerTimestamp } from '../../utils/date';
 
 const MDEditor = lazy(() => import('@uiw/react-md-editor'));
 
@@ -149,7 +150,7 @@ export default function NoteEditor({ note, onSave, onDelete, onColorChange }: No
 
       <div className="border-t border-gray-100 dark:border-slate-800 px-4 py-2">
         <span className="text-xs text-gray-400 dark:text-slate-500">
-          Última edición: {new Date(note.updated_at).toLocaleString('es-AR')}
+          Última edición: {parseServerTimestamp(note.updated_at).toLocaleString('es-AR')}
         </span>
       </div>
     </div>

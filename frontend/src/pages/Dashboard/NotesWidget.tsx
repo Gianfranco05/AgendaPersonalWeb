@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { LoadingSkeleton } from '../../components/LoadingSkeleton';
 import { fetchNotes } from '../../api/endpoints';
 import type { Note } from '../../types';
+import { parseServerTimestamp } from '../../utils/date';
 
 export default function NotesWidget() {
   const [notes, setNotes] = useState<Note[]>([]);
@@ -18,7 +19,7 @@ export default function NotesWidget() {
         const sorted = [...data]
           .sort((a, b) => {
             if (a.is_pinned !== b.is_pinned) return a.is_pinned ? -1 : 1;
-            return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
+            return parseServerTimestamp(b.updated_at).getTime() - parseServerTimestamp(a.updated_at).getTime();
           })
           .slice(0, 5);
         setNotes(sorted);
@@ -70,7 +71,7 @@ export default function NotesWidget() {
                 </p>
               </div>
               <span className="flex-shrink-0 text-xs text-gray-400 dark:text-slate-500">
-                {new Date(note.updated_at).toLocaleDateString('es-AR')}
+                {parseServerTimestamp(note.updated_at).toLocaleDateString('es-AR')}
               </span>
             </li>
           ))}

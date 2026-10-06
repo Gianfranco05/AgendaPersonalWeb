@@ -1,5 +1,6 @@
 import { Pencil, Trash2, Clock, Dumbbell } from 'lucide-react';
 import type { WorkoutSession } from '../../types';
+import { parseDateOnly } from '../../utils/date';
 
 interface Props {
   session: WorkoutSession;
@@ -14,7 +15,7 @@ export default function WorkoutSessionCard({ session, onEdit, onDelete }: Props)
         <div>
           <h3 className="font-semibold text-gray-800 dark:text-slate-100">{session.name}</h3>
           <div className="mt-1 flex items-center gap-3 text-xs text-gray-500 dark:text-slate-400">
-            <span>{new Date(session.date).toLocaleDateString('es-AR')}</span>
+            <span>{parseDateOnly(session.date).toLocaleDateString('es-AR')}</span>
             {session.duration_minutes != null && (
               <span className="flex items-center gap-1">
                 <Clock size={12} />

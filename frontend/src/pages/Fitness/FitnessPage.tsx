@@ -5,6 +5,7 @@ import { useFitnessSummary, useWorkoutSessions, removeWorkoutSession } from '../
 import type { WorkoutSession } from '../../types';
 import WorkoutSessionCard from './WorkoutSessionCard';
 import WorkoutSessionForm from './WorkoutSessionForm';
+import { parseDateOnly } from '../../utils/date';
 
 export default function FitnessPage() {
   const [showForm, setShowForm] = useState(false);
@@ -76,7 +77,7 @@ export default function FitnessPage() {
             </div>
             <p className="mt-1 text-2xl font-bold text-brand-fitness">
               {summary.last_session_date
-                ? new Date(summary.last_session_date).toLocaleDateString('es-AR')
+                ? parseDateOnly(summary.last_session_date).toLocaleDateString('es-AR')
                 : 'Sin datos'}
             </p>
           </div>

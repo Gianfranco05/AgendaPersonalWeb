@@ -2,10 +2,11 @@ import { useState } from 'react';
 import { Smartphone, Monitor, Loader2, X } from 'lucide-react';
 import { useSessions, revokeSession } from '../../hooks/useSessions';
 import type { Session } from '../../types';
+import { parseServerTimestamp } from '../../utils/date';
 
 function formatDate(value: string | null): string {
   if (!value) return '—';
-  return new Date(value).toLocaleString('es-AR', {
+  return parseServerTimestamp(value).toLocaleString('es-AR', {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',

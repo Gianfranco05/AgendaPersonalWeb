@@ -5,6 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { X } from 'lucide-react';
 import { saveMeal } from '../../hooks/useNutrition';
 import type { Meal } from '../../types';
+import { toLocalDateString } from '../../utils/date';
 
 const schema = z.object({
   date: z.string().min(1, 'La fecha es requerida'),
@@ -45,7 +46,7 @@ export default function MealForm({ meal, params, onClose, onSaved }: Props) {
   } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
-      date: new Date().toISOString().split('T')[0],
+      date: toLocalDateString(),
       meal_type: 'breakfast',
       name: '',
       calories: 0,

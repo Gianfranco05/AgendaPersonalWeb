@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Draggable } from '@hello-pangea/dnd';
 import { Pencil, Trash2, Check, X } from 'lucide-react';
 import type { Task, TaskPriority } from '../../types';
+import { daysUntilDate } from '../../utils/date';
 
 interface TaskCardProps {
   task: Task;
@@ -18,7 +19,7 @@ const priorityStyles: Record<TaskPriority, string> = {
 
 function isOverdue(dueDate: string | null): boolean {
   if (!dueDate) return false;
-  return new Date(dueDate) < new Date(new Date().toDateString());
+  return daysUntilDate(dueDate) < 0;
 }
 
 export default function TaskCard({ task, index, onUpdate, onDelete }: TaskCardProps) {

@@ -5,6 +5,7 @@ import { fetchNotes, createNote, updateNote, deleteNote, exportNotesJson } from 
 import type { Note } from '../../types';
 import NotesSidebar from './NotesSidebar';
 import NoteEditor from './NoteEditor';
+import { parseServerTimestamp } from '../../utils/date';
 
 export default function NotesPage() {
   const [notes, setNotes] = useState<Note[]>([]);
@@ -131,7 +132,7 @@ export default function NotesPage() {
     })
     .sort((a, b) => {
       if (a.is_pinned !== b.is_pinned) return a.is_pinned ? -1 : 1;
-      return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
+      return parseServerTimestamp(b.updated_at).getTime() - parseServerTimestamp(a.updated_at).getTime();
     });
 
   return (

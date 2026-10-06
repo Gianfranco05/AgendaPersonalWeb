@@ -7,6 +7,7 @@ import { useSettings, syncGoogle, disconnectGoogle } from '../../hooks/useSettin
 import { exportMyData, deleteMyAccount } from '../../api/endpoints';
 import SessionsSection from './SessionsSection';
 import ReminderSection from './ReminderSection';
+import { toLocalDateString } from '../../utils/date';
 
 const inputCls =
   'w-full rounded-lg border border-gray-200 dark:border-slate-700 px-3 py-2 text-sm focus:border-brand-indigo focus:outline-none focus:ring-1 focus:ring-brand-indigo disabled:bg-gray-50 disabled:text-gray-400';
@@ -90,7 +91,7 @@ export default function SettingsPage() {
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `vida-personal-${new Date().toISOString().slice(0, 10)}.json`;
+      link.download = `vida-personal-${toLocalDateString()}.json`;
       document.body.appendChild(link);
       link.click();
       link.remove();

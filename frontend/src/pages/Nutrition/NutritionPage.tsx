@@ -5,6 +5,7 @@ import { useNutritionSummary, useMeals, removeMeal } from '../../hooks/useNutrit
 import type { Meal, MealType } from '../../types';
 import MealCard from './MealCard';
 import MealForm from './MealForm';
+import { toLocalDateString } from '../../utils/date';
 
 const MEAL_GROUPS: { type: MealType; label: string }[] = [
   { type: 'breakfast', label: 'Desayuno' },
@@ -17,7 +18,7 @@ export default function NutritionPage() {
   const [showForm, setShowForm] = useState(false);
   const [editingMeal, setEditingMeal] = useState<Meal | null>(null);
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = toLocalDateString();
   const params = { date_from: today, date_to: today };
 
   const { data: summary, isLoading: summaryLoading } = useNutritionSummary();

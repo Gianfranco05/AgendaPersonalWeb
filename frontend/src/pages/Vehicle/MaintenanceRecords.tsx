@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Trash2 } from 'lucide-react';
 import { useVehicleRecords, addRecord, removeRecord } from '../../hooks/useVehicle';
 import type { MaintenanceRecordType } from '../../types';
+import { toLocalDateString } from '../../utils/date';
 
 interface Props {
   vehicleId: string;
@@ -22,7 +23,7 @@ const TYPE_ICONS: Record<MaintenanceRecordType, string> = {
 };
 
 function today(): string {
-  return new Date().toISOString().slice(0, 10);
+  return toLocalDateString();
 }
 
 export default function MaintenanceRecords({ vehicleId }: Props) {

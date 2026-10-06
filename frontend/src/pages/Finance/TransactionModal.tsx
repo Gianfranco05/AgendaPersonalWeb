@@ -5,6 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { X } from 'lucide-react';
 import { useCategories, saveTransaction } from '../../hooks/useFinance';
 import type { Transaction } from '../../types';
+import { toLocalDateString } from '../../utils/date';
 
 // Valores del enum PaymentMethod del backend. Mandar la etiqueta ("Efectivo")
 // en vez del valor rompía el alta con un 500.
@@ -71,7 +72,7 @@ export default function TransactionModal({ transaction, txParams, onClose, onSav
       type: 'expense' as const,
       amount: 0,
       currency: 'ARS' as const,
-      transaction_date: new Date().toISOString().split('T')[0],
+      transaction_date: toLocalDateString(),
       product_name: '',
       merchant_name: '',
       category_id: '',

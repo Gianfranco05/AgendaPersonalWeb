@@ -49,6 +49,7 @@ import type {
   ProjectTask,
   ProjectsSummary,
 } from '../types';
+import { toLocalDateString } from '../utils/date';
 
 const MOCK_ENABLED = import.meta.env.VITE_MOCK_ENABLED === 'true';
 
@@ -473,7 +474,7 @@ export async function updateGoalProgress(id: string, delta: number): Promise<Goa
   }
   const { data } = await apiClient.put<Goal>(`/api/v1/goals/${id}/checkin`, {
     value: delta,
-    record_date: new Date().toISOString().split('T')[0],
+    record_date: toLocalDateString(),
   });
   return data;
 }

@@ -9,10 +9,11 @@ import {
   stopFocus,
   removeFocusSession,
 } from '../../hooks/useFocus';
+import { parseServerTimestamp } from '../../utils/date';
 
 /** Segundos transcurridos desde un ISO string, nunca negativo. */
 function elapsedSince(startedAt: string): number {
-  const started = new Date(startedAt).getTime();
+  const started = parseServerTimestamp(startedAt).getTime();
   if (Number.isNaN(started)) return 0;
   return Math.max(0, Math.floor((Date.now() - started) / 1000));
 }
@@ -33,7 +34,7 @@ function formatDuration(totalSeconds: number): string {
 }
 
 function formatWhen(value: string): string {
-  const date = new Date(value);
+  const date = parseServerTimestamp(value);
   if (Number.isNaN(date.getTime())) return '';
   return date.toLocaleString('es-AR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
 }

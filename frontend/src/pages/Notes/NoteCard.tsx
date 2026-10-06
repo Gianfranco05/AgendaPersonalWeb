@@ -1,5 +1,6 @@
 import { Pin, Trash2 } from 'lucide-react';
 import type { Note } from '../../types';
+import { parseServerTimestamp } from '../../utils/date';
 
 interface NoteCardProps {
   note: Note;
@@ -42,7 +43,7 @@ export default function NoteCard({ note, isSelected, onSelect, onPin, onDelete }
           )}
           <div className="mt-1.5 flex items-center gap-2">
             <span className="text-xs text-gray-400 dark:text-slate-500">
-              {new Date(note.updated_at).toLocaleDateString('es-AR')}
+              {parseServerTimestamp(note.updated_at).toLocaleDateString('es-AR')}
             </span>
             {note.tags.length > 0 && (
               <div className="flex gap-1">

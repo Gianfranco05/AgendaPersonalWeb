@@ -1,5 +1,6 @@
 import { Pencil, Trash2, CheckCircle } from 'lucide-react';
 import type { Goal } from '../../types';
+import { daysUntilDate } from '../../utils/date';
 
 interface Props {
   goal: Goal;
@@ -53,9 +54,7 @@ function ProgressRing({ percentage, color, size = 64 }: { percentage: number; co
 
 function daysRemaining(deadline: string | null): { text: string; isOverdue: boolean } {
   if (!deadline) return { text: 'Sin fecha', isOverdue: false };
-  const now = new Date();
-  const end = new Date(deadline);
-  const diff = Math.ceil((end.getTime() - now.getTime()) / 86400000);
+  const diff = daysUntilDate(deadline);
   if (diff < 0) return { text: 'Vencida', isOverdue: true };
   if (diff === 0) return { text: 'Hoy', isOverdue: false };
   if (diff === 1) return { text: '1 día', isOverdue: false };
