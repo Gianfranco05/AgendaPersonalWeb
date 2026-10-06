@@ -82,6 +82,14 @@ function mapBankAccount(a: BankAccount): BankAccount {
   return { ...a, balance: num(a.balance) };
 }
 
+
+// "Hoy" del usuario para los resúmenes del server: sin esto el backend usa su
+// fecha UTC y en Argentina el día cambia a las 21:00. Minutos al este de UTC;
+// getTimezoneOffset() usa el signo opuesto, por eso se invierte.
+function tzOffsetMinutes(): number {
+  return -new Date().getTimezoneOffset();
+}
+
 export async function fetchFinanceSummary(): Promise<FinanceSummary> {
   if (MOCK_ENABLED) {
     return mockDelay({
@@ -627,7 +635,9 @@ export async function fetchFitnessSummary(): Promise<FitnessSummary> {
       last_session_date: new Date().toISOString().split('T')[0],
     });
   }
-  const { data } = await apiClient.get<FitnessSummary>('/api/v1/fitness/summary');
+  const { data } = await apiClient.get<FitnessSummary>('/api/v1/fitness/summary', {
+    params: { tz_offset_minutes: tzOffsetMinutes() },
+  });
   return data;
 }
 
@@ -737,7 +747,9 @@ export async function fetchNutritionSummary(): Promise<NutritionSummary> {
       week_fat_g: 385,
     });
   }
-  const { data } = await apiClient.get<NutritionSummary>('/api/v1/nutrition/summary');
+  const { data } = await apiClient.get<NutritionSummary>('/api/v1/nutrition/summary', {
+    params: { tz_offset_minutes: tzOffsetMinutes() },
+  });
   return data;
 }
 
@@ -1402,7 +1414,9 @@ export async function fetchExams(params?: { upcoming?: boolean }): Promise<Exam[
     }
     return mockDelay(mockExams);
   }
-  const { data } = await apiClient.get<Exam[]>('/api/v1/study/exams', { params });
+  const { data } = await apiClient.get<Exam[]>('/api/v1/study/exams', {
+    params: { ...params, tz_offset_minutes: tzOffsetMinutes() },
+  });
   return data;
 }
 
@@ -1447,7 +1461,9 @@ export async function fetchStudySummary(): Promise<StudySummary> {
       upcoming_count: 0,
     });
   }
-  const { data } = await apiClient.get<StudySummary>('/api/v1/study/summary');
+  const { data } = await apiClient.get<StudySummary>('/api/v1/study/summary', {
+    params: { tz_offset_minutes: tzOffsetMinutes() },
+  });
   return data;
 }
 
@@ -1640,11 +1656,8 @@ export async function fetchFocusSummary(): Promise<FocusSummary> {
   if (MOCK_ENABLED) {
     return mockDelay({ today_seconds: 3600, week_seconds: 14400, active: null });
   }
-  // Minutos al este de UTC: getTimezoneOffset() de JS usa el signo opuesto
-  // (positivo al oeste), por eso se invierte antes de mandarlo.
-  const tzOffsetMinutes = -new Date().getTimezoneOffset();
   const { data } = await apiClient.get<FocusSummary>('/api/v1/focus/summary', {
-    params: { tz_offset_minutes: tzOffsetMinutes },
+    params: { tz_offset_minutes: tzOffsetMinutes() },
   });
   return data;
 }
