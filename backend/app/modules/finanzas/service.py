@@ -4,6 +4,7 @@ from decimal import Decimal
 from uuid import UUID
 from typing import Optional
 
+from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.finanzas.enums import (
@@ -52,9 +53,23 @@ class FinanzasService:
         self.bank_account_repo = BankAccountRepository(db)
         self.budget_repo = BudgetRepository(db)
 
+    async def _ensure_own_category(self, user_id: UUID, category_id) -> None:
+        """404 si la categoria no existe o es de otro usuario.
+
+        category_id llega del cliente: sin validarlo, una transaccion o un
+        presupuesto podia apuntar a la categoria de otra persona (y los
+        reportes, que joinean por category_id, le mostraban su nombre), o a una
+        inexistente, lo que en Postgres rompe la FK con un 500.
+        """
+        if category_id is None:
+            return
+        if await self.category_repo.get_by_id(str(category_id), str(user_id)) is None:
+            raise HTTPException(status_code=404, detail="Categoría no encontrada")
+
     async def create_transaction(
         self, user_id: UUID, data: TransactionCreate
     ) -> Transaction:
+        await self._ensure_own_category(user_id, data.category_id)
         transaction = Transaction(
             user_id=user_id,
             amount=data.amount,
@@ -113,6 +128,7 @@ class FinanzasService:
         return await self.transaction_repo.get_by_id(transaction_id, user_id)
 
     async def update_transaction(self, transaction: Transaction, data: dict):
+        await self._ensure_own_category(transaction.user_id, data.get("category_id"))
         # `data` viene con exclude_unset, asi que un None es un null mandado a
         # proposito ("quitar la categoria"), no un campo omitido. Se respeta
         # solo en columnas que aceptan vacio; en el resto (amount, type...)
@@ -165,6 +181,7 @@ class FinanzasService:
         return await self.category_repo.get_by_id(category_id, user_id)
 
     async def create_category(self, user_id: UUID, data: CategoryCreate) -> Category:
+        await self._ensure_own_category(user_id, data.parent_id)
         category = Category(
             user_id=user_id,
             name=data.name,
@@ -175,6 +192,7 @@ class FinanzasService:
         return await self.category_repo.create(category)
 
     async def update_category(self, category: Category, data: dict) -> Category:
+        await self._ensure_own_category(category.user_id, data.get("parent_id"))
         for key, value in data.items():
             if key == "parent_id" and value is not None:
                 value = str(value)
@@ -241,6 +259,7 @@ class FinanzasService:
         }
 
     async def create_budget(self, user_id: UUID, data: BudgetCreate) -> Budget:
+        await self._ensure_own_category(user_id, data.category_id)
         budget = Budget(
             user_id=user_id,
             category_id=str(data.category_id),
@@ -257,6 +276,7 @@ class FinanzasService:
         return await self.budget_repo.get_by_id(budget_id, user_id)
 
     async def update_budget(self, budget: Budget, data: dict) -> Budget:
+        await self._ensure_own_category(budget.user_id, data.get("category_id"))
         for key, value in data.items():
             if key == "category_id" and value is not None:
                 value = str(value)

@@ -2,7 +2,7 @@ from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import Optional, Sequence
 
-from sqlalchemy import select, func, and_
+from sqlalchemy import select, func, and_, delete, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.finanzas.enums import (
@@ -288,6 +288,20 @@ class CategoryRepository:
         return category
 
     async def delete(self, category: Category) -> None:
+        # Lo que apunta a la categoria se desvincula a mano: las FK no tienen
+        # ON DELETE, y en Postgres borrar una categoria con transacciones
+        # (incluso las borradas logicamente), presupuestos o subcategorias
+        # fallaba con un 500. SQLite no aplica FKs y lo escondia.
+        await self.db.execute(
+            update(Transaction)
+            .where(Transaction.category_id == category.id)
+            .values(category_id=None)
+        )
+        await self.db.execute(
+            update(Category).where(Category.parent_id == category.id).values(parent_id=None)
+        )
+        # Un presupuesto sin categoria no tiene sentido: se va con ella.
+        await self.db.execute(delete(Budget).where(Budget.category_id == category.id))
         await self.db.delete(category)
         await self.db.commit()
 

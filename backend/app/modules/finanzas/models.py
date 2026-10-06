@@ -1,5 +1,5 @@
 from uuid import uuid4
-from datetime import datetime
+from datetime import date, datetime, time
 from enum import Enum
 
 from sqlalchemy import (
@@ -15,8 +15,34 @@ from sqlalchemy import (
     func,
 )
 from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.types import TypeDecorator
 
 from app.core.base import Base
+
+
+class IsoText(TypeDecorator):
+    """VARCHAR que guarda fechas/horas como texto ISO.
+
+    `transaction_date` y `transaction_time` son String(10) (decision vieja que
+    no se toca: cambiarla es una migracion de datos). El schema los entrega
+    como `date`/`time`: SQLite los adapta solo, pero asyncpg rechaza un `date`
+    para un parametro VARCHAR ("expected str, got date") — crear una
+    transaccion o filtrar por fechas daba 500 en Postgres. Convertirlos aca
+    cubre el insert, el update y los filtros `>=`/`<` de todos los repos.
+    """
+
+    impl = String
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        if isinstance(value, datetime):
+            return value.date().isoformat()
+        if isinstance(value, date):
+            return value.isoformat()
+        if isinstance(value, time):
+            # %H:%M:%S: isoformat() con microsegundos pasa los 10 caracteres.
+            return value.strftime("%H:%M:%S")
+        return value
 
 
 class Transaction(Base):
@@ -31,8 +57,8 @@ class Transaction(Base):
     currency: Mapped[str] = mapped_column(String(3), default="ARS")
     type: Mapped[str] = mapped_column(String(10))
 
-    transaction_date: Mapped[str] = mapped_column(String(10))
-    transaction_time: Mapped[str] = mapped_column(String(10), nullable=True)
+    transaction_date: Mapped[str] = mapped_column(IsoText(10))
+    transaction_time: Mapped[str] = mapped_column(IsoText(10), nullable=True)
 
     bank_entity_name: Mapped[str] = mapped_column(String(100), default="")
     account_type: Mapped[str] = mapped_column(String(10), default="cash")
