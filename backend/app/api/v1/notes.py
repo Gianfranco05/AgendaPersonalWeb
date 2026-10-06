@@ -54,6 +54,7 @@ async def create_note(
         title=data.title,
         content=data.content,
         color=data.color,
+        is_pinned=data.is_pinned,
     )
 
     if data.tag_names:

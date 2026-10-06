@@ -15,13 +15,19 @@ class AnotacionesService:
         self.tag_repo = TagRepository(db)
 
     async def create_note(
-        self, user_id: UUID, title: str, content: str, color: str = "#ffffff"
+        self,
+        user_id: UUID,
+        title: str,
+        content: str,
+        color: str = "#ffffff",
+        is_pinned: bool = False,
     ) -> Note:
         note = Note(
             user_id=user_id,
             title=title,
             content=content,
             color=color,
+            is_pinned=is_pinned,
         )
         return await self.note_repo.create(note)
 

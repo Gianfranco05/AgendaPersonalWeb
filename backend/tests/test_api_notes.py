@@ -221,3 +221,20 @@ async def test_api_update_note_without_tag_names_keeps_tags(api_auth_client):
     assert response.status_code == 200
     assert response.json()["title"] == "Otro titulo"
     assert [t["name"] for t in response.json()["tags"]] == ["queda"]
+
+
+@pytest.mark.asyncio
+async def test_create_note_respeta_is_pinned(api_auth_client):
+    created = await api_auth_client.post(
+        "/api/v1/notes", json={"title": "Fijada", "content": "x", "is_pinned": True}
+    )
+    assert created.status_code == 201
+    assert created.json()["is_pinned"] is True
+
+    # Compatible con el cliente que crea y despues fija con un PUT.
+    other = await api_auth_client.post("/api/v1/notes", json={"title": "Normal", "content": "x"})
+    assert other.json()["is_pinned"] is False
+    pinned = await api_auth_client.put(
+        f"/api/v1/notes/{other.json()['id']}", json={"is_pinned": True}
+    )
+    assert pinned.json()["is_pinned"] is True
