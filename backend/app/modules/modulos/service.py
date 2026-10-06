@@ -3,6 +3,7 @@ from typing import Optional
 
 from fastapi import HTTPException
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -144,7 +145,15 @@ class ModulesService:
                 stripe_session_id=stripe_session_id,
             )
         )
-        await self.db.commit()
+        try:
+            await self.db.commit()
+        except IntegrityError:
+            # Dos notificaciones del mismo pago llegando a la vez (MP las manda
+            # en rafaga, y hay varios workers) pasan las dos el SELECT de
+            # arriba y la segunda pega contra uq_module_purchase_user_key. Es
+            # un duplicado, no un error: un 500 haria que MP reintente en loop.
+            await self.db.rollback()
+            return False
         return True
 
     async def user_owns(self, user_id: str, module_key: str) -> bool:

@@ -489,3 +489,19 @@ async def test_signature_header_without_ts_or_v1_is_invalid():
     assert not mercadopago.verify_signature("v1=abc", "r1", "42", "s")
     assert not mercadopago.verify_signature("ts=10", "r1", "42", "s")
     assert not mercadopago.verify_signature("", "r1", "42", "s")
+
+
+@pytest.mark.asyncio
+async def test_grant_duplicado_concurrente_no_revienta(db_session, test_user, monkeypatch):
+    """Dos notificaciones del mismo pago pasan a la vez el SELECT de
+    idempotencia; la segunda choca con el UNIQUE. Tiene que ser un no-op, no un
+    500 (MP reintentaria en loop)."""
+    from sqlalchemy.exc import IntegrityError
+
+    from app.modules.modulos.service import ModulesService
+
+    async def boom():
+        raise IntegrityError("INSERT", {}, Exception("uq_module_purchase_user_key"))
+
+    monkeypatch.setattr(db_session, "commit", boom)
+    assert await ModulesService(db_session).grant(str(test_user.id), "study") is False
