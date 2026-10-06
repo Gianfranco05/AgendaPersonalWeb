@@ -24,7 +24,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   logout: async () => {
-    await authApi.logout();
+    try {
+      await authApi.logout();
+    } catch {
+      // Sin red o 5xx: igual se cierra la sesión local. Antes la promesa
+      // rechazada cortaba el flujo y "Cerrar sesión" no hacía nada.
+    }
     set({ user: null, isAuthenticated: false });
   },
 
