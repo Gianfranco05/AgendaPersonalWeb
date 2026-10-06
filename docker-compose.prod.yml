@@ -82,6 +82,13 @@ services:
       - GOOGLE_LOGIN_REDIRECT_URI=${GOOGLE_LOGIN_REDIRECT_URI:-${PUBLIC_BASE_URL:-http://localhost}/auth/api/google/callback}
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
       - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-}
+      # Opcionales: la lista es explicita, asi que sin estas lineas el valor del
+      # .env no llega al contenedor (Sentry quedaba apagado, /metrics publico y
+      # no se podia subir la version de los Terminos sin tocar el compose).
+      - SENTRY_DSN=${SENTRY_DSN:-}
+      - SENTRY_TRACES_SAMPLE_RATE=${SENTRY_TRACES_SAMPLE_RATE:-0.1}
+      - METRICS_TOKEN=${METRICS_TOKEN:-}
+      - CURRENT_TERMS_VERSION=${CURRENT_TERMS_VERSION:-1.0}
     volumes:
       - data:/app/data
     depends_on:
