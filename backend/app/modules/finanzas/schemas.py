@@ -1,9 +1,9 @@
 from datetime import datetime, date, time
 from decimal import Decimal
 from uuid import UUID
-from typing import Optional
+from typing import Annotated, Optional
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 from app.modules.finanzas.enums import (
     AccountType,
@@ -11,6 +11,12 @@ from app.modules.finanzas.enums import (
     PaymentMethod,
     TransactionType,
 )
+
+# Las columnas son Numeric(12, 2) (10 enteros) e Integer (32 bits): un valor mas
+# grande pasaba la validacion y en Postgres reventaba el INSERT con un 500
+# (SQLite no tiene limite y lo escondia).
+Money = Annotated[Decimal, Field(ge=Decimal("-9999999999.99"), le=Decimal("9999999999.99"))]
+Quantity = Annotated[int, Field(ge=0, le=1_000_000_000)]
 
 _TRANSACTION_ENUM_FIELDS = {
     "type": TransactionType,
@@ -29,7 +35,7 @@ def _check_enum(field: str, value: Optional[str]) -> Optional[str]:
 
 
 class TransactionBase(BaseModel):
-    amount: Decimal
+    amount: Money
     currency: str = "ARS"
     type: str
     transaction_date: date
@@ -40,8 +46,8 @@ class TransactionBase(BaseModel):
     payment_method: str
     product_name: str
     product_description: Optional[str] = None
-    quantity: Optional[int] = None
-    unit_price: Optional[Decimal] = None
+    quantity: Optional[Quantity] = None
+    unit_price: Optional[Money] = None
     merchant_name: str = ""
     merchant_category: str = "other"
     notes: Optional[str] = None
@@ -67,7 +73,7 @@ class TransactionCreate(TransactionBase):
 
 
 class TransactionUpdate(BaseModel):
-    amount: Optional[Decimal] = None
+    amount: Optional[Money] = None
     currency: Optional[str] = None
     type: Optional[str] = None
     transaction_date: Optional[date] = None
@@ -78,8 +84,8 @@ class TransactionUpdate(BaseModel):
     payment_method: Optional[str] = None
     product_name: Optional[str] = None
     product_description: Optional[str] = None
-    quantity: Optional[int] = None
-    unit_price: Optional[Decimal] = None
+    quantity: Optional[Quantity] = None
+    unit_price: Optional[Money] = None
     merchant_name: Optional[str] = None
     merchant_category: Optional[str] = None
     notes: Optional[str] = None
@@ -135,7 +141,7 @@ class BankAccountBase(BaseModel):
     account_number: str = ""
     last4: str = ""
     currency: str = "ARS"
-    balance: Decimal = Decimal("0")
+    balance: Money = Decimal("0")
 
 
 class BankAccountCreate(BankAccountBase):
@@ -154,7 +160,7 @@ class BankAccountUpdate(BaseModel):
     account_number: Optional[str] = None
     last4: Optional[str] = None
     currency: Optional[str] = None
-    balance: Optional[Decimal] = None
+    balance: Optional[Money] = None
 
     @field_validator("account_type")
     @classmethod
@@ -174,9 +180,9 @@ class BankAccountResponse(BankAccountBase):
 
 class BudgetBase(BaseModel):
     category_id: UUID
-    amount: Decimal
+    amount: Money
     period: str = "monthly"
-    alert_threshold: int = 80
+    alert_threshold: int = Field(default=80, ge=0, le=100)
 
 
 class BudgetCreate(BudgetBase):
@@ -193,9 +199,9 @@ class BudgetResponse(BudgetBase):
 
 class BudgetUpdate(BaseModel):
     category_id: Optional[UUID] = None
-    amount: Optional[Decimal] = None
+    amount: Optional[Money] = None
     period: Optional[str] = None
-    alert_threshold: Optional[int] = None
+    alert_threshold: Optional[int] = Field(default=None, ge=0, le=100)
 
 
 class BudgetProgress(BaseModel):

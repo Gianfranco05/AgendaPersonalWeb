@@ -132,3 +132,30 @@ async def test_borrar_categoria_desvincula_transacciones_presupuestos_y_hijas(
     assert (await db_session.execute(select(Budget))).first() is None
     await db_session.refresh(hija)
     assert hija.parent_id is None
+
+
+@pytest.mark.asyncio
+async def test_montos_fuera_de_rango_de_numeric_dan_422(api_auth_client, test_category):
+    # Numeric(12, 2) admite hasta 9.999.999.999,99: mas daba 500 en Postgres.
+    too_big = "99999999999"
+    assert (await api_auth_client.post(
+        "/api/v1/finance/transactions", json={**TX, "amount": too_big}
+    )).status_code == 422
+    assert (await api_auth_client.post(
+        "/api/v1/finance/transactions", json={**TX, "unit_price": too_big}
+    )).status_code == 422
+    assert (await api_auth_client.post(
+        "/api/v1/finance/transactions", json={**TX, "quantity": 3_000_000_000}
+    )).status_code == 422
+    assert (await api_auth_client.post(
+        "/api/v1/finance/accounts",
+        json={"name": "x", "account_type": "cash", "balance": too_big},
+    )).status_code == 422
+    assert (await api_auth_client.post(
+        "/api/v1/finance/budgets", json={"category_id": test_category.id, "amount": too_big}
+    )).status_code == 422
+
+    ok = await api_auth_client.post(
+        "/api/v1/finance/transactions", json={**TX, "amount": "9999999999.99"}
+    )
+    assert ok.status_code == 201
