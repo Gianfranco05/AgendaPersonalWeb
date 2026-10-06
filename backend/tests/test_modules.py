@@ -125,3 +125,22 @@ async def test_granting_twice_does_not_duplicate(db_session, test_user):
 
 async def test_granting_an_unknown_template_is_rejected(db_session, test_user):
     assert await ModulesService(db_session).grant(test_user.id, "inventada") is False
+
+
+async def test_paid_template_open_without_billing_in_dev(api_auth_client, monkeypatch):
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "BILLING_PROVIDER", "mercadopago")
+    monkeypatch.setattr(settings, "MERCADOPAGO_ACCESS_TOKEN", "")
+    # Dev/self-hosted sin cobro: no hay forma de comprarla, queda abierta.
+    assert (await api_auth_client.get("/api/v1/study/summary")).status_code == 200
+
+
+async def test_paid_template_locked_without_billing_in_production(api_auth_client, monkeypatch):
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "BILLING_PROVIDER", "mercadopago")
+    monkeypatch.setattr(settings, "MERCADOPAGO_ACCESS_TOKEN", "")
+    monkeypatch.setattr(settings, "ENVIRONMENT", "production")
+    # En prod un token vacio no puede regalar las plantillas pagas.
+    assert (await api_auth_client.get("/api/v1/study/summary")).status_code == 402

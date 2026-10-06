@@ -26,10 +26,12 @@ def require_module(module_key: str):
         current_user: User = Depends(get_current_user),
         db: AsyncSession = Depends(get_db),
     ) -> None:
-        # Sin Stripe configurado (dev, self-hosted) no se le puede cobrar a
+        # Sin proveedor de pago configurado en dev no se le puede cobrar a
         # nadie: bloquear plantillas que el usuario no tiene forma de comprar
-        # dejaria la app a medias.
-        if not settings.billing_enabled:
+        # dejaria la app a medias. En produccion no: ahi un token de Mercado
+        # Pago vacio o mal cargado regalaria todas las plantillas pagas, asi
+        # que quedan bloqueadas hasta que se configure el cobro.
+        if not settings.billing_enabled and not settings.is_production:
             return
         if not await ModulesService(db).user_owns(str(current_user.id), module_key):
             raise HTTPException(
