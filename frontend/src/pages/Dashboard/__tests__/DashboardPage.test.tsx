@@ -18,4 +18,9 @@ describe('DashboardPage', () => {
     expect(screen.getByText('FinanceWidget')).toBeInTheDocument()
     expect(screen.getByText('NotesWidget')).toBeInTheDocument()
   })
+
+  it('no muestra el widget de la Dream Machine salvo que se habilite', () => {
+    renderWithProviders(<DashboardPage />)
+    expect(screen.queryByText('InfraWidget')).not.toBeInTheDocument()
+  })
 })
