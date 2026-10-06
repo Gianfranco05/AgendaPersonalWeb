@@ -1023,6 +1023,9 @@ export async function exportMyData(): Promise<Blob> {
   // parsea a un objeto en memoria.
   const { data } = await apiClient.get<Blob>('/api/v1/me/export', {
     responseType: 'blob',
+    // El export arma todo el histórico del usuario: con el timeout general
+    // (15 s) una cuenta con mucha data fallaba justo la descarga que pide la ley.
+    timeout: 120_000,
   });
   return data;
 }
