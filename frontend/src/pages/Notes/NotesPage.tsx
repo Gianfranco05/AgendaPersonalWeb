@@ -36,12 +36,16 @@ export default function NotesPage() {
 
   const loadNotes = useCallback(async () => {
     setLoading(true);
-    const data = await fetchNotes();
-    setNotes(data);
-    if (data.length > 0 && !selectedId) {
-      setSelectedId(data[0].id);
+    try {
+      const data = await fetchNotes();
+      setNotes(data);
+      if (data.length > 0 && !selectedId) {
+        setSelectedId(data[0].id);
+      }
+    } finally {
+      // Si falla la carga no se queda en el esqueleto para siempre.
+      setLoading(false);
     }
-    setLoading(false);
   }, [selectedId]);
 
   useEffect(() => {

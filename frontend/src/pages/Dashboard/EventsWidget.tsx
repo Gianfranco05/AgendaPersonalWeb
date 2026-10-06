@@ -22,13 +22,17 @@ export default function EventsWidget() {
     let cancelled = false;
     async function load() {
       setLoading(true);
-      const data = await fetchEvents();
-      if (!cancelled) {
+      try {
+        const data = await fetchEvents();
+        if (cancelled) return;
         const upcoming = data
           .filter(isWithinNext7Days)
           .sort((a, b) => new Date(a.start_datetime).getTime() - new Date(b.start_datetime).getTime());
         setEvents(upcoming);
-        setLoading(false);
+      } catch {
+        // Si falla la carga el widget queda vacío en vez de quedarse cargando para siempre.
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     }
     load();

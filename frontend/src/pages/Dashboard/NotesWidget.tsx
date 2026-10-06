@@ -14,8 +14,9 @@ export default function NotesWidget() {
     let cancelled = false;
     async function load() {
       setLoading(true);
-      const data = await fetchNotes();
-      if (!cancelled) {
+      try {
+        const data = await fetchNotes();
+        if (cancelled) return;
         const sorted = [...data]
           .sort((a, b) => {
             if (a.is_pinned !== b.is_pinned) return a.is_pinned ? -1 : 1;
@@ -23,7 +24,10 @@ export default function NotesWidget() {
           })
           .slice(0, 5);
         setNotes(sorted);
-        setLoading(false);
+      } catch {
+        // Si falla la carga el widget queda vacío en vez de quedarse cargando para siempre.
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     }
     load();
