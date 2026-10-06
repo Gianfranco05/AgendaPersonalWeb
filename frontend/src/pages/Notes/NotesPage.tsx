@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { Plus } from 'lucide-react';
 import { LoadingSkeleton } from '../../components/LoadingSkeleton';
 import { fetchNotes, createNote, updateNote, deleteNote, exportNotesJson } from '../../api/endpoints';
@@ -16,6 +16,9 @@ export default function NotesPage() {
   const [exporting, setExporting] = useState(false);
   // Solo importa en pantallas chicas (en md+ se ven lista y editor a la vez).
   const [mobileView, setMobileView] = useState<'list' | 'editor'>('list');
+  // El editor guarda lo pendiente al desmontarse: si la nota se borró desde la
+  // lista justo después de tipear, ese último guardado la recreaba (o daba 404).
+  const deletedIdsRef = useRef<Set<string>>(new Set());
 
   async function handleExport() {
     setExporting(true);
@@ -77,6 +80,7 @@ export default function NotesPage() {
   }
 
   async function handleSave(note: Note) {
+    if (deletedIdsRef.current.has(note.id)) return;
     if (note.id.startsWith('temp-')) {
       const created = await createNote({
         title: note.title,
@@ -102,8 +106,15 @@ export default function NotesPage() {
   }
 
   async function handleDelete(id: string) {
+    deletedIdsRef.current.add(id);
     if (!id.startsWith('temp-')) {
-      await deleteNote(id);
+      try {
+        await deleteNote(id);
+      } catch (err) {
+        // No se borró: la nota sigue viva y tiene que poder guardarse.
+        deletedIdsRef.current.delete(id);
+        throw err;
+      }
     }
     setNotes((prev) => prev.filter((n) => n.id !== id));
     if (selectedId === id) {
