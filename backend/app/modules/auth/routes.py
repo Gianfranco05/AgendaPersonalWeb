@@ -87,6 +87,11 @@ async def login(
     if not user or not verify_password(password, user.password_hash):
         return templates.TemplateResponse(request, "auth/login.html", {"error": "Email o contraseña incorrectos"}, status_code=400)
 
+    # Igual que en /auth/api/login: una cuenta desactivada no entra. Sin esto
+    # este flujo le daba una cookie de 24h que las rutas HTML aceptan.
+    if not user.is_active:
+        return templates.TemplateResponse(request, "auth/login.html", {"error": "Usuario inactivo"}, status_code=403)
+
     if not user.password_hash.startswith("$2"):
         user.password_hash = hash_password(password)
         db.add(user)

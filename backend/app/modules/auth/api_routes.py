@@ -6,7 +6,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Request, Response, HTTPException, status
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, EmailStr, Field, field_validator
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -134,6 +134,15 @@ class UpdateMeRequest(BaseModel):
         return v
 
 
+async def _find_user_by_email(db: AsyncSession, email: str) -> Optional[User]:
+    """Busca por email sin distinguir mayusculas. EmailStr solo normaliza el
+    dominio, y el login con Google devuelve el email en minusculas: con una
+    comparacion exacta "Ana@x.com" (registrada a mano) y "ana@x.com" (Google)
+    terminaban siendo dos cuentas distintas para la misma persona."""
+    result = await db.execute(select(User).where(func.lower(User.email) == email.lower()))
+    return result.scalars().first()
+
+
 def _set_access_cookie(response: Response, access_token: str) -> None:
     response.set_cookie(
         key=settings.JWT_COOKIE_NAME,
@@ -176,8 +185,7 @@ async def api_login(
     response: Response,
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(select(User).where(User.email == data.email))
-    user = result.scalar_one_or_none()
+    user = await _find_user_by_email(db, data.email)
 
     if not user or not verify_password(data.password, user.password_hash):
         raise HTTPException(
@@ -215,8 +223,7 @@ async def api_register(
     response: Response,
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(select(User).where(User.email == data.email))
-    existing = result.scalar_one_or_none()
+    existing = await _find_user_by_email(db, data.email)
     if existing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -224,7 +231,7 @@ async def api_register(
         )
 
     user = User(
-        email=data.email,
+        email=data.email.lower(),
         full_name=data.full_name,
         password_hash=hash_password(data.password),
         # accept_terms=True ya lo garantizo el validator del schema.
@@ -432,8 +439,7 @@ async def api_forgot_password(
     data: ForgotPasswordRequest,
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(select(User).where(User.email == data.email))
-    user = result.scalar_one_or_none()
+    user = await _find_user_by_email(db, data.email)
 
     if user is not None and user.is_active:
         token = await VerificationService(db).issue(
@@ -609,14 +615,17 @@ async def api_google_login_callback(
             google_requests.Request(),
             settings.GOOGLE_CLIENT_ID,
         )
-        email = idinfo["email"]
+        if idinfo.get("email_verified") is False:
+            # Cuenta de Google con el email sin confirmar: no prueba que el
+            # email sea suyo, y se lo usa para ubicar/crear la cuenta.
+            raise ValueError("email de Google sin verificar")
+        email = idinfo["email"].lower()
         full_name = idinfo.get("name") or email.split("@")[0]
     except Exception:
         logger.exception("Fallo el intercambio de codigo o la verificacion de identidad con Google")
         return RedirectResponse(url=f"{app_redirect}?error=google_failed", status_code=303)
 
-    result = await db.execute(select(User).where(User.email == email))
-    user = result.scalar_one_or_none()
+    user = await _find_user_by_email(db, email)
 
     if user is None:
         # Cuenta nueva, creada solo por Google: el hash es aleatorio e
@@ -633,6 +642,17 @@ async def api_google_login_callback(
         await db.refresh(user)
     elif not user.is_active:
         return RedirectResponse(url=f"{app_redirect}?error=inactive_account", status_code=303)
+    elif not user.is_verified:
+        # Cuenta creada con email+password que nunca confirmo el mail: Google
+        # acaba de probar que el email es de quien esta entrando. Quien la
+        # registro pudo ser otra persona (nada impedia anotarse con el email
+        # ajeno) y conoce su password: se lo invalida y se cierran sus sesiones
+        # para que no quede con acceso a la cuenta de la victima.
+        user.is_verified = True
+        user.password_hash = hash_password(secrets.token_urlsafe(32))
+        db.add(user)
+        await db.commit()
+        await RefreshService(db).revoke_all(str(user.id))
 
     redirect_response = RedirectResponse(url="about:blank", status_code=303)
     access_token, refresh_token = await _issue_session(db, redirect_response, request, user)

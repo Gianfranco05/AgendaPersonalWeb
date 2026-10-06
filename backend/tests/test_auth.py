@@ -123,3 +123,14 @@ async def test_register_page_get(client):
     response = await client.get("/auth/register")
     assert response.status_code == 200
     assert "Crear Cuenta" in response.text
+
+
+@pytest.mark.asyncio
+async def test_legacy_login_html_rechaza_usuario_inactivo(client, db_session, test_user):
+    test_user.is_active = False
+    await db_session.commit()
+    response = await client.post(
+        "/auth/login", data={"email": "test@test.com", "password": "test123"}
+    )
+    assert response.status_code == 403
+    assert "vida_token" not in response.cookies
