@@ -12,7 +12,8 @@ const schema = z
     goal_type: z.enum(['progress', 'binary', 'metric', 'savings']),
     target: z.number(),
     unit: z.string().optional(),
-    deadline: z.string().min(1, 'La fecha límite es requerida'),
+    // Opcional: un hábito diario no tiene fecha de cierre y la API acepta end_date nulo.
+    deadline: z.string(),
     color: z.string().min(1, 'El color es requerido'),
   })
   .superRefine((data, ctx) => {
@@ -104,7 +105,7 @@ export default function GoalForm({
           : data.goal_type === 'savings'
             ? data.unit || 'ARS'
             : null,
-      end_date: data.deadline,
+      end_date: data.deadline || null,
       color: data.color,
       icon: goal?.icon ?? 'fa-bullseye',
       is_completed: goal?.is_completed ?? false,
@@ -238,7 +239,7 @@ export default function GoalForm({
           )}
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-slate-400">Fecha límite</label>
+            <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-slate-400">Fecha límite (opcional)</label>
             <input {...register('deadline')} type="date" className={inputCls} />
             {errors.deadline && <p className={errorCls}>{errors.deadline.message}</p>}
           </div>
