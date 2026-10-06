@@ -9,7 +9,7 @@ from app.database import get_db
 from app.core.dependencies import get_current_user
 from app.modules.auth.models import User
 from app.modules.eventos.service import EventosService
-from app.modules.eventos.schemas import EventCreate, EventUpdate, EventResponse
+from app.modules.eventos.schemas import EventCreate, EventUpdate, EventResponse, to_wall_clock
 
 router = APIRouter(prefix="/events", tags=["events"])
 
@@ -97,8 +97,14 @@ async def export_events_ics(
     ]
 
     for event in events:
-        start_str = event.start_datetime.strftime("%Y%m%dT%H%M%SZ")
-        end_str = event.end_datetime.strftime("%Y%m%dT%H%M%SZ") if event.end_datetime else start_str
+        # Hora de pared: sin "Z", el calendario la toma como hora local
+        # flotante (con "Z" la correria a UTC).
+        start_str = to_wall_clock(event.start_datetime).strftime("%Y%m%dT%H%M%S")
+        end_str = (
+            to_wall_clock(event.end_datetime).strftime("%Y%m%dT%H%M%S")
+            if event.end_datetime
+            else start_str
+        )
 
         lines.append("BEGIN:VEVENT")
         lines.append(f"UID:{event.id}@cancen")
@@ -109,7 +115,11 @@ async def export_events_ics(
             lines.append(f"DESCRIPTION:{_escape_ics(event.description)}")
         if event.location:
             lines.append(f"LOCATION:{_escape_ics(event.location)}")
-        lines.append(f"DTSTAMP:{event.created_at.strftime('%Y%m%dT%H%M%SZ') if event.created_at else start_str}")
+        lines.append(
+            f"DTSTAMP:{event.created_at.strftime('%Y%m%dT%H%M%SZ')}"
+            if event.created_at
+            else f"DTSTAMP:{start_str}"
+        )
         lines.append("END:VEVENT")
 
     lines.append("END:VCALENDAR")
