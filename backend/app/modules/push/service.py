@@ -11,6 +11,12 @@ logger = logging.getLogger(__name__)
 
 EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send"
 
+# Canal de Android que crea la app mobile (ANDROID_CHANNEL_ID en
+# src/lib/notifications.ts). Sin channelId en el mensaje, una push remota cae en
+# el canal por defecto de Android, no en "Recordatorios" (sonido, importancia y
+# permisos propios): tienen que coincidir.
+ANDROID_CHANNEL_ID = "recordatorios"
+
 
 class PushService:
     def __init__(self, db: AsyncSession):
@@ -36,8 +42,14 @@ class PushService:
         await self.db.refresh(push_token)
         return push_token
 
-    async def unregister(self, token: str) -> None:
-        await self.db.execute(delete(PushToken).where(PushToken.token == token))
+    async def unregister(self, token: str, user_id: Optional[str] = None) -> None:
+        """Borra el token. Si viene `user_id` (pedido de un usuario), solo borra
+        el suyo: sin ese filtro cualquiera con sesion que conozca el token de
+        otra persona podia desregistrarle las notificaciones."""
+        query = delete(PushToken).where(PushToken.token == token)
+        if user_id is not None:
+            query = query.where(PushToken.user_id == user_id)
+        await self.db.execute(query)
         await self.db.commit()
 
     async def tokens_for_user(self, user_id: str) -> list[str]:
@@ -57,7 +69,14 @@ class PushService:
             return
 
         messages = [
-            {"to": token, "title": title, "body": body, "data": data or {}, "sound": "default"}
+            {
+                "to": token,
+                "title": title,
+                "body": body,
+                "data": data or {},
+                "sound": "default",
+                "channelId": ANDROID_CHANNEL_ID,
+            }
             for token in tokens
         ]
 

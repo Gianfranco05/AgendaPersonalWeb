@@ -32,4 +32,4 @@ async def unregister_push_token(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    await PushService(db).unregister(body.token)
+    await PushService(db).unregister(body.token, str(current_user.id))

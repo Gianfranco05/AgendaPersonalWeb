@@ -1,9 +1,11 @@
 import asyncio
 import logging
 from datetime import date, datetime, timedelta, timezone
+from typing import Optional
 
 from sqlalchemy import select
 
+from app.config import settings
 from app.database import AsyncSessionLocal
 from app.modules.push.service import PushService
 from app.modules.recordatorios.models import Reminder
@@ -14,11 +16,21 @@ CHECK_INTERVAL_SECONDS = 60
 
 # Dedup en memoria: sin esto, dos ciclos del loop que caigan en el mismo
 # minuto (o un reinicio del proceso) podrian mandar la misma push dos veces.
-# Vive en el proceso (no en Redis/DB) — igual que el rate limiter en memoria
-# de app/core/http_security.py, alcanza con una sola instancia de backend;
-# con mas de una replica cada proceso dedupea por separado y una push podria
-# duplicarse entre replicas.
+# Es el filtro rapido de un solo proceso; el que vale entre procesos es
+# `_claim_in_redis`: gunicorn levanta 2*CPU+1 workers y CADA uno corre su
+# propio scheduler (el lifespan se ejecuta por worker), asi que sin un claim
+# compartido el usuario recibe la misma push N veces.
 _sent_today: dict[str, date] = {}
+
+# Ultimo minuto (UTC, truncado) ya revisado por este proceso. Si un ciclo se
+# atrasa y se saltea un minuto (el sleep de 60s mas lo que tarda el ciclo hace
+# que el intervalo real sea > 60s), el siguiente ciclo recupera los minutos
+# perdidos en vez de dejar sin sonar al recordatorio que caia justo ahi.
+_last_checked_minute: Optional[datetime] = None
+# Tope de recuperacion: tras una caida larga no se disparan recordatorios viejos.
+MAX_CATCHUP_MINUTES = 3
+
+_redis_client = None
 
 
 def should_fire(reminder: Reminder, now_utc: datetime) -> bool:
@@ -42,8 +54,55 @@ def should_fire(reminder: Reminder, now_utc: datetime) -> bool:
     return True
 
 
+async def _claim_in_redis(reminder_id: str, local_date: date) -> bool:
+    """True si este proceso es el primero en reclamar el disparo (recordatorio,
+    dia). SET NX es atomico: de N workers solo uno lo gana. Sin REDIS_URL, o si
+    Redis no responde, devuelve True y manda igual: con un solo proceso no hay
+    carrera, y es preferible un duplicado a perder el recordatorio."""
+    global _redis_client
+    if not settings.REDIS_URL:
+        return True
+    try:
+        if _redis_client is None:
+            import redis.asyncio as aioredis
+
+            _redis_client = aioredis.from_url(
+                settings.REDIS_URL, encoding="utf-8", decode_responses=True
+            )
+        # 36h: cubre el dia local completo en cualquier huso horario.
+        claimed = await _redis_client.set(
+            f"reminder-fired:{reminder_id}:{local_date.isoformat()}", "1", nx=True, ex=129600
+        )
+        return bool(claimed)
+    except Exception:
+        logger.warning("Scheduler: Redis no disponible para deduplicar", exc_info=True)
+        _redis_client = None
+        return True
+
+
+def _minutes_to_check(now_utc: datetime) -> list[datetime]:
+    """Minutos (UTC, truncados) que este ciclo tiene que revisar: el actual y
+    los que se hayan saltado desde el ultimo ciclo."""
+    global _last_checked_minute
+    current = now_utc.replace(second=0, microsecond=0)
+    start = current
+    if _last_checked_minute is not None and _last_checked_minute < current:
+        start = max(
+            _last_checked_minute + timedelta(minutes=1),
+            current - timedelta(minutes=MAX_CATCHUP_MINUTES),
+        )
+    _last_checked_minute = current
+    minutes = []
+    minute = start
+    while minute <= current:
+        minutes.append(minute)
+        minute += timedelta(minutes=1)
+    return minutes
+
+
 async def _tick() -> None:
     now_utc = datetime.now(timezone.utc)
+    minutes = _minutes_to_check(now_utc)
     async with AsyncSessionLocal() as db:
         result = await db.execute(
             select(Reminder).where(
@@ -55,10 +114,13 @@ async def _tick() -> None:
 
         push = PushService(db)
         for reminder in reminders:
-            if not should_fire(reminder, now_utc):
+            fire_at = next((m for m in minutes if should_fire(reminder, m)), None)
+            if fire_at is None:
                 continue
-            local_date = (now_utc + timedelta(minutes=reminder.timezone_offset_minutes)).date()
+            local_date = (fire_at + timedelta(minutes=reminder.timezone_offset_minutes)).date()
             _sent_today[reminder.id] = local_date
+            if not await _claim_in_redis(reminder.id, local_date):
+                continue
             try:
                 await push.send_to_user(
                     reminder.user_id,
@@ -71,8 +133,10 @@ async def _tick() -> None:
 
     # El dict de dedup solo necesita la fecha de hoy: una entrada de ayer no
     # sirve para nada y se acumularia para siempre en un proceso de larga vida.
-    today = now_utc.date()
-    stale = [rid for rid, sent_date in _sent_today.items() if sent_date != today]
+    # Con husos de +14h a -12h el "hoy" local puede ser ayer o manana de UTC:
+    # se conserva todo lo que no sea anterior a ayer UTC.
+    cutoff = now_utc.date() - timedelta(days=1)
+    stale = [rid for rid, sent_date in _sent_today.items() if sent_date < cutoff]
     for rid in stale:
         del _sent_today[rid]
 
@@ -90,4 +154,8 @@ async def run_reminder_scheduler() -> None:
             raise
         except Exception:
             logger.exception("Fallo un ciclo del scheduler de recordatorios")
-        await asyncio.sleep(CHECK_INTERVAL_SECONDS)
+        # Alineado al inicio del minuto siguiente: con un sleep fijo de 60s mas
+        # lo que tarda el ciclo, el loop se va corriendo y cada tanto un minuto
+        # entero queda sin revisar.
+        now = datetime.now(timezone.utc)
+        await asyncio.sleep(CHECK_INTERVAL_SECONDS - now.second - now.microsecond / 1e6 + 1)
