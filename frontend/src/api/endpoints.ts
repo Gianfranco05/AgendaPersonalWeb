@@ -231,6 +231,12 @@ export async function createNote(note: Omit<Note, 'id' | 'created_at' | 'updated
     is_pinned: note.is_pinned,
     tag_names: note.tags.map((t) => t.name),
   });
+  // El POST de la API ignora is_pinned (solo lo respeta el PUT): una nota que
+  // se fija antes del primer guardado quedaba sin fijar.
+  if (note.is_pinned && !data.is_pinned) {
+    const { data: pinned } = await apiClient.put<Note>(`/api/v1/notes/${data.id}`, { is_pinned: true });
+    return pinned;
+  }
   return data;
 }
 
@@ -555,7 +561,7 @@ export async function fetchTags(): Promise<Tag[]> {
     ];
     return mockDelay(tags);
   }
-  const { data } = await apiClient.get<Tag[]>('/api/v1/tags');
+  const { data } = await apiClient.get<Tag[]>('/api/v1/notes/tags');
   return data;
 }
 
