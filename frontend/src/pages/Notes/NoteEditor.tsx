@@ -164,7 +164,15 @@ export default function NoteEditor({ note, onSave, onDelete, onColorChange, onBa
 
       <div className="border-t border-gray-100 dark:border-slate-800 px-4 py-2">
         <span className="text-xs text-gray-400 dark:text-slate-500">
-          Última edición: {parseServerTimestamp(note.updated_at).toLocaleString('es-AR')}
+          Última edición: {parseServerTimestamp(note.updated_at).toLocaleString('es-AR', {
+            day: 'numeric',
+            month: 'numeric',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            // Sin esto algunos navegadores mostraban "03:11:09" para las 15:11 (12 h sin a. m./p. m.).
+            hourCycle: 'h23',
+          })}
         </span>
       </div>
     </div>
