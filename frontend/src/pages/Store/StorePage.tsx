@@ -16,6 +16,8 @@ import {
 } from 'lucide-react';
 import { LoadingSkeleton } from '../../components/LoadingSkeleton';
 import { useStore, startCheckout, revalidateAfterPurchase } from '../../hooks/useStore';
+import { requestEmailVerification } from '../../api/authApi';
+import { apiErrorMessage } from '../../utils/apiError';
 import type { StoreItem } from '../../types';
 
 const ICONS: Record<string, typeof Package> = {
@@ -83,6 +85,9 @@ export default function StorePage() {
   const { data: store, isLoading } = useStore();
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [buyError, setBuyError] = useState<string | null>(null);
+  // La API exige email verificado para comprar (403): se ofrece reenviar el mail.
+  const [needsVerification, setNeedsVerification] = useState(false);
+  const [verificationSent, setVerificationSent] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
   const checkoutStatus = searchParams.get('checkout');
 
@@ -105,17 +110,26 @@ export default function StorePage() {
   async function handleBuy(item: StoreItem) {
     setBusyKey(item.key);
     setBuyError(null);
+    setNeedsVerification(false);
+    setVerificationSent(false);
     try {
       await startCheckout(item.key);
       // No hace falta limpiar busyKey en éxito: la página navega afuera
       // (checkout del proveedor de pago) antes de que el usuario vea el botón de nuevo.
     } catch (err: unknown) {
-      const msg =
-        err && typeof err === 'object' && 'response' in err
-          ? String((err as { response: { data: { detail: string } } }).response.data.detail)
-          : 'No se pudo iniciar el pago';
-      setBuyError(msg);
+      setBuyError(apiErrorMessage(err, 'No se pudo iniciar el pago'));
+      setNeedsVerification((err as { response?: { status?: number } })?.response?.status === 403);
       setBusyKey(null);
+    }
+  }
+
+  async function handleResendVerification() {
+    try {
+      await requestEmailVerification();
+      setVerificationSent(true);
+    } catch {
+      setBuyError('No pudimos reenviar el mail. Probá de nuevo en unos minutos.');
+      setNeedsVerification(false);
     }
   }
 
@@ -179,6 +193,14 @@ export default function StorePage() {
           <div className="flex items-center gap-2 text-sm">
             <CircleAlert size={18} />
             {buyError}
+            {needsVerification &&
+              (verificationSent ? (
+                <span className="font-medium">Te mandamos el mail: revisá tu casilla.</span>
+              ) : (
+                <button onClick={handleResendVerification} className="font-medium underline">
+                  Reenviar mail de verificación
+                </button>
+              ))}
           </div>
           <button onClick={() => setBuyError(null)} aria-label="Cerrar aviso">
             <X size={16} />

@@ -39,6 +39,11 @@ export async function resetPassword(token: string, password: string): Promise<vo
   await apiClient.post('/auth/api/reset-password', { token, password });
 }
 
+// Pide que se reenvíe el mail de verificación al usuario logueado.
+export async function requestEmailVerification(): Promise<void> {
+  await apiClient.post('/auth/api/verify-email/request');
+}
+
 export async function verifyEmail(token: string): Promise<void> {
   await apiClient.post('/auth/api/verify-email', { token });
 }

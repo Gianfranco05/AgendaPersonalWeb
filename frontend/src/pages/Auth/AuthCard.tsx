@@ -28,11 +28,4 @@ export const authInputCls =
 export const authButtonCls =
   'w-full rounded-lg bg-brand-charcoal py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-charcoal-hover disabled:cursor-not-allowed disabled:opacity-60';
 
-/** Mensaje de error de una respuesta de la API (detail string o lista de 422). */
-export function apiErrorMessage(err: unknown, fallback: string): string {
-  const data = (err as { response?: { data?: { detail?: unknown } } })?.response?.data;
-  const detail = data?.detail;
-  if (typeof detail === 'string') return detail;
-  if (Array.isArray(detail) && typeof detail[0]?.msg === 'string') return detail[0].msg;
-  return fallback;
-}
+export { apiErrorMessage } from '../../utils/apiError';
