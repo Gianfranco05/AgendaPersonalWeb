@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { X } from 'lucide-react';
 import type { CalendarEvent } from '../../types';
+import { toLocalDateString } from '../../utils/date';
 
 const schema = z.object({
   title: z.string().min(1, 'El título es requerido'),
@@ -25,11 +26,13 @@ const errorCls = 'mt-1 text-xs text-red-500';
 
 interface Props {
   event: CalendarEvent | null;
+  /** Fecha (YYYY-MM-DD) con la que arranca un evento nuevo, p. ej. el día clickeado en el calendario. */
+  initialDate?: string;
   onClose: () => void;
   onSave: (data: Omit<CalendarEvent, 'id'>, id?: string) => Promise<void>;
 }
 
-export default function EventForm({ event, onClose, onSave }: Props) {
+export default function EventForm({ event, initialDate, onClose, onSave }: Props) {
   const {
     register,
     handleSubmit,
@@ -41,7 +44,7 @@ export default function EventForm({ event, onClose, onSave }: Props) {
     defaultValues: {
       title: '',
       description: '',
-      date: new Date().toISOString().split('T')[0],
+      date: initialDate ?? toLocalDateString(),
       time: '',
       all_day: false,
       location: '',
@@ -57,7 +60,9 @@ export default function EventForm({ event, onClose, onSave }: Props) {
       reset({
         title: event.title,
         description: event.description ?? '',
-        date: d.toISOString().split('T')[0],
+        // En hora local, igual que `time`: toISOString() pasaba a UTC y un evento
+        // de las 21:00 o más tarde se editaba con la fecha del día siguiente.
+        date: toLocalDateString(d),
         time: event.is_all_day ? '' : `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`,
         all_day: event.is_all_day,
         location: event.location ?? '',
@@ -72,11 +77,13 @@ export default function EventForm({ event, onClose, onSave }: Props) {
       : `${data.date}T${data.time || '00:00'}:00`;
     const payload: Omit<CalendarEvent, 'id'> = {
       title: data.title,
-      description: data.description || undefined,
+      // Al editar, vacío va como '' y no undefined: la API ignora los null/ausentes
+      // y el texto borrado en el form volvía a aparecer.
+      description: event ? (data.description ?? '') : data.description || undefined,
       start_datetime,
       is_all_day: data.all_day,
       color: data.color,
-      location: data.location || undefined,
+      location: event ? (data.location ?? '') : data.location || undefined,
     };
     await onSave(payload, event?.id);
     onClose();

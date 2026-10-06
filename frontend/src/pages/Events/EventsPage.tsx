@@ -13,6 +13,7 @@ export default function EventsPage() {
   const [month, setMonth] = useState(new Date().getMonth());
   const [showForm, setShowForm] = useState(false);
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
+  const [newEventDate, setNewEventDate] = useState<string | undefined>(undefined);
   const [exporting, setExporting] = useState(false);
 
   const { data: events, isLoading, mutate } = useEvents();
@@ -44,8 +45,9 @@ export default function EventsPage() {
     else setMonth((m) => m + 1);
   }
 
-  function handleDayClick() {
+  function handleDayClick(day: number) {
     setEditingEvent(null);
+    setNewEventDate(`${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`);
     setShowForm(true);
   }
 
@@ -82,7 +84,7 @@ export default function EventsPage() {
             {exporting ? 'Exportando…' : 'Exportar'}
           </button>
           <button
-            onClick={() => { setEditingEvent(null); setShowForm(true); }}
+            onClick={() => { setEditingEvent(null); setNewEventDate(undefined); setShowForm(true); }}
             className="flex items-center gap-2 rounded-lg bg-brand-charcoal px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-charcoal-hover"
           >
             <Plus size={16} />
@@ -121,7 +123,8 @@ export default function EventsPage() {
       {showForm && (
         <EventForm
           event={editingEvent}
-          onClose={() => { setShowForm(false); setEditingEvent(null); }}
+          initialDate={newEventDate}
+          onClose={() => { setShowForm(false); setEditingEvent(null); setNewEventDate(undefined); }}
           onSave={handleSave}
         />
       )}

@@ -4,11 +4,14 @@ import { LoadingSkeleton } from '../../components/LoadingSkeleton';
 import { fetchEvents } from '../../api/endpoints';
 import type { CalendarEvent } from '../../types';
 
-function isWithinNext7Days(dateStr: string): boolean {
+function isWithinNext7Days(ev: CalendarEvent): boolean {
   const now = new Date();
-  const date = new Date(dateStr);
+  const date = new Date(ev.start_datetime);
   const weekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-  return date >= now && date <= weekFromNow;
+  // Un evento de todo el día arranca a las 00:00: el de hoy ya "pasó" para
+  // `date >= now` y desaparecía del dashboard justo el día que importa.
+  const from = ev.is_all_day ? new Date(now.getFullYear(), now.getMonth(), now.getDate()) : now;
+  return date >= from && date <= weekFromNow;
 }
 
 export default function EventsWidget() {
@@ -22,7 +25,7 @@ export default function EventsWidget() {
       const data = await fetchEvents();
       if (!cancelled) {
         const upcoming = data
-          .filter((e) => isWithinNext7Days(e.start_datetime))
+          .filter(isWithinNext7Days)
           .sort((a, b) => new Date(a.start_datetime).getTime() - new Date(b.start_datetime).getTime());
         setEvents(upcoming);
         setLoading(false);
