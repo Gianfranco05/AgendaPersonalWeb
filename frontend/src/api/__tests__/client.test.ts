@@ -176,7 +176,7 @@ describe('apiClient', () => {
     it('matches public pages and their subpaths, not lookalikes', async () => {
       const { isPublicPath } = await import('../client')
       expect(isPublicPath('/privacy')).toBe(true)
-      expect(isPublicPath('/auth/google/callback')).toBe(true)
+      expect(isPublicPath('/google/callback')).toBe(true)
       expect(isPublicPath('/')).toBe(false)
       expect(isPublicPath('/store')).toBe(false)
       expect(isPublicPath('/privacy-old')).toBe(false)

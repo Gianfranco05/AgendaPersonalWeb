@@ -30,6 +30,12 @@ function refreshSession(): Promise<void> {
   return refreshPromise;
 }
 
+// A dónde vuelve el navegador después del login con Google (ruta del SPA).
+// No puede colgar de /auth/: el dev server de Vite y el nginx de producción
+// mandan todo /auth/* al backend, que no tiene esa ruta y devolvía un 404 en
+// vez de la pantalla de callback.
+export const GOOGLE_CALLBACK_PATH = '/google/callback';
+
 // Páginas que se usan sin sesión. Al abrirlas, el chequeo de sesión (/me)
 // devuelve 401 y el refresh también: ahí eso solo significa "no logueado", y
 // mandar al login dejaba inaccesibles el registro, los textos legales y el
@@ -37,7 +43,7 @@ function refreshSession(): Promise<void> {
 const PUBLIC_PATHS = [
   '/login',
   '/register',
-  '/auth/google/callback',
+  GOOGLE_CALLBACK_PATH,
   '/terms',
   '/privacy',
   '/arrepentimiento',

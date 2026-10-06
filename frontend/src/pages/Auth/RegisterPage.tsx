@@ -5,6 +5,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import * as authApi from '../../api/authApi';
 import GoogleIcon from '../../components/icons/GoogleIcon';
 import PublicFooter from '../../components/PublicFooter';
+import { GOOGLE_CALLBACK_PATH } from '../../api/client';
 
 const API_BASE = import.meta.env.VITE_API_URL ?? '';
 
@@ -43,7 +44,7 @@ export default function RegisterPage() {
   }
 
   function handleGoogleSignup() {
-    const redirectUri = `${window.location.origin}/auth/google/callback`;
+    const redirectUri = `${window.location.origin}${GOOGLE_CALLBACK_PATH}`;
     window.location.href = `${API_BASE}/auth/api/google/login?app_redirect=${encodeURIComponent(redirectUri)}`;
   }
 

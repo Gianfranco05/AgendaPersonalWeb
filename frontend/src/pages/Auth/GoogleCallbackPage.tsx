@@ -9,7 +9,7 @@ const ERROR_MESSAGES: Record<string, string> = {
 };
 
 /**
- * Adonde vuelve el navegador después de /auth/api/google/login. El backend
+ * Adonde vuelve el navegador (GOOGLE_CALLBACK_PATH) después de /auth/api/google/login. El backend
  * ya dejó las cookies httpOnly de sesión seteadas en esa respuesta (mismo
  * mecanismo que login/register normal) — acá no hace falta leer ningún
  * token de la query string, solo confirmar la sesión contra /auth/api/me

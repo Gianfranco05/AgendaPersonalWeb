@@ -12,6 +12,7 @@ import RegisterPage from './pages/Auth/RegisterPage';
 import GoogleCallbackPage from './pages/Auth/GoogleCallbackPage';
 import LoginPage from './features/auth/LoginPage';
 import { useAuthStore } from './store/authStore';
+import { GOOGLE_CALLBACK_PATH } from './api/client';
 
 const FinancePage = lazy(() => import('./pages/Finance/FinancePage'));
 const NotesPage = lazy(() => import('./pages/Notes/NotesPage'));
@@ -49,7 +50,7 @@ export default function App() {
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
-            <Route path="/auth/google/callback" element={<GoogleCallbackPage />} />
+            <Route path={GOOGLE_CALLBACK_PATH} element={<GoogleCallbackPage />} />
             {/* Públicas: tienen que ser accesibles antes de registrarse, ya que
                 el registro remite a ellas. */}
             <Route path="/terms" element={<Suspense fallback={<LoadingSkeleton type="page" />}><TermsPage /></Suspense>} />

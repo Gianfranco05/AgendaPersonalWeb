@@ -6,6 +6,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import GoogleIcon from '../../components/icons/GoogleIcon';
 import PublicFooter from '../../components/PublicFooter';
+import { GOOGLE_CALLBACK_PATH } from '../../api/client';
 
 const API_BASE = import.meta.env.VITE_API_URL ?? '';
 
@@ -17,7 +18,7 @@ const loginSchema = z.object({
 type LoginForm = z.infer<typeof loginSchema>;
 
 function handleGoogleLogin() {
-  const redirectUri = `${window.location.origin}/auth/google/callback`;
+  const redirectUri = `${window.location.origin}${GOOGLE_CALLBACK_PATH}`;
   window.location.href = `${API_BASE}/auth/api/google/login?app_redirect=${encodeURIComponent(redirectUri)}`;
 }
 
