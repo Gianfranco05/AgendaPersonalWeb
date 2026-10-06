@@ -6,6 +6,7 @@ from fastapi import HTTPException
 from sqlalchemy import case, delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.clock import local_today
 from app.core.crud_service import apply_changes, get_by_id_or_404
 from app.modules.estudio.models import SUBJECT_STATUSES, Exam, Subject, SubjectStatus
 
@@ -81,10 +82,12 @@ class StudyService:
 
     # ── Examenes ─────────────────────────────────────────────────────────────
 
-    async def list_exams(self, user_id: str, upcoming: bool = False) -> list[Exam]:
+    async def list_exams(
+        self, user_id: str, upcoming: bool = False, tz_offset_minutes: Optional[int] = None
+    ) -> list[Exam]:
         query = select(Exam).where(Exam.user_id == user_id)
         if upcoming:
-            query = query.where(Exam.exam_date >= date.today()).order_by(Exam.exam_date)
+            query = query.where(Exam.exam_date >= local_today(tz_offset_minutes)).order_by(Exam.exam_date)
         else:
             query = query.order_by(Exam.exam_date.desc())
         result = await self.db.execute(query)
@@ -143,7 +146,7 @@ class StudyService:
 
     # ── Resumen ──────────────────────────────────────────────────────────────
 
-    async def summary(self, user_id: str) -> dict:
+    async def summary(self, user_id: str, tz_offset_minutes: Optional[int] = None) -> dict:
         subject_result = await self.db.execute(
             select(
                 func.count(Subject.id),
@@ -153,7 +156,7 @@ class StudyService:
         )
         subjects_total, subjects_cursando, subjects_aprobadas = subject_result.one()
 
-        today = date.today()
+        today = local_today(tz_offset_minutes)
         exam_result = await self.db.execute(
             select(
                 func.avg(Exam.grade),

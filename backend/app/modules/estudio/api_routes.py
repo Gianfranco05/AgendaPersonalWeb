@@ -126,10 +126,13 @@ async def delete_subject(
 @router.get("/exams", response_model=list[ExamOut])
 async def list_exams(
     upcoming: bool = Query(False),
+    # Minutos al este de UTC (Buenos Aires = -180). Opcional: sin el, "hoy" es
+    # el del server (UTC) y cambia a las 21:00 en Argentina.
+    tz_offset_minutes: Optional[int] = Query(None, ge=-840, le=840),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return await StudyService(db).list_exams(str(current_user.id), upcoming)
+    return await StudyService(db).list_exams(str(current_user.id), upcoming, tz_offset_minutes)
 
 
 @router.post("/exams", response_model=ExamOut, status_code=status.HTTP_201_CREATED)
@@ -171,7 +174,10 @@ async def delete_exam(
 
 @router.get("/summary", response_model=StudySummaryOut)
 async def get_study_summary(
+    # Minutos al este de UTC (Buenos Aires = -180). Opcional: sin el, "hoy" es
+    # el del server (UTC) y cambia a las 21:00 en Argentina.
+    tz_offset_minutes: Optional[int] = Query(None, ge=-840, le=840),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return await StudyService(db).summary(str(current_user.id))
+    return await StudyService(db).summary(str(current_user.id), tz_offset_minutes)

@@ -234,3 +234,20 @@ async def test_cannot_attach_an_exam_to_another_users_subject(api_auth_client, d
         },
     )
     assert resp.status_code == 404
+
+
+def test_local_today_respeta_el_huso_del_cliente(monkeypatch):
+    from datetime import date, datetime, timezone
+
+    from app.core import clock
+
+    class FakeDatetime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            # 23:30 UTC del 6/10 == 20:30 del 6/10 en Buenos Aires...
+            return datetime(2026, 10, 7, 0, 30, tzinfo=timezone.utc)
+
+    monkeypatch.setattr(clock, "datetime", FakeDatetime)
+    # ...y a las 00:30 UTC del 7/10 todavia es 6/10 en Argentina (UTC-3).
+    assert clock.local_today(-180) == date(2026, 10, 6)
+    assert clock.local_today(0) == date(2026, 10, 7)

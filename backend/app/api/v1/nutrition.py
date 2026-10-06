@@ -1,7 +1,7 @@
 from datetime import date
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -20,11 +20,14 @@ router = APIRouter(prefix="/nutrition", tags=["nutrition"])
 
 @router.get("/summary", response_model=NutritionSummary)
 async def get_summary(
+    # Minutos al este de UTC (Buenos Aires = -180). Opcional: sin el, "hoy" es
+    # el del server (UTC) y cambia a las 21:00 en Argentina.
+    tz_offset_minutes: Optional[int] = Query(None, ge=-840, le=840),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     service = NutricionService(db)
-    return await service.get_summary(current_user.id)
+    return await service.get_summary(current_user.id, tz_offset_minutes)
 
 
 @router.get("/meals", response_model=list[MealOut])
