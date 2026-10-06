@@ -62,6 +62,25 @@ function mockDelay<T>(data: T): Promise<T> {
 
 // ── Finance ──
 
+// La API serializa los Decimal de plata como string ("1500.50"). Con el string
+// a secas, `toLocaleString('es-AR')` no formatea y los totales salían como
+// "$50000.00" en vez de "$50.000". Se convierten a number en la frontera.
+function num(value: unknown): number {
+  return typeof value === 'number' ? value : Number(value);
+}
+
+function mapTransaction(t: Transaction): Transaction {
+  return { ...t, amount: num(t.amount) };
+}
+
+function mapBudget<T extends Budget>(b: T): T {
+  return { ...b, amount: num(b.amount) };
+}
+
+function mapBankAccount(a: BankAccount): BankAccount {
+  return { ...a, balance: num(a.balance) };
+}
+
 export async function fetchFinanceSummary(): Promise<FinanceSummary> {
   if (MOCK_ENABLED) {
     return mockDelay({
@@ -71,7 +90,11 @@ export async function fetchFinanceSummary(): Promise<FinanceSummary> {
     });
   }
   const { data } = await apiClient.get<FinanceSummary>('/api/v1/finance/summary');
-  return data;
+  return {
+    total_income: num(data.total_income),
+    total_expenses: num(data.total_expenses),
+    balance: num(data.balance),
+  };
 }
 
 // TransactionsResponse is now imported from '../types'
@@ -116,7 +139,7 @@ export async function fetchTransactions(params?: {
       ...(params?.date_to && { date_to: params.date_to }),
     },
   });
-  return data;
+  return { ...data, items: data.items.map(mapTransaction) };
 }
 
 export async function createTransaction(transaction: Record<string, unknown>): Promise<Transaction> {
@@ -137,7 +160,7 @@ export async function createTransaction(transaction: Record<string, unknown>): P
     category_id: transaction.category_id || null,
     notes: transaction.notes ?? null,
   });
-  return data;
+  return mapTransaction(data);
 }
 
 export async function updateTransaction(id: string, transaction: Record<string, unknown>): Promise<Transaction> {
@@ -158,7 +181,7 @@ export async function updateTransaction(id: string, transaction: Record<string, 
     // notas, y mandar null en cada edición borraría las cargadas desde mobile.
     ...('notes' in transaction && { notes: transaction.notes ?? null }),
   });
-  return data;
+  return mapTransaction(data);
 }
 
 export async function deleteTransaction(id: string): Promise<void> {
@@ -813,7 +836,7 @@ export async function fetchBudgets(year: number, month: number): Promise<BudgetP
   const { data } = await apiClient.get<BudgetProgress[]>('/api/v1/finance/budgets', {
     params: { year, month },
   });
-  return data;
+  return data.map((b) => ({ ...mapBudget(b), spent: num(b.spent), remaining: num(b.remaining) }));
 }
 
 export async function createBudget(budget: Omit<Budget, 'id'>): Promise<Budget> {
@@ -821,7 +844,7 @@ export async function createBudget(budget: Omit<Budget, 'id'>): Promise<Budget> 
     return mockDelay({ ...budget, id: generateId() });
   }
   const { data } = await apiClient.post<Budget>('/api/v1/finance/budgets', budget);
-  return data;
+  return mapBudget(data);
 }
 
 export async function updateBudget(id: string, budget: Partial<Budget>): Promise<Budget> {
@@ -829,7 +852,7 @@ export async function updateBudget(id: string, budget: Partial<Budget>): Promise
     return mockDelay({ ...budget, id } as Budget);
   }
   const { data } = await apiClient.put<Budget>(`/api/v1/finance/budgets/${id}`, budget);
-  return data;
+  return mapBudget(data);
 }
 
 export async function deleteBudget(id: string): Promise<void> {
@@ -865,7 +888,11 @@ export async function fetchFinanceReports(): Promise<FinanceReports> {
     });
   }
   const { data } = await apiClient.get<FinanceReports>('/api/v1/finance/reports');
-  return data;
+  return {
+    by_category: data.by_category.map((c) => ({ ...c, total: num(c.total) })),
+    monthly: data.monthly.map((m) => ({ ...m, income: num(m.income), expense: num(m.expense) })),
+    total_expenses: num(data.total_expenses),
+  };
 }
 
 // ── Bank Accounts ──
@@ -899,7 +926,7 @@ export async function fetchBankAccounts(): Promise<BankAccount[]> {
     return mockDelay(accounts);
   }
   const { data } = await apiClient.get<BankAccount[]>('/api/v1/finance/accounts');
-  return data;
+  return data.map(mapBankAccount);
 }
 
 export async function createBankAccount(
@@ -914,7 +941,7 @@ export async function createBankAccount(
     });
   }
   const { data } = await apiClient.post<BankAccount>('/api/v1/finance/accounts', account);
-  return data;
+  return mapBankAccount(data);
 }
 
 export async function updateBankAccount(
@@ -925,7 +952,7 @@ export async function updateBankAccount(
     return mockDelay({ ...account, id } as BankAccount);
   }
   const { data } = await apiClient.put<BankAccount>(`/api/v1/finance/accounts/${id}`, account);
-  return data;
+  return mapBankAccount(data);
 }
 
 export async function deleteBankAccount(id: string): Promise<void> {
