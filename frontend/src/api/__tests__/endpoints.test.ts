@@ -1,13 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-const { mockGet, mockPut, mockPost } = vi.hoisted(() => ({
+const { mockGet, mockPut, mockPost, mockPatch } = vi.hoisted(() => ({
   mockGet: vi.fn(),
   mockPut: vi.fn(),
   mockPost: vi.fn(),
+  mockPatch: vi.fn(),
 }))
 
 vi.mock('../client', () => ({
-  default: { get: mockGet, put: mockPut, post: mockPost, patch: vi.fn(), delete: vi.fn() },
+  default: { get: mockGet, put: mockPut, post: mockPost, patch: mockPatch, delete: vi.fn() },
 }))
 
 import {
@@ -18,6 +19,8 @@ import {
   fetchBankAccounts,
   createNote,
   fetchTags,
+  createReminder,
+  updateReminder,
 } from '../endpoints'
 
 beforeEach(() => {
@@ -104,5 +107,29 @@ describe('notas', () => {
     mockGet.mockResolvedValue({ data: [] })
     await fetchTags()
     expect(mockGet).toHaveBeenCalledWith('/api/v1/notes/tags')
+  })
+})
+
+describe('recordatorios: zona horaria para la push del servidor', () => {
+  const expected = -new Date().getTimezoneOffset()
+
+  it('al crear manda timezone_offset_minutes', async () => {
+    mockPost.mockResolvedValue({ data: { id: 'r1' } })
+    await createReminder({ message: 'm', icon: '🔔', hour: 21, minute: 30, enabled: true })
+    expect(mockPost).toHaveBeenCalledWith(
+      '/api/v1/reminders',
+      expect.objectContaining({ hour: 21, timezone_offset_minutes: expected }),
+    )
+  })
+
+  it('al cambiar la hora lo actualiza, pero no al prender o apagar', async () => {
+    mockPatch.mockResolvedValue({ data: { id: 'r1' } })
+    await updateReminder('r1', { hour: 8, minute: 0 })
+    expect(mockPatch).toHaveBeenLastCalledWith(
+      '/api/v1/reminders/r1',
+      expect.objectContaining({ timezone_offset_minutes: expected }),
+    )
+    await updateReminder('r1', { enabled: false })
+    expect(mockPatch).toHaveBeenLastCalledWith('/api/v1/reminders/r1', { enabled: false })
   })
 })

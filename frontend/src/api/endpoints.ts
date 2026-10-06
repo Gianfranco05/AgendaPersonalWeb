@@ -1082,13 +1082,24 @@ export async function fetchReminders(): Promise<Reminder[]> {
   return data;
 }
 
+// Minutos al este de UTC (Buenos Aires = -180): getTimezoneOffset() de JS usa el
+// signo opuesto. El backend dispara la push a la hora local del usuario con este
+// valor; sin él el recordatorio nunca suena desde el servidor (solo con la
+// pestaña abierta).
+function localTzOffsetMinutes(): number {
+  return -new Date().getTimezoneOffset();
+}
+
 export async function createReminder(
   input: Omit<Reminder, 'id'>,
 ): Promise<Reminder> {
   if (MOCK_ENABLED) {
     return mockDelay({ id: generateId(), ...input });
   }
-  const { data } = await apiClient.post<Reminder>('/api/v1/reminders', input);
+  const { data } = await apiClient.post<Reminder>('/api/v1/reminders', {
+    ...input,
+    timezone_offset_minutes: localTzOffsetMinutes(),
+  });
   return data;
 }
 
@@ -1107,7 +1118,12 @@ export async function updateReminder(
       ...input,
     });
   }
-  const { data } = await apiClient.patch<Reminder>(`/api/v1/reminders/${id}`, input);
+  // Solo si cambia la hora: prender/apagar el recordatorio no debe pisar la zona con la de este navegador.
+  const changesTime = input.hour !== undefined || input.minute !== undefined;
+  const { data } = await apiClient.patch<Reminder>(`/api/v1/reminders/${id}`, {
+    ...input,
+    ...(changesTime && { timezone_offset_minutes: localTzOffsetMinutes() }),
+  });
   return data;
 }
 
