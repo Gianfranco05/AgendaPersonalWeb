@@ -17,9 +17,20 @@ export default function NoteCard({ note, isSelected, onSelect, onPin, onDelete }
     .substring(0, 100);
 
   return (
-    <button
+    // div y no button: adentro van los botones de fijar/borrar, y un button
+    // dentro de otro button es HTML inválido (React lo advierte y Firefox no
+    // entrega bien los clicks de los hijos).
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onSelect}
-      className={`group relative w-full rounded-lg p-3 text-left transition-colors ${
+      onKeyDown={(e) => {
+        if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
+          e.preventDefault();
+          onSelect();
+        }
+      }}
+      className={`group relative cursor-pointer w-full rounded-lg p-3 text-left transition-colors ${
         isSelected
           ? 'bg-brand-surface-container ring-1 ring-brand-indigo/30'
           : 'hover:bg-gray-50 dark:hover:bg-slate-700/50'
@@ -69,7 +80,7 @@ export default function NoteCard({ note, isSelected, onSelect, onPin, onDelete }
       </div>
 
       {/* Actions (show on hover) */}
-      <div className="absolute right-2 top-2 flex gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+      <div className="absolute right-2 top-2 flex gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
         <button
           onClick={(e) => { e.stopPropagation(); onPin(); }}
           className="rounded p-1 text-gray-400 dark:text-slate-500 hover:bg-gray-200 dark:hover:bg-slate-600 hover:text-brand-indigo"
@@ -78,13 +89,17 @@ export default function NoteCard({ note, isSelected, onSelect, onPin, onDelete }
           <Pin size={12} />
         </button>
         <button
-          onClick={(e) => { e.stopPropagation(); onDelete(); }}
+          onClick={(e) => {
+            e.stopPropagation();
+            // Desde el editor se confirma; acá era un click suelto que borraba la nota.
+            if (window.confirm('¿Eliminar esta nota?')) onDelete();
+          }}
           className="rounded p-1 text-gray-400 dark:text-slate-500 hover:bg-rose-100 hover:text-rose-500"
           title="Eliminar"
         >
           <Trash2 size={12} />
         </button>
       </div>
-    </button>
+    </div>
   );
 }
