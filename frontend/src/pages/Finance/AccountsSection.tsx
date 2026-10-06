@@ -38,9 +38,10 @@ function AccountForm({
     setSaving(true);
     await saveBankAccount(account, {
       name: name.trim(),
-      bank_name: bankName.trim() || undefined,
+      // '' y no undefined: al editar, la API ignora lo ausente y no se podía borrar el valor.
+      bank_name: bankName.trim(),
       account_type: accountType,
-      account_number: accountNumber.trim() || undefined,
+      account_number: accountNumber.trim(),
       currency: currency.trim() || 'ARS',
       balance: Number(balance) || 0,
     });
