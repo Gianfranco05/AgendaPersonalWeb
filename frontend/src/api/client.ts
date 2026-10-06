@@ -30,10 +30,27 @@ function refreshSession(): Promise<void> {
   return refreshPromise;
 }
 
+// Páginas que se usan sin sesión. Al abrirlas, el chequeo de sesión (/me)
+// devuelve 401 y el refresh también: ahí eso solo significa "no logueado", y
+// mandar al login dejaba inaccesibles el registro, los textos legales y el
+// botón de arrepentimiento, que la ley (y Google Play) exigen públicos.
+const PUBLIC_PATHS = [
+  '/login',
+  '/register',
+  '/auth/google/callback',
+  '/terms',
+  '/privacy',
+  '/arrepentimiento',
+];
+
+export function isPublicPath(pathname: string): boolean {
+  return PUBLIC_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`));
+}
+
 async function forceLogout(): Promise<void> {
   const { useAuthStore } = await import('../store/authStore');
   useAuthStore.setState({ user: null, isAuthenticated: false, isLoading: false });
-  if (!(window.location.pathname ?? '').startsWith('/login')) {
+  if (!isPublicPath(window.location.pathname ?? '')) {
     window.location.href = '/login';
   }
 }
