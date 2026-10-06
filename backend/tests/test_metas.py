@@ -331,3 +331,51 @@ async def test_list_goals_with_existing_goal(auth_client):
     response = await auth_client.get("/metas/")
     assert response.status_code == 200
     assert "Leer" in response.text
+
+
+@pytest.mark.asyncio
+async def test_checkin_binario_negativo_deshace_la_meta(api_auth_client):
+    goal_id = (await api_auth_client.post("/api/v1/goals", json={
+        "title": "Meditar", "goal_type": "binary",
+    })).json()["id"]
+
+    done = await api_auth_client.put(
+        f"/api/v1/goals/{goal_id}/checkin", json={"record_date": "2026-10-06", "value": 1}
+    )
+    assert done.json()["is_completed"] is True
+
+    # El "reset" de la web manda el delta negativo.
+    reset = await api_auth_client.put(
+        f"/api/v1/goals/{goal_id}/checkin", json={"record_date": "2026-10-06", "value": -1}
+    )
+    body = reset.json()
+    assert body["is_completed"] is False
+    assert body["current_value"] == 0.0
+
+    # Y no quedan registros: ni el positivo ni uno negativo.
+    records = await api_auth_client.get(
+        f"/api/v1/goals/{goal_id}/records", params={"year": 2026, "month": 10}
+    )
+    assert records.json() == []
+
+
+@pytest.mark.asyncio
+async def test_checkin_negativo_no_baja_de_cero_y_desmarca_la_meta_de_progreso(api_auth_client):
+    goal_id = (await api_auth_client.post("/api/v1/goals", json={
+        "title": "Ahorro", "goal_type": "progress", "target_value": 10,
+    })).json()["id"]
+
+    full = await api_auth_client.put(
+        f"/api/v1/goals/{goal_id}/checkin", json={"record_date": "2026-10-06", "value": 10}
+    )
+    assert full.json()["is_completed"] is True
+
+    back = await api_auth_client.put(
+        f"/api/v1/goals/{goal_id}/checkin", json={"record_date": "2026-10-06", "value": -4}
+    )
+    assert (back.json()["current_value"], back.json()["is_completed"]) == (6.0, False)
+
+    below = await api_auth_client.put(
+        f"/api/v1/goals/{goal_id}/checkin", json={"record_date": "2026-10-06", "value": -100}
+    )
+    assert below.json()["current_value"] == 0.0

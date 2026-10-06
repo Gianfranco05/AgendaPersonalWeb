@@ -3,7 +3,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -265,20 +265,34 @@ async def habit_checkin(
     if not goal:
         raise HTTPException(status_code=404, detail="Meta no encontrada")
 
-    record = HabitRecord(
-        user_id=current_user.id,
-        goal_id=goal_id,
-        record_date=data.record_date,
-        value=data.value,
-        notes=data.notes,
-    )
-    db.add(record)
+    if data.value >= 0:
+        db.add(
+            HabitRecord(
+                user_id=current_user.id,
+                goal_id=goal_id,
+                record_date=data.record_date,
+                value=data.value,
+                notes=data.notes,
+            )
+        )
+    else:
+        # Un delta negativo es "deshacer" (el reset de la web): no es un registro
+        # de actividad, asi que no se guarda como uno; se borra el de ese dia.
+        await db.execute(
+            delete(HabitRecord).where(
+                HabitRecord.goal_id == goal_id,
+                HabitRecord.user_id == current_user.id,
+                HabitRecord.record_date == data.record_date,
+            )
+        )
 
-    goal.current_value = (goal.current_value or 0) + data.value
+    # Nunca por debajo de 0, y el estado de completada se recalcula en los dos
+    # sentidos: antes un reset dejaba is_completed=True para siempre.
+    goal.current_value = max(0.0, (goal.current_value or 0) + data.value)
     if goal.goal_type == "binary":
-        goal.is_completed = True
-    elif goal.target_value and goal.current_value >= goal.target_value:
-        goal.is_completed = True
+        goal.is_completed = goal.current_value > 0
+    elif goal.target_value:
+        goal.is_completed = goal.current_value >= goal.target_value
 
     await db.commit()
     await db.refresh(goal)
