@@ -10,6 +10,9 @@ import GoalsPage from './pages/Goals/GoalsPage';
 import SettingsPage from './pages/Settings/SettingsPage';
 import RegisterPage from './pages/Auth/RegisterPage';
 import GoogleCallbackPage from './pages/Auth/GoogleCallbackPage';
+import ForgotPasswordPage from './pages/Auth/ForgotPasswordPage';
+import ResetPasswordPage from './pages/Auth/ResetPasswordPage';
+import VerifyEmailPage from './pages/Auth/VerifyEmailPage';
 import LoginPage from './features/auth/LoginPage';
 import { useAuthStore } from './store/authStore';
 import { GOOGLE_CALLBACK_PATH } from './api/client';
@@ -51,6 +54,11 @@ export default function App() {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path={GOOGLE_CALLBACK_PATH} element={<GoogleCallbackPage />} />
+            {/* Los mails de recuperación y verificación linkean a estas rutas
+                (backend/app/core/email.py): se abren desde el mail, con o sin sesión. */}
+            <Route path="/olvide-password" element={<ForgotPasswordPage />} />
+            <Route path="/resetear-password" element={<ResetPasswordPage />} />
+            <Route path="/verificar-email" element={<VerifyEmailPage />} />
             {/* Públicas: tienen que ser accesibles antes de registrarse, ya que
                 el registro remite a ellas. */}
             <Route path="/terms" element={<Suspense fallback={<LoadingSkeleton type="page" />}><TermsPage /></Suspense>} />

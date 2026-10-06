@@ -25,7 +25,9 @@ function handleGoogleLogin() {
 export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const googleError = (location.state as { googleError?: string } | null)?.googleError;
+  const locationState = location.state as { googleError?: string; registered?: boolean } | null;
+  const googleError = locationState?.googleError;
+  const registered = locationState?.registered;
   const { login, isAuthenticated } = useAuthStore();
 
   const {
@@ -81,6 +83,11 @@ export default function LoginPage() {
           </div>
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            {registered && (
+              <div className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-700">
+                Cuenta creada. Iniciá sesión para empezar.
+              </div>
+            )}
             {googleError && (
               <div className="rounded-lg bg-red-50 p-3 text-sm text-red-600">{googleError}</div>
             )}
@@ -108,6 +115,9 @@ export default function LoginPage() {
             <div>
               <div className="mb-1 flex items-center justify-between">
                 <label className="block text-sm font-medium text-gray-700 dark:text-slate-200">Contraseña</label>
+                <Link to="/olvide-password" className="text-xs font-medium text-brand-indigo hover:text-brand-indigo-hover">
+                  ¿Olvidaste tu contraseña?
+                </Link>
               </div>
               <input
                 {...register('password')}

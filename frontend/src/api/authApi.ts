@@ -29,6 +29,20 @@ export async function register(
   });
 }
 
+// Recuperación de contraseña y verificación de email. Los links de los mails
+// del backend apuntan a /resetear-password y /verificar-email del SPA.
+export async function forgotPassword(email: string): Promise<void> {
+  await apiClient.post('/auth/api/forgot-password', { email });
+}
+
+export async function resetPassword(token: string, password: string): Promise<void> {
+  await apiClient.post('/auth/api/reset-password', { token, password });
+}
+
+export async function verifyEmail(token: string): Promise<void> {
+  await apiClient.post('/auth/api/verify-email', { token });
+}
+
 export async function updateProfile(fullName: string): Promise<AuthUser> {
   const { data } = await apiClient.patch<AuthUser>('/auth/api/me', { full_name: fullName });
   return data;
