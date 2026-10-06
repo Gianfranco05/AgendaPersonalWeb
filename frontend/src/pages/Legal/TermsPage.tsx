@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import LegalLayout from './LegalLayout';
 
 /**
@@ -71,8 +72,10 @@ export default function TermsPage() {
           <li>
             Reembolsos: tenés 14 días corridos desde la compra para pedir un
             reembolso completo, sin necesidad de justificar el motivo,
-            escribiendo a [EMAIL DE CONTACTO]. Ver la Política de Compras y
-            Reembolsos para el detalle.
+            desde el{' '}
+            <Link to="/arrepentimiento">Botón de arrepentimiento</Link>{' '}
+            (no hace falta tener cuenta) o escribiendo a [EMAIL DE CONTACTO].
+            Ver la Política de Compras y Reembolsos para el detalle.
           </li>
         </ul>
       </section>

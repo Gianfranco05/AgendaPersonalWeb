@@ -3,6 +3,7 @@
 Se habla con la API HTTP directamente (httpx ya es dependencia) en vez de sumar
 el SDK: es un solo POST y evita una dependencia mas que mantener.
 """
+import html as html_lib
 import logging
 
 import httpx
@@ -98,3 +99,24 @@ async def send_password_reset_email(to: str, token: str) -> bool:
         cta_label="Elegir nueva contraseña",
     )
     return await send_email(to, "Restablecer tu contraseña", html)
+
+
+async def send_withdrawal_confirmation_email(to: str, code: str, full_name: str) -> bool:
+    """Constancia del Boton de arrepentimiento (Res. 424/2020): lleva el codigo
+    de tramite y lo que pasa despues. El nombre lo escribe cualquiera en un
+    formulario publico, asi que se escapa antes de ir al HTML."""
+    nombre = html_lib.escape(full_name)
+    html = f"""<div style="font-family:system-ui,-apple-system,sans-serif;max-width:480px;margin:0 auto;padding:24px;color:#1f2937">
+  <h1 style="font-size:20px;margin:0 0 16px">Recibimos tu solicitud de arrepentimiento</h1>
+  <p>Hola {nombre}, registramos tu pedido de revocar la compra en {settings.MAIL_FROM_NAME}.</p>
+  <p style="margin:20px 0;padding:16px;background:#f3f4f6;border-radius:8px;text-align:center">
+    <span style="font-size:13px;color:#6b7280">Código de trámite</span><br>
+    <span style="font-size:26px;font-weight:700;letter-spacing:2px">{code}</span>
+  </p>
+  <p>Guardá este código: lo vas a necesitar si querés consultar el estado del trámite.</p>
+  <p><strong>Qué sigue:</strong> te respondemos en un máximo de 5 días hábiles. Si
+  corresponde, el reembolso se hace por el mismo medio de pago con el que
+  compraste (Mercado Pago).</p>
+  <p style="font-size:13px;color:#6b7280">Si no fuiste vos quien hizo este pedido, ignorá este mail.</p>
+</div>"""
+    return await send_email(to, f"Solicitud de arrepentimiento {code}", html)

@@ -1154,6 +1154,30 @@ export async function createCheckout(moduleKey: string): Promise<{ url: string }
   return data;
 }
 
+// ── Botón de arrepentimiento (público: no requiere sesión) ──
+
+export interface WithdrawalRequestInput {
+  full_name: string;
+  email: string;
+  purchase_detail: string;
+  message?: string;
+}
+
+export interface WithdrawalRequestResult {
+  code: string;
+  created_at: string;
+}
+
+export async function createWithdrawalRequest(
+  input: WithdrawalRequestInput,
+): Promise<WithdrawalRequestResult> {
+  if (MOCK_ENABLED) {
+    return mockDelay({ code: 'ARR-MOCK23', created_at: new Date().toISOString() });
+  }
+  const { data } = await apiClient.post<WithdrawalRequestResult>('/api/v1/arrepentimiento', input);
+  return data;
+}
+
 // ── Travel (plantilla de pago: /travel requiere haber comprado el módulo) ──
 
 export async function fetchTrips(): Promise<Trip[]> {

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
+import PublicFooter from '../../components/PublicFooter';
 
 /**
  * Gate obligatorio: se muestra cuando `user.terms_accepted_version` no
@@ -35,7 +36,7 @@ export default function AcceptTermsPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-10 dark:bg-slate-900">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-gray-50 px-4 py-10 dark:bg-slate-900">
       <div className="w-full max-w-md rounded-xl bg-white p-8 shadow-sm dark:bg-slate-800">
         <h1 className="text-xl font-bold text-gray-800 dark:text-slate-100">
           Actualizamos nuestros Términos
@@ -88,6 +89,8 @@ export default function AcceptTermsPage() {
           Cerrar sesión
         </button>
       </div>
+
+      <PublicFooter className="mt-6" />
     </div>
   );
 }

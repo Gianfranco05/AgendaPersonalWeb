@@ -85,7 +85,9 @@ export default function PrivacyPage() {
           Mientras tengas la cuenta abierta. Si la eliminás, borramos tus datos de
           la base de forma inmediata e irreversible. Pueden persistir hasta
           [PLAZO DE RETENCIÓN DE BACKUPS] en copias de seguridad, que se sobrescriben
-          por rotación.
+          por rotación. La excepción son las solicitudes del Botón de
+          arrepentimiento (nombre, email y detalle de la compra): se conservan,
+          desvinculadas de tu cuenta, como constancia del trámite.
         </p>
       </section>
 

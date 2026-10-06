@@ -186,6 +186,13 @@ export default function StorePage() {
         </div>
       )}
 
+      <p className="text-xs text-gray-500 dark:text-slate-400">
+        Tenés 14 días corridos desde la compra para pedir el reembolso completo.{' '}
+        <Link to="/arrepentimiento" className="font-medium text-brand-indigo hover:underline">
+          Botón de arrepentimiento
+        </Link>
+      </p>
+
       {isLoading ? (
         <div className="space-y-3">
           <LoadingSkeleton type="card" />

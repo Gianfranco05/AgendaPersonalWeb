@@ -61,7 +61,7 @@ No compartimos tus datos con ningún otro tercero, y no los transferimos fuera d
 
 ## 5. Cuánto tiempo guardamos tus datos
 
-Guardamos tus datos mientras tu cuenta esté activa. Si eliminás tu cuenta, borramos permanentemente todos tus datos personales de nuestra base de datos de forma inmediata (ver sección 7). Los registros de pago que Mercado Pago requiere por normativa contable/fiscal pueden conservarse en los sistemas de Mercado Pago según sus propias políticas, independientes de las nuestras.
+Guardamos tus datos mientras tu cuenta esté activa. Si eliminás tu cuenta, borramos permanentemente todos tus datos personales de nuestra base de datos de forma inmediata (ver sección 7). Los registros de pago que Mercado Pago requiere por normativa contable/fiscal pueden conservarse en los sistemas de Mercado Pago según sus propias políticas, independientes de las nuestras. La excepción son las solicitudes del Botón de arrepentimiento (nombre, email y detalle de la compra): se conservan, desvinculadas de tu cuenta, como constancia del trámite.
 
 ## 6. Cómo protegemos tus datos
 

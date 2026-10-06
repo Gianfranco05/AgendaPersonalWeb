@@ -4,6 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useNavigate, Link } from 'react-router-dom';
 import * as authApi from '../../api/authApi';
 import GoogleIcon from '../../components/icons/GoogleIcon';
+import PublicFooter from '../../components/PublicFooter';
 
 const API_BASE = import.meta.env.VITE_API_URL ?? '';
 
@@ -178,6 +179,8 @@ export default function RegisterPage() {
               Iniciá sesión
             </Link>
           </p>
+
+          <PublicFooter className="mt-8" />
         </div>
       </div>
     </div>

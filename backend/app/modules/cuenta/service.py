@@ -14,11 +14,12 @@ from decimal import Decimal
 from typing import Any, Optional
 from uuid import UUID
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.ajustes.models import UserPreference
 from app.modules.anotaciones.models import Note, Tag, note_tags
+from app.modules.arrepentimiento.models import WithdrawalRequest
 from app.modules.auth.models import RefreshToken, User, VerificationToken
 from app.modules.billing.models import StripeCustomer
 from app.modules.eventos.models import Event
@@ -86,6 +87,14 @@ OWNED_TABLES: list[tuple[str, Any]] = [
     ("verification_tokens", VerificationToken),
 ]
 
+# Tablas con `user_id` que se CONSERVAN al borrar la cuenta: se desvincula al
+# usuario (user_id = NULL) pero la fila queda. Son registros legales — la
+# solicitud del Boton de arrepentimiento tiene que poder responderse aunque la
+# persona haya cerrado su cuenta. Salen en el export como cualquier otra tabla.
+RETAINED_TABLES: list[tuple[str, Any]] = [
+    ("withdrawal_requests", WithdrawalRequest),
+]
+
 # Nunca salen en el export: son credenciales, material de sesion, o
 # identificadores de dispositivo sin valor para el usuario fuera de la app.
 NEVER_EXPORTED: set[str] = {"refresh_tokens", "verification_tokens", "push_tokens"}
@@ -137,7 +146,7 @@ class AccountService:
             "user": _serialize_row(User, user, "users"),
         }
 
-        for table_key, model in OWNED_TABLES:
+        for table_key, model in [*OWNED_TABLES, *RETAINED_TABLES]:
             if table_key in NEVER_EXPORTED:
                 continue
             result = await self.db.execute(
@@ -194,6 +203,11 @@ class AccountService:
         await self.db.execute(delete(note_tags).where(note_tags.c.note_id.in_(note_ids)))
         tag_ids = select(Tag.id).where(Tag.user_id == user_id)
         await self.db.execute(delete(note_tags).where(note_tags.c.tag_id.in_(tag_ids)))
+
+        for _table_key, model in RETAINED_TABLES:
+            await self.db.execute(
+                update(model).where(model.user_id == user_id).values(user_id=None)
+            )
 
         for _table_key, model in OWNED_TABLES:
             await self.db.execute(delete(model).where(model.user_id == user_id))

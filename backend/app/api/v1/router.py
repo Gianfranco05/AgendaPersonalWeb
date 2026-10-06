@@ -14,6 +14,7 @@ from app.modules.modulos.api_routes import router as modules_router
 from app.modules.focus.api_routes import router as focus_router
 from app.modules.recordatorios.api_routes import router as reminders_router
 from app.modules.push.api_routes import router as push_router
+from app.modules.arrepentimiento.api_routes import router as withdrawal_router
 from app.modules.estudio.api_routes import router as study_router
 from app.modules.biblioteca.api_routes import router as library_router
 from app.modules.peliculas.api_routes import router as media_router
@@ -39,6 +40,7 @@ api_router.include_router(modules_router)
 api_router.include_router(focus_router)
 api_router.include_router(reminders_router)
 api_router.include_router(push_router)
+api_router.include_router(withdrawal_router)
 api_router.include_router(study_router)
 api_router.include_router(library_router)
 api_router.include_router(media_router)

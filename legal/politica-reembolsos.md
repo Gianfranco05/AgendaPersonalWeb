@@ -15,7 +15,7 @@ El pago se procesa a través de **Mercado Pago**. Al confirmar la compra, el mó
 
 Tenés **14 días corridos** desde la fecha de compra para pedir un reembolso completo, sin necesidad de justificar el motivo.
 
-Para pedirlo, escribinos a **[EMAIL DE CONTACTO]** con el email de tu cuenta y qué módulo querés reembolsar. Procesamos el reembolso dentro de los 5 días hábiles siguientes, a través del mismo medio de pago que usaste.
+Para pedirlo, usá el **Botón de arrepentimiento** (`/arrepentimiento`), que está visible en todas las páginas del sitio y **no requiere tener cuenta ni iniciar sesión**: al enviarlo recibís un código de trámite en pantalla y por email. También podés escribirnos a **[EMAIL DE CONTACTO]** con el email de tu cuenta y qué módulo querés reembolsar. Procesamos el reembolso dentro de los 5 días hábiles siguientes, a través del mismo medio de pago que usaste.
 
 Al procesarse el reembolso, perdés el acceso al módulo correspondiente, pero **conservás los datos que hayas cargado en él** durante 30 días adicionales por si te arrepentís y volvés a comprarlo — pasado ese plazo, esos datos específicos del módulo pueden eliminarse.
 

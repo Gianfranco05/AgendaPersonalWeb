@@ -360,6 +360,10 @@ export default function SettingsPage() {
         <Link to="/privacy" className="hover:underline">
           Política de Privacidad
         </Link>
+        {' · '}
+        <Link to="/arrepentimiento" className="hover:underline">
+          Botón de arrepentimiento
+        </Link>
       </p>
     </div>
   );

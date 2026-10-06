@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
+import PublicFooter from '../../components/PublicFooter';
 
 interface LegalLayoutProps {
   title: string;
@@ -31,6 +32,8 @@ export default function LegalLayout({ title, updatedAt, children }: LegalLayoutP
             {children}
           </div>
         </article>
+
+        <PublicFooter className="mt-6" />
       </div>
     </div>
   );

@@ -9,7 +9,7 @@ from app.modules.anotaciones.models import Note, Tag, note_tags
 from app.modules.auth.models import User
 from app.modules.billing.models import StripeCustomer
 from app.modules.modulos.models import ModulePurchase
-from app.modules.cuenta.service import OWNED_TABLES
+from app.modules.cuenta.service import OWNED_TABLES, RETAINED_TABLES
 from app.modules.fitness.models import Exercise, WorkoutSession
 from app.modules.finanzas.models import Category, Transaction
 from app.modules.metas.models import Goal, HabitRecord
@@ -26,7 +26,7 @@ def test_owned_tables_cubre_todos_los_modelos_con_user_id():
     fuera del borrado (quedan filas huerfanas apuntando a un usuario que ya no
     existe). Este test es el que hace que la lista no se pudra.
     """
-    registradas = {nombre for nombre, _ in OWNED_TABLES}
+    registradas = {nombre for nombre, _ in [*OWNED_TABLES, *RETAINED_TABLES]}
     con_user_id = {
         tabla.name
         for tabla in Base.metadata.tables.values()

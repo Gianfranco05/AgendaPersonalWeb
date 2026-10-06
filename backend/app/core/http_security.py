@@ -177,6 +177,10 @@ auth_rate_limiter = _build_rate_limiter(
 # castigaria a cualquiera detras del mismo NAT/red corporativa que el
 # usuario.
 billing_rate_limiter = _build_rate_limiter(max_attempts=10, window_seconds=300)
+# Boton de arrepentimiento: es publico (sin login), asi que la key es la IP.
+# Mas estricto que el de auth: cada pedido dispara un mail y un aviso al
+# operador, y una persona real manda uno, quizas un par si se equivoco.
+withdrawal_rate_limiter = _build_rate_limiter(max_attempts=5, window_seconds=3600)
 
 
 async def rate_limit_auth(request: Request) -> None:
@@ -198,6 +202,19 @@ async def rate_limit_billing(
     if not settings.RATE_LIMIT_ENABLED:
         return
     retry_after = await billing_rate_limiter.hit(str(current_user.id))
+    if retry_after:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Demasiados intentos. Probá de nuevo en unos minutos.",
+            headers={"Retry-After": str(retry_after)},
+        )
+
+
+async def rate_limit_withdrawal(request: Request) -> None:
+    if not settings.RATE_LIMIT_ENABLED:
+        return
+    client_ip = request.client.host if request.client else "unknown"
+    retry_after = await withdrawal_rate_limiter.hit(client_ip)
     if retry_after:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,

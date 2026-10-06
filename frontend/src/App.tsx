@@ -22,6 +22,7 @@ const NutritionPage = lazy(() => import('./pages/Nutrition/NutritionPage'));
 const HabitsPage = lazy(() => import('./pages/Habits/HabitsPage'));
 const TermsPage = lazy(() => import('./pages/Legal/TermsPage'));
 const PrivacyPage = lazy(() => import('./pages/Legal/PrivacyPage'));
+const WithdrawalPage = lazy(() => import('./pages/Legal/WithdrawalPage'));
 const ModulesPage = lazy(() => import('./pages/Modules/ModulesPage'));
 const StorePage = lazy(() => import('./pages/Store/StorePage'));
 const AcceptTermsPage = lazy(() => import('./pages/Legal/AcceptTermsPage'));
@@ -53,6 +54,9 @@ export default function App() {
                 el registro remite a ellas. */}
             <Route path="/terms" element={<Suspense fallback={<LoadingSkeleton type="page" />}><TermsPage /></Suspense>} />
             <Route path="/privacy" element={<Suspense fallback={<LoadingSkeleton type="page" />}><PrivacyPage /></Suspense>} />
+            {/* Botón de arrepentimiento (Res. 424/2020): público y sin login a
+                propósito, la norma exige que se pueda usar sin cuenta. */}
+            <Route path="/arrepentimiento" element={<Suspense fallback={<LoadingSkeleton type="page" />}><WithdrawalPage /></Suspense>} />
             {/* Requiere sesión iniciada, pero sin pasar por el gate de términos
                 (evita el loop de redirección contra sí misma). */}
             <Route element={<ProtectedRoute skipTermsGate />}>

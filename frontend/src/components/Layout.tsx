@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, PiggyBank, StickyNote, ListTodo, Calendar, Target, Settings, Menu, X, LogOut, Dumbbell, Apple, Repeat, Sun, Moon, LayoutGrid, Timer } from 'lucide-react';
+import { LayoutDashboard, PiggyBank, StickyNote, ListTodo, Calendar, Target, Settings, Menu, X, LogOut, Dumbbell, Apple, Repeat, Sun, Moon, LayoutGrid, Timer, Undo2 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { useTheme } from '../context/ThemeContext';
+import PublicFooter from './PublicFooter';
 
 const navItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -89,6 +90,16 @@ export default function Layout() {
         </nav>
 
         <div className="absolute bottom-0 left-0 right-0 border-t border-white/20 p-4">
+          {/* Res. 424/2020: el botón de arrepentimiento tiene que estar a la
+              vista en todo el sitio, no escondido en un submenú. */}
+          <NavLink
+            to="/arrepentimiento"
+            onClick={() => setMobileOpen(false)}
+            className="mb-3 flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-medium text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+          >
+            <Undo2 size={16} aria-hidden="true" />
+            Botón de arrepentimiento
+          </NavLink>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3 min-w-0">
               <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/20 text-xs font-semibold">
@@ -139,6 +150,7 @@ export default function Layout() {
           <div key={location.pathname} className="animate-fade-in">
             <Outlet />
           </div>
+          <PublicFooter className="mt-10 pb-2" />
         </main>
       </div>
     </div>
