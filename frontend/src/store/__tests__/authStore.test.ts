@@ -1,6 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { useAuthStore } from '../authStore'
 import * as authApi from '../../api/authApi'
+import { mutate as swrMutate } from 'swr'
+
+vi.mock('swr', async () => {
+  const actual = await vi.importActual('swr')
+  return { ...(actual as object), mutate: vi.fn() }
+})
 
 vi.mock('../../api/authApi', () => ({
   login: vi.fn(),
@@ -36,5 +42,22 @@ describe('authStore.logout', () => {
     await useAuthStore.getState().logout()
     expect(authApi.logout).toHaveBeenCalledTimes(1)
     expect(useAuthStore.getState().isAuthenticated).toBe(false)
+  })
+})
+
+describe('caché de SWR entre sesiones', () => {
+  it('se vacía al cerrar sesión, para que el próximo usuario no vea datos ajenos', async () => {
+    vi.mocked(authApi.logout).mockResolvedValue(undefined)
+    await useAuthStore.getState().logout()
+    expect(swrMutate).toHaveBeenCalledWith(expect.any(Function), undefined, { revalidate: false })
+    const matcher = vi.mocked(swrMutate).mock.calls[0][0] as (key: unknown) => boolean
+    expect(matcher('finance/summary')).toBe(true)
+    expect(matcher(['finance/budgets', 2026, 10])).toBe(true)
+  })
+
+  it('se vacía al iniciar sesión', async () => {
+    vi.mocked(authApi.login).mockResolvedValue(user)
+    await useAuthStore.getState().login('a@b.com', 'x')
+    expect(swrMutate).toHaveBeenCalledTimes(1)
   })
 })

@@ -1,6 +1,14 @@
 import { create } from 'zustand';
 import type { AuthUser } from '../types/auth';
+import { mutate as clearSwrCache } from 'swr';
 import * as authApi from '../api/authApi';
+
+// El caché de SWR vive en memoria durante toda la pestaña: sin vaciarlo, quien
+// entra después en el mismo navegador veía por un instante (o sin conexión,
+// todo el tiempo) los datos de la sesión anterior.
+export function resetClientCache() {
+  return clearSwrCache(() => true, undefined, { revalidate: false });
+}
 
 interface AuthState {
   user: AuthUser | null;
@@ -20,6 +28,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   login: async (email, password) => {
     const user = await authApi.login(email, password);
+    await resetClientCache();
     set({ user, isAuthenticated: true });
   },
 
@@ -31,6 +40,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       // rechazada cortaba el flujo y "Cerrar sesión" no hacía nada.
     }
     set({ user: null, isAuthenticated: false });
+    await resetClientCache();
   },
 
   checkAuth: async () => {

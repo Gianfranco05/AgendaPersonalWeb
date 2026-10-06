@@ -57,8 +57,9 @@ export function isPublicPath(pathname: string): boolean {
 }
 
 async function forceLogout(): Promise<void> {
-  const { useAuthStore } = await import('../store/authStore');
+  const { useAuthStore, resetClientCache } = await import('../store/authStore');
   useAuthStore.setState({ user: null, isAuthenticated: false, isLoading: false });
+  await resetClientCache();
   if (!isPublicPath(window.location.pathname ?? '')) {
     window.location.href = '/login';
   }
