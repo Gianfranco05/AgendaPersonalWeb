@@ -159,7 +159,7 @@ export default function FinancePage() {
                 summary.balance >= 0 ? 'text-emerald-500' : 'text-rose-500'
               }`}
             >
-              ${summary.balance.toLocaleString('es-AR')}
+              {summary.balance < 0 ? '-' : ''}${Math.abs(summary.balance).toLocaleString('es-AR')}
             </p>
           </div>
         </div>
