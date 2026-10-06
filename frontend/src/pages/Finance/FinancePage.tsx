@@ -64,6 +64,7 @@ export default function FinancePage() {
   }
 
   async function handleDelete(id: string) {
+    if (!window.confirm('¿Eliminar esta transacción?')) return;
     await removeTransaction(id, txParams);
   }
 

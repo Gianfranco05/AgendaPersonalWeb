@@ -35,6 +35,7 @@ export default function NutritionPage() {
   }
 
   async function handleDelete(id: string) {
+    if (!window.confirm('¿Eliminar esta comida?')) return;
     await removeMeal(id, params);
   }
 

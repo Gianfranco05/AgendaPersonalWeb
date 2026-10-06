@@ -25,6 +25,7 @@ export default function FitnessPage() {
   }
 
   async function handleDelete(id: string) {
+    if (!window.confirm('¿Eliminar esta sesión?')) return;
     await removeWorkoutSession(id);
   }
 

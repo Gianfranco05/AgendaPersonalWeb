@@ -131,6 +131,7 @@ export default function BudgetsSection() {
   }
 
   async function handleDelete(id: string) {
+    if (!window.confirm('¿Eliminar este presupuesto?')) return;
     await removeBudget(id, year, month);
   }
 
