@@ -265,19 +265,40 @@ async def habit_checkin(
     if not goal:
         raise HTTPException(status_code=404, detail="Meta no encontrada")
 
-    if data.value >= 0:
-        db.add(
-            HabitRecord(
-                user_id=current_user.id,
-                goal_id=goal_id,
-                record_date=data.record_date,
-                value=data.value,
-                notes=data.notes,
+    day_records = (
+        await db.execute(
+            select(HabitRecord)
+            .where(
+                HabitRecord.goal_id == goal_id,
+                HabitRecord.user_id == current_user.id,
+                HabitRecord.record_date == data.record_date,
             )
+            .order_by(HabitRecord.created_at.desc())
         )
-    else:
-        # Un delta negativo es "deshacer" (el reset de la web): no es un registro
-        # de actividad, asi que no se guarda como uno; se borra el de ese dia.
+    ).scalars().all()
+
+    # El contador se mueve exactamente lo que cambian los registros del dia:
+    # antes un "deshacer" borraba todos los registros pero restaba solo el
+    # delta pedido, y contador y registros quedaban desparejos.
+    if data.value >= 0:
+        if goal.goal_type == "binary" and day_records:
+            # Un habito de si/no ya marcado ese dia no suma de nuevo (doble
+            # toque, reintento de la cola offline).
+            delta = 0.0
+        else:
+            db.add(
+                HabitRecord(
+                    user_id=current_user.id,
+                    goal_id=goal_id,
+                    record_date=data.record_date,
+                    value=data.value,
+                    notes=data.notes,
+                )
+            )
+            delta = data.value
+    elif goal.goal_type == "binary":
+        # Deshacer un habito de si/no: el dia queda sin marcar.
+        delta = -sum(r.value or 0 for r in day_records)
         await db.execute(
             delete(HabitRecord).where(
                 HabitRecord.goal_id == goal_id,
@@ -285,10 +306,25 @@ async def habit_checkin(
                 HabitRecord.record_date == data.record_date,
             )
         )
+    else:
+        # Meta de progreso: se descuenta de los registros de ese dia, del mas
+        # nuevo al mas viejo, sin guardar registros negativos.
+        remaining = -data.value
+        for record in day_records:
+            if remaining <= 0:
+                break
+            value = record.value or 0
+            if value <= remaining:
+                remaining -= value
+                await db.delete(record)
+            else:
+                record.value = value - remaining
+                remaining = 0
+        delta = data.value + remaining
 
     # Nunca por debajo de 0, y el estado de completada se recalcula en los dos
     # sentidos: antes un reset dejaba is_completed=True para siempre.
-    goal.current_value = max(0.0, (goal.current_value or 0) + data.value)
+    goal.current_value = max(0.0, (goal.current_value or 0) + delta)
     if goal.goal_type == "binary":
         goal.is_completed = goal.current_value > 0
     elif goal.target_value:
