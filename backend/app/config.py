@@ -8,6 +8,9 @@ _INSECURE_SECRETS = {
     "change-this-to-a-random-secret-key-in-production",
     "secret",
     "changeme",
+    # Default del docker-compose.yml de desarrollo: tiene mas de 32 caracteres,
+    # asi que sin esto pasaria el control de largo si se usara en produccion.
+    "dev-secret-key-change-in-production",
 }
 
 

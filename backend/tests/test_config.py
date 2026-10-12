@@ -29,6 +29,12 @@ def test_production_requires_a_strong_secret_key():
         Settings(**_base_kwargs(SECRET_KEY="change-this-in-production"))
 
 
+def test_production_rejects_the_dev_compose_secret():
+    # Tiene mas de 32 caracteres: el control de largo solo no lo frenaba.
+    with pytest.raises(ValidationError, match="SECRET_KEY inseguro"):
+        Settings(**_base_kwargs(SECRET_KEY="dev-secret-key-change-in-production"))
+
+
 def test_production_requires_debug_false():
     with pytest.raises(ValidationError, match="DEBUG debe ser false"):
         Settings(**_base_kwargs(DEBUG=True))
