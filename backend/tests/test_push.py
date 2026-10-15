@@ -199,6 +199,7 @@ async def test_claim_en_redis_solo_lo_gana_un_proceso(monkeypatch):
     from datetime import date
 
     from app.config import settings
+    from app.core import redis_claim
     from app.modules.recordatorios import scheduler
 
     claimed_keys = set()
@@ -211,7 +212,7 @@ async def test_claim_en_redis_solo_lo_gana_un_proceso(monkeypatch):
             return True
 
     monkeypatch.setattr(settings, "REDIS_URL", "redis://fake")
-    monkeypatch.setattr(scheduler, "_redis_client", FakeRedis())
+    monkeypatch.setattr(redis_claim, "_redis_client", FakeRedis())
 
     # Dos workers (dos procesos) intentan reclamar el mismo disparo.
     assert await scheduler._claim_in_redis("r1", date(2026, 9, 21)) is True
@@ -226,6 +227,7 @@ async def test_claim_sin_redis_o_con_redis_caido_no_pierde_el_recordatorio(monke
     from datetime import date
 
     from app.config import settings
+    from app.core import redis_claim
     from app.modules.recordatorios import scheduler
 
     monkeypatch.setattr(settings, "REDIS_URL", "")
@@ -236,7 +238,7 @@ async def test_claim_sin_redis_o_con_redis_caido_no_pierde_el_recordatorio(monke
             raise ConnectionError("redis caido")
 
     monkeypatch.setattr(settings, "REDIS_URL", "redis://fake")
-    monkeypatch.setattr(scheduler, "_redis_client", BrokenRedis())
+    monkeypatch.setattr(redis_claim, "_redis_client", BrokenRedis())
     assert await scheduler._claim_in_redis("r1", date(2026, 9, 21)) is True
 
 

@@ -5,7 +5,7 @@ from typing import Optional
 
 from sqlalchemy import select
 
-from app.config import settings
+from app.core.redis_claim import claim_once
 from app.database import AsyncSessionLocal
 from app.modules.push.service import PushService
 from app.modules.recordatorios.models import Reminder
@@ -29,8 +29,6 @@ _sent_today: dict[str, date] = {}
 _last_checked_minute: Optional[datetime] = None
 # Tope de recuperacion: tras una caida larga no se disparan recordatorios viejos.
 MAX_CATCHUP_MINUTES = 3
-
-_redis_client = None
 
 
 def should_fire(reminder: Reminder, now_utc: datetime) -> bool:
@@ -56,28 +54,9 @@ def should_fire(reminder: Reminder, now_utc: datetime) -> bool:
 
 async def _claim_in_redis(reminder_id: str, local_date: date) -> bool:
     """True si este proceso es el primero en reclamar el disparo (recordatorio,
-    dia). SET NX es atomico: de N workers solo uno lo gana. Sin REDIS_URL, o si
-    Redis no responde, devuelve True y manda igual: con un solo proceso no hay
-    carrera, y es preferible un duplicado a perder el recordatorio."""
-    global _redis_client
-    if not settings.REDIS_URL:
-        return True
-    try:
-        if _redis_client is None:
-            import redis.asyncio as aioredis
-
-            _redis_client = aioredis.from_url(
-                settings.REDIS_URL, encoding="utf-8", decode_responses=True
-            )
-        # 36h: cubre el dia local completo en cualquier huso horario.
-        claimed = await _redis_client.set(
-            f"reminder-fired:{reminder_id}:{local_date.isoformat()}", "1", nx=True, ex=129600
-        )
-        return bool(claimed)
-    except Exception:
-        logger.warning("Scheduler: Redis no disponible para deduplicar", exc_info=True)
-        _redis_client = None
-        return True
+    dia). Ver `claim_once`: sin Redis, o con Redis caido, manda igual."""
+    # 36h: cubre el dia local completo en cualquier huso horario.
+    return await claim_once(f"reminder-fired:{reminder_id}:{local_date.isoformat()}", 129600)
 
 
 def _minutes_to_check(now_utc: datetime) -> list[datetime]:

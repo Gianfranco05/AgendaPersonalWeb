@@ -23,6 +23,7 @@ from app.core.http_security import BodySizeLimitMiddleware, SecurityHeadersMiddl
 from app.core.logging_config import setup_logging
 from app.core.health import health_router
 from app.modules.recordatorios.scheduler import run_reminder_scheduler
+from app.modules.inversiones.scheduler import run_investment_alert_scheduler
 
 logger = logging.getLogger(__name__)
 
@@ -43,9 +44,13 @@ async def lifespan(app: FastAPI):
     setup_logging()
     init_sentry()
     logger.info("Sentry initialized")
-    scheduler_task = asyncio.create_task(run_reminder_scheduler())
+    scheduler_tasks = [
+        asyncio.create_task(run_reminder_scheduler()),
+        asyncio.create_task(run_investment_alert_scheduler()),
+    ]
     yield
-    scheduler_task.cancel()
+    for task in scheduler_tasks:
+        task.cancel()
     await engine.dispose()
 
 
