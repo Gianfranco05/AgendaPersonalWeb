@@ -68,7 +68,13 @@ export interface Category {
 export interface FinanceSummary {
   total_income: number;
   total_expenses: number;
+  // Solo efectivo (se asume ARS), tenga o no activado "Sumar inversiones al balance".
   balance: number;
+  // Aditivos: null = falta una cotización para valuar las inversiones en ARS.
+  investments_value_ars?: number | null;
+  net_worth_ars?: number | null;
+  investments_missing_rates?: string[];
+  include_investments_in_balance?: boolean;
 }
 
 export interface TransactionsResponse {
@@ -132,6 +138,11 @@ export interface Settings {
   date_format: string;
   google_calendar_id: string;
   google_connected: boolean;
+  // Cotizaciones que carga el usuario (ARS por 1 USD / 1 EUR); null = sin cargar.
+  fx_usd_ars?: number | null;
+  fx_eur_ars?: number | null;
+  fx_rates_updated_at?: string | null;
+  include_investments_in_balance?: boolean;
 }
 
 export type TaskStatus = 'pending' | 'in_progress' | 'completed';
@@ -476,4 +487,120 @@ export interface ProjectsSummary {
   tasks_pending: number;
   tasks_in_progress: number;
   tasks_done: number;
+}
+
+// ── Inversiones ──
+
+export type AssetType =
+  | 'stock'
+  | 'fixed_term'
+  | 'crypto'
+  | 'bond'
+  | 'fund'
+  | 'fx'
+  | 'real_estate'
+  | 'vehicle'
+  | 'other';
+
+export type InvestmentCurrency = 'ARS' | 'USD' | 'USDT' | 'EUR';
+
+export type InvestmentStatus = 'active' | 'closed';
+
+export type ValueSource = 'quote' | 'manual' | 'fixed_term_accrued' | 'invested';
+
+export interface FixedTermInfo {
+  term_days: number;
+  interest_total: number;
+  amount_at_maturity: number;
+  accrued_interest: number;
+  tea_pct: number;
+}
+
+export interface Investment {
+  id: string;
+  asset_type: AssetType;
+  name: string;
+  ticker: string | null;
+  currency: InvestmentCurrency;
+  quantity: number | null;
+  invested_amount: number;
+  current_value: number | null;
+  interest_rate_tna: number | null;
+  start_date: string | null;
+  maturity_date: string | null;
+  institution: string | null;
+  notes: string | null;
+  status: InvestmentStatus;
+  notify_maturity: boolean;
+  value_updated_at: string | null;
+  // Calculados por el server a "hoy" del usuario.
+  effective_value: number;
+  value_source: ValueSource;
+  gain: number;
+  gain_pct: number | null;
+  days_to_maturity: number | null;
+  is_matured: boolean;
+  fixed_term: FixedTermInfo | null;
+}
+
+// Lo que se manda al crear/editar. En PUT, `null` en un campo opcional lo borra.
+export interface InvestmentInput {
+  asset_type: AssetType;
+  name: string;
+  ticker: string | null;
+  currency: InvestmentCurrency;
+  quantity: number | null;
+  invested_amount: number;
+  current_value: number | null;
+  interest_rate_tna: number | null;
+  start_date: string | null;
+  maturity_date: string | null;
+  institution: string | null;
+  notes: string | null;
+  notify_maturity: boolean;
+}
+
+export interface CurrencyBreakdown {
+  currency: InvestmentCurrency;
+  invested: number;
+  current_value: number;
+  gain: number;
+  count: number;
+}
+
+export interface TypeBreakdown {
+  asset_type: AssetType;
+  count: number;
+  value_ars: number | null;
+}
+
+export interface UpcomingMaturity {
+  id: string;
+  name: string;
+  asset_type: AssetType;
+  currency: InvestmentCurrency;
+  maturity_date: string;
+  days_to_maturity: number;
+  amount: number;
+}
+
+export interface InvestmentSummary {
+  by_currency: CurrencyBreakdown[];
+  by_type: TypeBreakdown[];
+  total_ars: number | null;
+  total_usd: number | null;
+  missing_rates: string[];
+  count_active: number;
+  upcoming_maturities: UpcomingMaturity[];
+}
+
+export interface NetWorth {
+  cash_balance_ars: number;
+  cash_balance_usd: number | null;
+  investments: InvestmentSummary;
+  net_worth_ars: number | null;
+  net_worth_usd: number | null;
+  rates: { usd_ars: number | null; eur_ars: number | null; updated_at: string | null };
+  missing_rates: string[];
+  include_investments_in_balance: boolean;
 }

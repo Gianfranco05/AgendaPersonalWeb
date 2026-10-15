@@ -48,8 +48,15 @@ import type {
   Project,
   ProjectTask,
   ProjectsSummary,
+  Investment,
+  InvestmentInput,
+  InvestmentSummary,
+  InvestmentCurrency,
+  NetWorth,
+  AssetType,
 } from '../types';
 import { toLocalDateString } from '../utils/date';
+import { enrichInvestment } from '../utils/investments';
 
 const MOCK_ENABLED = import.meta.env.VITE_MOCK_ENABLED === 'true';
 
@@ -90,19 +97,42 @@ function tzOffsetMinutes(): number {
   return -new Date().getTimezoneOffset();
 }
 
+// Decimal opcional de la API: null se queda null (no es 0) y ausente, ausente.
+function numOrNull(value: unknown): number | null {
+  return value === null || value === undefined ? null : num(value);
+}
+
 export async function fetchFinanceSummary(): Promise<FinanceSummary> {
   if (MOCK_ENABLED) {
+    const net = mockNetWorth();
     return mockDelay({
       total_income: 1250000,
       total_expenses: 870000,
       balance: 380000,
+      investments_value_ars: net.investments.total_ars,
+      net_worth_ars: net.net_worth_ars,
+      investments_missing_rates: net.investments.total_ars === null ? net.investments.missing_rates : [],
+      include_investments_in_balance: net.include_investments_in_balance,
     });
   }
-  const { data } = await apiClient.get<FinanceSummary>('/api/v1/finance/summary');
+  const { data } = await apiClient.get<FinanceSummary>('/api/v1/finance/summary', {
+    params: { tz_offset_minutes: tzOffsetMinutes() },
+  });
   return {
     total_income: num(data.total_income),
     total_expenses: num(data.total_expenses),
     balance: num(data.balance),
+    // Los campos de inversiones son aditivos: un server viejo no los manda.
+    ...(data.investments_value_ars !== undefined && {
+      investments_value_ars: numOrNull(data.investments_value_ars),
+    }),
+    ...(data.net_worth_ars !== undefined && { net_worth_ars: numOrNull(data.net_worth_ars) }),
+    ...(data.investments_missing_rates !== undefined && {
+      investments_missing_rates: data.investments_missing_rates,
+    }),
+    ...(data.include_investments_in_balance !== undefined && {
+      include_investments_in_balance: data.include_investments_in_balance,
+    }),
   };
 }
 
@@ -977,26 +1007,50 @@ export async function deleteBankAccount(id: string): Promise<void> {
 
 // ── Settings ──
 
+// Las cotizaciones llegan como string ("1450.5000"): se pasan a number en la frontera.
+function mapSettings(data: Settings): Settings {
+  return {
+    ...data,
+    ...(data.fx_usd_ars !== undefined && { fx_usd_ars: numOrNull(data.fx_usd_ars) }),
+    ...(data.fx_eur_ars !== undefined && { fx_eur_ars: numOrNull(data.fx_eur_ars) }),
+  };
+}
+
+// Estado del modo mock: las cotizaciones y el toggle sobreviven entre pantallas.
+let mockSettingsState: Settings = {
+  currency: 'ARS',
+  theme_color: 'violet',
+  date_format: 'DD/MM/YYYY',
+  google_calendar_id: 'primary',
+  google_connected: false,
+  fx_usd_ars: null,
+  fx_eur_ars: null,
+  fx_rates_updated_at: null,
+  include_investments_in_balance: false,
+};
+
 export async function fetchSettings(): Promise<Settings> {
   if (MOCK_ENABLED) {
-    return mockDelay({
-      currency: 'ARS',
-      theme_color: 'violet',
-      date_format: 'DD/MM/YYYY',
-      google_calendar_id: 'primary',
-      google_connected: false,
-    });
+    return mockDelay({ ...mockSettingsState });
   }
   const { data } = await apiClient.get<Settings>('/api/v1/settings');
-  return data;
+  return mapSettings(data);
 }
 
 export async function updateSettings(settings: Partial<Settings>): Promise<Settings> {
   if (MOCK_ENABLED) {
-    return mockDelay(settings as Settings);
+    const ratesChanged =
+      ('fx_usd_ars' in settings && settings.fx_usd_ars !== mockSettingsState.fx_usd_ars) ||
+      ('fx_eur_ars' in settings && settings.fx_eur_ars !== mockSettingsState.fx_eur_ars);
+    mockSettingsState = {
+      ...mockSettingsState,
+      ...settings,
+      ...(ratesChanged && { fx_rates_updated_at: new Date().toISOString() }),
+    };
+    return mockDelay({ ...mockSettingsState });
   }
   const { data } = await apiClient.put<Settings>('/api/v1/settings', settings);
-  return data;
+  return mapSettings(data);
 }
 
 export async function syncGoogleCalendar(): Promise<{ synced: number }> {
@@ -1018,7 +1072,335 @@ export async function disconnectGoogleCalendar(): Promise<Settings> {
     });
   }
   const { data } = await apiClient.post<Settings>('/api/v1/settings/google/disconnect');
-  return data;
+  return mapSettings(data);
+}
+
+// ── Inversiones ──
+
+// La API serializa los Decimal como string; fecha y hora de "hoy" las pone el
+// server a partir de tz_offset_minutes (minutos al este de UTC).
+function mapInvestment(i: Investment): Investment {
+  return {
+    ...i,
+    quantity: numOrNull(i.quantity),
+    invested_amount: num(i.invested_amount),
+    current_value: numOrNull(i.current_value),
+    interest_rate_tna: numOrNull(i.interest_rate_tna),
+    effective_value: num(i.effective_value),
+    gain: num(i.gain),
+    gain_pct: numOrNull(i.gain_pct),
+    fixed_term: i.fixed_term
+      ? {
+          ...i.fixed_term,
+          interest_total: num(i.fixed_term.interest_total),
+          amount_at_maturity: num(i.fixed_term.amount_at_maturity),
+          accrued_interest: num(i.fixed_term.accrued_interest),
+          tea_pct: num(i.fixed_term.tea_pct),
+        }
+      : null,
+  };
+}
+
+function mapInvestmentSummary(s: InvestmentSummary): InvestmentSummary {
+  return {
+    ...s,
+    by_currency: s.by_currency.map((c) => ({
+      ...c,
+      invested: num(c.invested),
+      current_value: num(c.current_value),
+      gain: num(c.gain),
+    })),
+    by_type: s.by_type.map((t) => ({ ...t, value_ars: numOrNull(t.value_ars) })),
+    total_ars: numOrNull(s.total_ars),
+    total_usd: numOrNull(s.total_usd),
+    upcoming_maturities: s.upcoming_maturities.map((u) => ({ ...u, amount: num(u.amount) })),
+  };
+}
+
+function mapNetWorth(n: NetWorth): NetWorth {
+  return {
+    ...n,
+    cash_balance_ars: num(n.cash_balance_ars),
+    cash_balance_usd: numOrNull(n.cash_balance_usd),
+    investments: mapInvestmentSummary(n.investments),
+    net_worth_ars: numOrNull(n.net_worth_ars),
+    net_worth_usd: numOrNull(n.net_worth_usd),
+    rates: {
+      ...n.rates,
+      usd_ars: numOrNull(n.rates.usd_ars),
+      eur_ars: numOrNull(n.rates.eur_ars),
+    },
+  };
+}
+
+// Mock: una cartera en memoria con la misma forma que la API real. Create,
+// update y delete la modifican, así que el flujo completo funciona sin backend.
+type MockInvestmentBase = Parameters<typeof enrichInvestment>[0];
+
+function isoDaysFromToday(days: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return toLocalDateString(d);
+}
+
+function mockBase(overrides: Partial<MockInvestmentBase> & Pick<MockInvestmentBase, 'id' | 'asset_type' | 'name' | 'currency' | 'invested_amount'>): MockInvestmentBase {
+  return {
+    ticker: null,
+    quantity: null,
+    current_value: null,
+    interest_rate_tna: null,
+    start_date: null,
+    maturity_date: null,
+    institution: null,
+    notes: null,
+    status: 'active',
+    notify_maturity: true,
+    value_updated_at: null,
+    ...overrides,
+  };
+}
+
+let mockInvestmentBases: MockInvestmentBase[] = [
+  mockBase({
+    id: 'mock-inv-1',
+    asset_type: 'fixed_term',
+    name: 'Plazo fijo Galicia',
+    currency: 'ARS',
+    invested_amount: 1000000,
+    interest_rate_tna: 30,
+    start_date: isoDaysFromToday(-12),
+    maturity_date: isoDaysFromToday(18),
+    institution: 'Banco Galicia',
+  }),
+  mockBase({
+    id: 'mock-inv-2',
+    asset_type: 'stock',
+    name: 'Apple CEDEAR',
+    ticker: 'AAPL',
+    currency: 'ARS',
+    quantity: 10,
+    invested_amount: 150000,
+    current_value: 172500,
+    institution: 'Balanz',
+  }),
+  mockBase({
+    id: 'mock-inv-3',
+    asset_type: 'fx',
+    name: 'Dólares billete',
+    currency: 'USD',
+    quantity: 2000,
+    invested_amount: 1800,
+    current_value: 2000,
+  }),
+];
+
+function mockInvestmentList(status: 'active' | 'closed' | 'all' = 'active'): Investment[] {
+  return mockInvestmentBases
+    .filter((b) => status === 'all' || b.status === status)
+    .map((b) => enrichInvestment(b))
+    .sort(
+      (a, b) =>
+        a.asset_type.localeCompare(b.asset_type) ||
+        (a.maturity_date ?? '9999').localeCompare(b.maturity_date ?? '9999') ||
+        a.name.localeCompare(b.name),
+    );
+}
+
+function mockInvestmentSummary(): InvestmentSummary {
+  const rates = { usd: mockSettingsState.fx_usd_ars ?? null, eur: mockSettingsState.fx_eur_ars ?? null };
+  const active = mockInvestmentList('active');
+  const order: InvestmentCurrency[] = ['ARS', 'USD', 'USDT', 'EUR'];
+  const sub = new Map<InvestmentCurrency, { invested: number; value: number; count: number }>();
+  for (const i of active) {
+    const cur = sub.get(i.currency) ?? { invested: 0, value: 0, count: 0 };
+    cur.invested += i.invested_amount;
+    cur.value += i.effective_value;
+    cur.count += 1;
+    sub.set(i.currency, cur);
+  }
+  const has = (c: InvestmentCurrency) => sub.has(c);
+  const hasUsd = has('USD') || has('USDT');
+  const usdLike = (sub.get('USD')?.value ?? 0) + (sub.get('USDT')?.value ?? 0);
+  const ars = sub.get('ARS')?.value ?? 0;
+  const eur = sub.get('EUR')?.value ?? 0;
+  const missing: string[] = [];
+  if (rates.usd === null && (hasUsd || has('ARS') || has('EUR'))) missing.push('USD');
+  if (rates.eur === null && has('EUR')) missing.push('EUR');
+  const totalArs =
+    (hasUsd && rates.usd === null) || (has('EUR') && rates.eur === null)
+      ? null
+      : Math.round((ars + usdLike * (rates.usd ?? 0) + eur * (rates.eur ?? 0)) * 100) / 100;
+  const totalUsd =
+    ((has('ARS') || has('EUR')) && rates.usd === null) || (has('EUR') && rates.eur === null)
+      ? null
+      : Math.round((usdLike + (rates.usd ? (ars + eur * (rates.eur ?? 0)) / rates.usd : 0)) * 100) / 100;
+  const byType = new Map<AssetType, { count: number; ars: number | null }>();
+  for (const i of active) {
+    const rate = i.currency === 'ARS' ? 1 : i.currency === 'EUR' ? rates.eur : rates.usd;
+    const t = byType.get(i.asset_type) ?? { count: 0, ars: 0 };
+    t.count += 1;
+    t.ars = t.ars === null || rate === null ? null : t.ars + i.effective_value * rate;
+    byType.set(i.asset_type, t);
+  }
+  return {
+    by_currency: order
+      .filter(has)
+      .map((c) => {
+        const v = sub.get(c)!;
+        return {
+          currency: c,
+          invested: v.invested,
+          current_value: v.value,
+          gain: Math.round((v.value - v.invested) * 100) / 100,
+          count: v.count,
+        };
+      }),
+    by_type: [...byType.entries()].map(([asset_type, t]) => ({
+      asset_type,
+      count: t.count,
+      value_ars: t.ars === null ? null : Math.round(t.ars * 100) / 100,
+    })),
+    total_ars: totalArs,
+    total_usd: totalUsd,
+    missing_rates: missing,
+    count_active: active.length,
+    upcoming_maturities: active
+      .filter((i) => i.days_to_maturity !== null && i.days_to_maturity >= 0 && i.days_to_maturity <= 30)
+      .sort((a, b) => a.days_to_maturity! - b.days_to_maturity!)
+      .slice(0, 5)
+      .map((i) => ({
+        id: i.id,
+        name: i.name,
+        asset_type: i.asset_type,
+        currency: i.currency,
+        maturity_date: i.maturity_date!,
+        days_to_maturity: i.days_to_maturity!,
+        amount: i.fixed_term ? i.fixed_term.amount_at_maturity : i.effective_value,
+      })),
+  };
+}
+
+function mockNetWorth(): NetWorth {
+  const investments = mockInvestmentSummary();
+  const usd = mockSettingsState.fx_usd_ars ?? null;
+  const cash = 380000;
+  const cashUsd = usd ? Math.round((cash / usd) * 100) / 100 : null;
+  const missing = [...investments.missing_rates];
+  if (usd === null && !missing.includes('USD')) missing.unshift('USD');
+  return {
+    cash_balance_ars: cash,
+    cash_balance_usd: cashUsd,
+    investments,
+    net_worth_ars: investments.total_ars === null ? null : Math.round((cash + investments.total_ars) * 100) / 100,
+    net_worth_usd:
+      cashUsd === null || investments.total_usd === null
+        ? null
+        : Math.round((cashUsd + investments.total_usd) * 100) / 100,
+    rates: {
+      usd_ars: usd,
+      eur_ars: mockSettingsState.fx_eur_ars ?? null,
+      updated_at: mockSettingsState.fx_rates_updated_at ?? null,
+    },
+    missing_rates: missing,
+    include_investments_in_balance: mockSettingsState.include_investments_in_balance ?? false,
+  };
+}
+
+export async function fetchInvestments(
+  params: { status?: 'active' | 'closed' | 'all'; asset_type?: AssetType } = {},
+): Promise<Investment[]> {
+  if (MOCK_ENABLED) {
+    return mockDelay(
+      mockInvestmentList(params.status).filter((i) => !params.asset_type || i.asset_type === params.asset_type),
+    );
+  }
+  const { data } = await apiClient.get<Investment[]>('/api/v1/finance/investments', {
+    params: {
+      ...(params.status && { status: params.status }),
+      ...(params.asset_type && { asset_type: params.asset_type }),
+      tz_offset_minutes: tzOffsetMinutes(),
+    },
+  });
+  return data.map(mapInvestment);
+}
+
+export async function fetchInvestment(id: string): Promise<Investment> {
+  if (MOCK_ENABLED) {
+    const found = mockInvestmentList('all').find((i) => i.id === id);
+    if (!found) throw new Error('Inversión no encontrada');
+    return mockDelay(found);
+  }
+  const { data } = await apiClient.get<Investment>(`/api/v1/finance/investments/${id}`, {
+    params: { tz_offset_minutes: tzOffsetMinutes() },
+  });
+  return mapInvestment(data);
+}
+
+export async function fetchInvestmentSummary(): Promise<InvestmentSummary> {
+  if (MOCK_ENABLED) {
+    return mockDelay(mockInvestmentSummary());
+  }
+  const { data } = await apiClient.get<InvestmentSummary>('/api/v1/finance/investments/summary', {
+    params: { tz_offset_minutes: tzOffsetMinutes() },
+  });
+  return mapInvestmentSummary(data);
+}
+
+export async function fetchNetWorth(): Promise<NetWorth> {
+  if (MOCK_ENABLED) {
+    return mockDelay(mockNetWorth());
+  }
+  const { data } = await apiClient.get<NetWorth>('/api/v1/finance/net-worth', {
+    params: { tz_offset_minutes: tzOffsetMinutes() },
+  });
+  return mapNetWorth(data);
+}
+
+export async function createInvestment(input: InvestmentInput): Promise<Investment> {
+  if (MOCK_ENABLED) {
+    const base: MockInvestmentBase = {
+      ...input,
+      id: `mock-inv-${generateId()}`,
+      status: 'active',
+      value_updated_at: input.current_value !== null ? new Date().toISOString() : null,
+    };
+    mockInvestmentBases = [...mockInvestmentBases, base];
+    return mockDelay(enrichInvestment(base));
+  }
+  const { data } = await apiClient.post<Investment>('/api/v1/finance/investments', {
+    ...input,
+    timezone_offset_minutes: tzOffsetMinutes(),
+  });
+  return mapInvestment(data);
+}
+
+export async function updateInvestment(
+  id: string,
+  input: Partial<InvestmentInput> & { status?: 'active' | 'closed' },
+): Promise<Investment> {
+  if (MOCK_ENABLED) {
+    const current = mockInvestmentBases.find((b) => b.id === id);
+    if (!current) throw new Error('Inversión no encontrada');
+    const next = { ...current, ...input };
+    if ('current_value' in input && input.current_value !== current.current_value) {
+      next.value_updated_at = input.current_value === null ? null : new Date().toISOString();
+    }
+    mockInvestmentBases = mockInvestmentBases.map((b) => (b.id === id ? next : b));
+    return mockDelay(enrichInvestment(next));
+  }
+  const { data } = await apiClient.put<Investment>(`/api/v1/finance/investments/${id}`, {
+    ...input,
+    timezone_offset_minutes: tzOffsetMinutes(),
+  });
+  return mapInvestment(data);
+}
+
+export async function deleteInvestment(id: string): Promise<void> {
+  if (MOCK_ENABLED) {
+    mockInvestmentBases = mockInvestmentBases.filter((b) => b.id !== id);
+    return mockDelay(undefined);
+  }
+  await apiClient.delete(`/api/v1/finance/investments/${id}`);
 }
 
 // ── Cuenta (export y baja) ──
