@@ -35,11 +35,19 @@ The system SHALL convert totals by first summing effective values per currency, 
 - **THEN** `total_ars` and `total_usd` SHALL be `null` and `missing_rates` SHALL contain `"EUR"`
 
 ### Requirement: Net worth (Patrimonio)
-The system SHALL provide `GET /api/v1/finance/net-worth` (optional `tz_offset_minutes`) returning `cash_balance_ars` (the existing finance `balance`, assumed ARS), `cash_balance_usd`, the investments totals and per-currency breakdown (active investments only), `net_worth_ars = cash_balance_ars + investments total_ars`, `net_worth_usd`, the rates with `updated_at`, `missing_rates` and `include_investments_in_balance`. Values that depend on a missing rate SHALL be `null`.
+The system SHALL provide `GET /api/v1/finance/net-worth` (optional `tz_offset_minutes`) returning the full breakdown of the Patrimonio card, each part in ARS and in USD: `cash_balance_ars` (the existing finance `balance`, assumed ARS) and `cash_balance_usd` (`cash_balance_ars / fx_usd_ars`, rounded half-up to 2 decimals, `null` without `fx_usd_ars`); the investments summary (`investments`, with its own `total_ars` / `total_usd` and per-currency breakdown, active investments only); `net_worth_ars = cash_balance_ars + investments.total_ars` and `net_worth_usd = cash_balance_usd + investments.total_usd`; the rates with `updated_at`; `missing_rates` (the investments' missing rates plus `"USD"` when `fx_usd_ars` is not set); and `include_investments_in_balance`. Any value that depends on a missing rate SHALL be `null`.
 
 #### Scenario: Net worth with cash and investments
-- **WHEN** a user has a finance balance of 100000 and active investments worth 3401000.00 ARS in total
+- **WHEN** a user has a finance balance of 100000, active investments worth 3401000.00 ARS in total and `fx_usd_ars = 1450.50`
 - **THEN** `net_worth_ars` SHALL be `3501000.00`
+
+#### Scenario: Full breakdown in ARS and USD
+- **WHEN** a user has a finance balance of 100000, active investments worth 500000 ARS and 2000 USD and `fx_usd_ars = 1450.50`
+- **THEN** `cash_balance_ars` SHALL be `100000.00`, `cash_balance_usd` `68.94`, `investments.total_ars` `3401000.00`, `investments.total_usd` `2344.71`, `net_worth_ars` `3501000.00` and `net_worth_usd` `2413.65`
+
+#### Scenario: No dollar rate keeps the ARS part
+- **WHEN** a user has a finance balance of 100000, only ARS investments worth 500000 and no `fx_usd_ars`
+- **THEN** `cash_balance_ars` SHALL be `100000.00`, `investments.total_ars` `500000.00` and `net_worth_ars` `600000.00`; `cash_balance_usd`, `investments.total_usd` and `net_worth_usd` SHALL be `null` and `missing_rates` SHALL contain `"USD"`
 
 #### Scenario: Closed investments do not count
 - **WHEN** a user closes an investment
@@ -76,7 +84,7 @@ When `include_investments_in_balance` is true, the web Dashboard finance widget,
 - **THEN** the cards SHALL show the cash balance and a message inviting to set the dollar rate
 
 ### Requirement: Investments UI in web and mobile
-The web Finanzas page SHALL have an "Inversiones" tab and the mobile app SHALL have an "Inversiones" screen reachable from the Finanzas tools grid and from a "Inversión" option in the Home "+" menu. Both SHALL show the net-worth card, the editable exchange rate with its last update, the "Sumar inversiones al balance" toggle, the investments grouped by type with per-asset value, gain/loss (green/red), TNA and a maturity chip ("vence en X días", "vence hoy", "venció"), and a create/edit form whose fields adapt to the asset type, accept decimal comma, and preview the fixed-term interest and amount at maturity before saving. All user-facing text SHALL be in Spanish.
+The web Finanzas page SHALL have an "Inversiones" tab and the mobile app SHALL have an "Inversiones" screen reachable from the Finanzas tools grid and from a "Inversión" option in the Home "+" menu. Both SHALL show the net-worth card (the breakdown "Disponible", "Inversiones" and "Total", each in ARS and in USD, with a "—" and a prompt to set the rate where a USD value cannot be computed), the editable exchange rate with its last update, the "Sumar inversiones al balance" toggle, the investments grouped by type with per-asset value, gain/loss (green/red), TNA and a maturity chip ("vence en X días", "vence hoy", "venció"), and a create/edit form whose fields adapt to the asset type, accept decimal comma, and preview the fixed-term interest and amount at maturity before saving. All user-facing text SHALL be in Spanish.
 
 #### Scenario: Quick create from Home
 - **WHEN** the user taps "+" in mobile Home and chooses "Inversión"

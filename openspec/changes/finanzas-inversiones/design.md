@@ -130,7 +130,7 @@ Ejemplo: 500.000 ARS + 2.000 USD, `fx_usd_ars = 1450,50` → `total_ars = 3.401.
 ### D7. Patrimonio y `/finance/summary`
 
 - `balance` de `/finance/summary` **no cambia** (efectivo, se asume ARS). Campos nuevos aditivos: `investments_value_ars: Decimal | null`, `net_worth_ars: Decimal | null` (= `balance + investments_value_ars`), `include_investments_in_balance: bool`, `investments_missing_rates: list[str]`. Acepta `tz_offset_minutes` opcional (para el devengado de plazos fijos). Clientes viejos ignoran los campos nuevos.
-- `GET /finance/net-worth?tz_offset_minutes=` devuelve el desglose completo: `cash_balance_ars`, `cash_balance_usd`, `investments` (= resumen de D6), `net_worth_ars`, `net_worth_usd`, `rates {usd_ars, eur_ars, updated_at}`, `missing_rates`, `include_investments_in_balance`.
+- `GET /finance/net-worth?tz_offset_minutes=` devuelve el desglose completo, cada parte en ARS y en USD (decisión del usuario: la tarjeta de Patrimonio muestra Disponible / Inversiones / Total en ambas monedas): `cash_balance_ars`, `cash_balance_usd` (= `round2(cash_balance_ars / fx_usd_ars)`, null sin cotización), `investments` (= resumen de D6, con su `total_ars`/`total_usd`), `net_worth_ars`, `net_worth_usd` (= `cash_balance_usd + investments.total_usd`), `rates {usd_ars, eur_ars, updated_at}`, `missing_rates` (los del resumen de inversiones + `USD` si falta `fx_usd_ars`), `include_investments_in_balance`.
 - Solo cuentan activos `active`; los `closed` se listan aparte y no suman.
 - Toggle ON: los clientes muestran `net_worth_ars` como número grande con dos tramos (efectivo / inversiones) en colores distintos y rótulo "Balance + inversiones"; OFF: igual que hoy. La decisión de presentación es del cliente; el server solo informa el flag y los montos.
 
@@ -187,7 +187,7 @@ Todas bajo `/api/v1`, autenticadas, filtradas por `user_id` en el repository; un
 - `src/api/endpoints.ts`: `fetchInvestments`, `fetchInvestmentSummary`, `createInvestment`, `updateInvestment`, `deleteInvestment`, `fetchNetWorth`, todos con `tz_offset_minutes: tzOffsetMinutes()` y mocks equivalentes cuando `MOCK_ENABLED`.
 - `src/hooks/useInvestments.ts`: SWR (`finance/investments`, `finance/investments/summary`, `finance/net-worth`); toda mutación revalida esas keys **y** `finance/summary`; cambiar cotización o toggle revalida además `settings`.
 - `FinancePage.tsx`: nueva pestaña `inversiones` ("Inversiones") → `InvestmentsSection.tsx`:
-  - `NetWorthCard`: Patrimonio en ARS y USD, barra de dos tramos (efectivo esmeralda / inversiones celeste-índigo, con leyenda), aviso de cotización faltante.
+  - `NetWorthCard`: desglose Disponible / Inversiones / Total, cada uno en ARS y en USD, barra de dos tramos (efectivo esmeralda / inversiones celeste-índigo, con leyenda), aviso de cotización faltante.
   - Editor de cotización inline ("Dólar: $ 1.450,50 · actualizada hace 3 días" → editar USD y EUR).
   - Toggle "Sumar inversiones al balance" con texto de ayuda.
   - Lista agrupada por tipo (encabezado con subtotal), fila/tarjeta con nombre, ticker, entidad, invertido, valor, ganancia (verde/rojo), TNA, chip "vence en X días" / "venció" / "vence hoy"; acciones editar, cerrar/reabrir, borrar (con confirmación). Filtro activos/cerrados.
@@ -229,4 +229,4 @@ Todas bajo `/api/v1`, autenticadas, filtradas por `user_id` en el repository; un
 2. **Horario del aviso**: fijo a las 9:00 locales. ¿Alcanza o se quiere configurable más adelante?
 3. **Cotización EUR**: se agrega como campo opcional. ¿Se muestra siempre en la UI o solo si hay activos en EUR? (Propuesta: solo si hay activos en EUR.)
 4. **Al vencer un plazo fijo** la app no lo cierra sola: sigue sumando su monto al vencimiento hasta que el usuario lo cierre o lo renueve. ¿Agregar una acción "Renovar" (crea uno nuevo con el monto cobrado y cierra el anterior)? Propuesta: fuera de este change.
-5. **Cash en USD**: ¿mostrar `cash_balance_usd` (balance ARS convertido) en la tarjeta de Patrimonio o solo el total? (Propuesta: solo totales.)
+5. ~~**Cash en USD**~~ Resuelto por el usuario: la tarjeta muestra disponible, inversiones y total, cada uno en ARS y en USD.
