@@ -116,6 +116,21 @@ RESOURCES = [
         "path": "/api/v1/goals/{id}",
     },
     {
+        "name": "investment",
+        "create": ("POST", "/api/v1/finance/investments", {
+            "asset_type": "stock",
+            "name": "Inversion A",
+            "currency": "ARS",
+            "invested_amount": "1000",
+        }),
+        "detail": [
+            ("GET", "{id}", None),
+            ("PUT", "{id}", {"name": "hackeada"}),
+            ("DELETE", "{id}", None),
+        ],
+        "path": "/api/v1/finance/investments/{id}",
+    },
+    {
         "name": "note",
         "create": ("POST", "/api/v1/notes", {"title": "Nota A", "content": "contenido"}),
         "detail": [
@@ -206,3 +221,30 @@ async def test_bearer_only_client_still_respects_tenant_boundary(user_a, user_b)
 
     resp = await user_b.patch(f"/api/v1/tasks/{task_id}", json={"title": "hackeada"})
     assert resp.status_code == 404
+
+
+async def test_user_b_net_worth_no_cuenta_los_datos_de_user_a(user_a, user_b):
+    await user_a.post("/api/v1/finance/transactions", json={
+        "amount": "5000",
+        "type": "income",
+        "transaction_date": "2026-01-01",
+        "account_type": "cash",
+        "payment_method": "cash",
+        "product_name": "Sueldo A",
+    })
+    await user_a.post("/api/v1/finance/investments", json={
+        "asset_type": "stock",
+        "name": "Inversion A",
+        "currency": "ARS",
+        "invested_amount": "7000",
+    })
+    resp = await user_b.get("/api/v1/finance/net-worth")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert float(data["cash_balance_ars"]) == 0
+    assert float(data["net_worth_ars"]) == 0
+    assert data["investments"]["count_active"] == 0
+
+    summary = (await user_b.get("/api/v1/finance/summary")).json()
+    assert float(summary["investments_value_ars"]) == 0
+    assert float(summary["net_worth_ars"]) == 0

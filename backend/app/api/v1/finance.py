@@ -7,7 +7,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.core.dependencies import get_current_user
+from app.core.clock import local_today
 from app.modules.auth.models import User
+from app.modules.inversiones.service import InvestmentService
+from app.modules.inversiones.valuation import round2
 from app.modules.finanzas.service import FinanzasService
 from app.modules.finanzas.schemas import (
     TransactionCreate,
@@ -33,9 +36,16 @@ from pydantic import BaseModel
 
 
 class FinanceSummary(BaseModel):
+    # `balance` es solo efectivo (se asume ARS), tenga o no activado el toggle
+    # de inversiones: los campos de abajo son aditivos y los clientes viejos
+    # los ignoran.
     total_income: Decimal
     total_expenses: Decimal
     balance: Decimal
+    investments_value_ars: Optional[Decimal] = None
+    net_worth_ars: Optional[Decimal] = None
+    investments_missing_rates: list[str] = []
+    include_investments_in_balance: bool = False
 
 
 class CategoryWithTotals(BaseModel):
@@ -67,15 +77,32 @@ class FinanceReports(BaseModel):
 
 @router.get("/summary", response_model=FinanceSummary)
 async def get_summary(
+    tz_offset_minutes: int = Query(0, ge=-840, le=840),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     service = FinanzasService(db)
     stats = await service.get_dashboard_stats(current_user.id)
+    # Las inversiones se valuan al "hoy" del usuario (devengado de plazos fijos).
+    invest = InvestmentService(db)
+    rates, _, include = await invest.get_rates(current_user.id)
+    investments = await invest.summary(current_user.id, local_today(tz_offset_minutes), rates)
     return FinanceSummary(
         total_income=stats.total_income,
         total_expenses=stats.total_expenses,
         balance=stats.balance,
+        investments_value_ars=investments.total_ars,
+        net_worth_ars=(
+            round2(stats.balance + investments.total_ars)
+            if investments.total_ars is not None
+            else None
+        ),
+        # Solo importa si el valor en ARS no se pudo calcular (un activo ARS
+        # sin cotizacion de dolar no impide el total en pesos).
+        investments_missing_rates=(
+            investments.missing_rates if investments.total_ars is None else []
+        ),
+        include_investments_in_balance=include,
     )
 
 

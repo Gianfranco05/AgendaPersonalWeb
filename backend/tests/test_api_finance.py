@@ -592,3 +592,158 @@ async def test_api_update_transaction_can_clear_category(api_auth_client, test_c
     assert response.json()["category_id"] is None
     # Lo que no se mando no se toca.
     assert response.json()["notes"] == "nota cargada desde mobile"
+
+
+# ── Inversiones: campos aditivos del resumen y patrimonio ───────────────────
+
+
+async def _income(client, amount):
+    resp = await client.post("/api/v1/finance/transactions", json={
+        "amount": str(amount),
+        "type": "income",
+        "transaction_date": "2025-06-15",
+        "product_name": "Ingreso",
+        "account_type": "cash",
+        "payment_method": "cash",
+    })
+    assert resp.status_code == 201, resp.text
+
+
+async def _investment(client, **overrides):
+    body = {
+        "asset_type": "stock",
+        "name": "Activo",
+        "currency": "ARS",
+        "invested_amount": "100",
+    }
+    body.update(overrides)
+    resp = await client.post("/api/v1/finance/investments", json=body)
+    assert resp.status_code == 201, resp.text
+    return resp.json()
+
+
+@pytest.mark.asyncio
+async def test_summary_sin_inversiones_mantiene_balance_y_suma_campos(api_auth_client):
+    await _income(api_auth_client, 1000)
+    data = (await api_auth_client.get("/api/v1/finance/summary")).json()
+    assert float(data["balance"]) == 1000
+    assert float(data["investments_value_ars"]) == 0
+    assert float(data["net_worth_ars"]) == 1000
+    assert data["investments_missing_rates"] == []
+    assert data["include_investments_in_balance"] is False
+
+
+@pytest.mark.asyncio
+async def test_summary_el_toggle_no_cambia_el_balance(api_auth_client):
+    await _income(api_auth_client, 100000)
+    await _investment(api_auth_client, invested_amount="500000", current_value="500000")
+
+    off = (await api_auth_client.get("/api/v1/finance/summary")).json()
+    resp = await api_auth_client.put("/api/v1/settings", json={"include_investments_in_balance": True})
+    assert resp.json()["include_investments_in_balance"] is True
+    on = (await api_auth_client.get("/api/v1/finance/summary")).json()
+
+    assert off["balance"] == on["balance"]
+    assert float(on["balance"]) == 100000
+    assert float(on["investments_value_ars"]) == 500000
+    assert float(on["net_worth_ars"]) == 600000
+    assert off["include_investments_in_balance"] is False
+    assert on["include_investments_in_balance"] is True
+
+
+@pytest.mark.asyncio
+async def test_summary_con_cotizacion_faltante_devuelve_null(api_auth_client):
+    await _income(api_auth_client, 1000)
+    await _investment(api_auth_client, currency="USD")
+    data = (await api_auth_client.get("/api/v1/finance/summary")).json()
+    assert float(data["balance"]) == 1000
+    assert data["investments_value_ars"] is None
+    assert data["net_worth_ars"] is None
+    assert data["investments_missing_rates"] == ["USD"]
+
+
+@pytest.mark.asyncio
+async def test_summary_solo_ars_sin_cotizacion_no_pide_cotizacion(api_auth_client):
+    await _investment(api_auth_client, current_value="250")
+    data = (await api_auth_client.get("/api/v1/finance/summary")).json()
+    assert float(data["investments_value_ars"]) == 250
+    assert data["investments_missing_rates"] == []
+
+
+@pytest.mark.asyncio
+async def test_summary_acepta_tz_offset_y_lo_valida(api_auth_client):
+    ok = await api_auth_client.get("/api/v1/finance/summary", params={"tz_offset_minutes": -180})
+    assert ok.status_code == 200
+    bad = await api_auth_client.get("/api/v1/finance/summary", params={"tz_offset_minutes": 841})
+    assert bad.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_net_worth_suma_balance_e_inversiones_activas(api_auth_client):
+    from decimal import Decimal as D
+
+    await api_auth_client.put("/api/v1/settings", json={"fx_usd_ars": "1450.50"})
+    await _income(api_auth_client, 100000)
+    await _investment(api_auth_client, name="Pesos", current_value="500000")
+    await _investment(
+        api_auth_client, name="Dolares", currency="USD", asset_type="fx",
+        invested_amount="1800", current_value="2000",
+    )
+
+    data = (await api_auth_client.get("/api/v1/finance/net-worth")).json()
+    assert D(data["cash_balance_ars"]) == D("100000.00")
+    assert D(data["cash_balance_usd"]) == D("68.94")
+    assert D(data["investments"]["total_ars"]) == D("3401000.00")
+    assert D(data["investments"]["total_usd"]) == D("2344.71")
+    assert D(data["net_worth_ars"]) == D("3501000.00")
+    assert D(data["net_worth_usd"]) == D("2413.65")
+    assert D(data["rates"]["usd_ars"]) == D("1450.5000")
+    assert data["rates"]["eur_ars"] is None
+    assert data["rates"]["updated_at"] is not None
+    assert data["missing_rates"] == []
+    assert data["include_investments_in_balance"] is False
+
+
+@pytest.mark.asyncio
+async def test_net_worth_sin_cotizacion_conserva_la_parte_en_pesos(api_auth_client):
+    from decimal import Decimal as D
+
+    await _income(api_auth_client, 100000)
+    await _investment(api_auth_client, current_value="500000")
+    data = (await api_auth_client.get("/api/v1/finance/net-worth")).json()
+    assert D(data["cash_balance_ars"]) == D("100000.00")
+    assert D(data["investments"]["total_ars"]) == D("500000.00")
+    assert D(data["net_worth_ars"]) == D("600000.00")
+    assert data["cash_balance_usd"] is None
+    assert data["investments"]["total_usd"] is None
+    assert data["net_worth_usd"] is None
+    assert data["missing_rates"] == ["USD"]
+
+
+@pytest.mark.asyncio
+async def test_net_worth_con_dolares_sin_cotizacion_deja_ars_en_null(api_auth_client):
+    await _income(api_auth_client, 100000)
+    await _investment(api_auth_client, currency="USD", current_value="100")
+    data = (await api_auth_client.get("/api/v1/finance/net-worth")).json()
+    assert float(data["cash_balance_ars"]) == 100000
+    assert data["net_worth_ars"] is None
+    assert data["net_worth_usd"] is None
+    assert data["missing_rates"] == ["USD"]
+
+
+@pytest.mark.asyncio
+async def test_net_worth_cerrar_una_inversion_la_descuenta(api_auth_client):
+    await _income(api_auth_client, 1000)
+    inv = await _investment(api_auth_client, current_value="500")
+    before = (await api_auth_client.get("/api/v1/finance/net-worth")).json()
+    await api_auth_client.put(f"/api/v1/finance/investments/{inv['id']}", json={"status": "closed"})
+    after = (await api_auth_client.get("/api/v1/finance/net-worth")).json()
+    assert float(before["net_worth_ars"]) - float(after["net_worth_ars"]) == 500
+
+
+@pytest.mark.asyncio
+async def test_net_worth_usuario_nuevo_en_cero(api_auth_client):
+    data = (await api_auth_client.get("/api/v1/finance/net-worth")).json()
+    assert float(data["cash_balance_ars"]) == 0
+    assert float(data["net_worth_ars"]) == 0
+    assert data["investments"]["count_active"] == 0

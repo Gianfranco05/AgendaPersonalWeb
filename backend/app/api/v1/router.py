@@ -22,11 +22,13 @@ from app.modules.trabajo.api_routes import router as work_router
 from app.modules.viajes.api_routes import router as travel_router
 from app.modules.vehiculo.api_routes import router as vehicle_router
 from app.modules.proyectos.api_routes import router as projects_router
+from app.modules.inversiones.api_routes import router as investments_router
 from app.infra.router import router as infra_router
 
 api_router = APIRouter()
 
 api_router.include_router(finance_router)
+api_router.include_router(investments_router)
 api_router.include_router(notes_router)
 api_router.include_router(events_router)
 api_router.include_router(goals_router)
