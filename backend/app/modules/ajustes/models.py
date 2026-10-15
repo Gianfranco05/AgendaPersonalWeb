@@ -1,7 +1,8 @@
 from uuid import uuid4
 from datetime import datetime
+from decimal import Decimal
 
-from sqlalchemy import String, Text, DateTime, ForeignKey, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Numeric, String, Text, false, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.base import Base
@@ -21,6 +22,17 @@ class UserPreference(Base):
     google_refresh_token: Mapped[str | None] = mapped_column(Text, nullable=True)
     google_token_expiry: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     google_calendar_id: Mapped[str] = mapped_column(String(100), default="primary")
+
+    # Cotizaciones que carga el usuario para convertir inversiones (ARS por 1
+    # USD / 1 EUR). USDT se valua 1:1 con USD. `fx_rates_updated_at` lo setea
+    # el server cuando cambia alguna; el cliente no lo manda.
+    fx_usd_ars: Mapped[Decimal | None] = mapped_column(Numeric(14, 4), nullable=True)
+    fx_eur_ars: Mapped[Decimal | None] = mapped_column(Numeric(14, 4), nullable=True)
+    fx_rates_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Solo cambia la presentacion en los clientes; `balance` sigue siendo efectivo.
+    include_investments_in_balance: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=false()
+    )
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(

@@ -24,6 +24,7 @@ from app.modules.auth.models import RefreshToken, User, VerificationToken
 from app.modules.billing.models import StripeCustomer
 from app.modules.eventos.models import Event
 from app.modules.finanzas.models import BankAccount, Budget, Category, Transaction
+from app.modules.inversiones.models import Investment
 from app.modules.fitness.models import Exercise, WorkoutSession
 from app.modules.biblioteca.models import Book
 from app.modules.estudio.models import Exam, Subject
@@ -70,6 +71,7 @@ OWNED_TABLES: list[tuple[str, Any]] = [
     ("categories", Category),
     ("goals", Goal),
     ("bank_accounts", BankAccount),
+    ("investments", Investment),
     ("notes", Note),
     ("tags", Tag),
     ("events", Event),
