@@ -53,4 +53,63 @@ describe('FinanceWidget', () => {
     expect(screen.getByText(/Freelance/)).toBeInTheDocument()
     expect(screen.getByText(/Supermercado/)).toBeInTheDocument()
   })
+
+  describe('Sumar inversiones al balance', () => {
+    const withInvestments = {
+      ...mockSummary,
+      investments_value_ars: 500000,
+      net_worth_ars: 880000,
+      investments_missing_rates: [],
+    }
+
+    it('apagado muestra solo el balance de efectivo, como siempre', async () => {
+      vi.mocked(fetchFinanceSummary).mockResolvedValue({ ...withInvestments, include_investments_in_balance: false })
+      vi.mocked(fetchTransactions).mockResolvedValue(mockTransactions)
+      renderWithProviders(<FinanceWidget />)
+
+      await waitFor(() => expect(screen.getByText('Balance actual')).toBeInTheDocument())
+      expect(screen.getByText('+$380.000')).toBeInTheDocument()
+      expect(screen.queryByTestId('net-worth-block')).not.toBeInTheDocument()
+      expect(screen.queryByText('Balance + inversiones')).not.toBeInTheDocument()
+    })
+
+    it('un server sin los campos nuevos se ve igual que apagado', async () => {
+      vi.mocked(fetchFinanceSummary).mockResolvedValue(mockSummary)
+      vi.mocked(fetchTransactions).mockResolvedValue(mockTransactions)
+      renderWithProviders(<FinanceWidget />)
+      await waitFor(() => expect(screen.getByText('Balance actual')).toBeInTheDocument())
+    })
+
+    it('encendido muestra efectivo + inversiones con tramos diferenciados', async () => {
+      vi.mocked(fetchFinanceSummary).mockResolvedValue({ ...withInvestments, include_investments_in_balance: true })
+      vi.mocked(fetchTransactions).mockResolvedValue(mockTransactions)
+      renderWithProviders(<FinanceWidget />)
+
+      const block = await screen.findByTestId('net-worth-block')
+      expect(block).toHaveTextContent('Balance + inversiones')
+      expect(block).toHaveTextContent('$ 880.000,00')
+      expect(block).toHaveTextContent('Efectivo $ 380.000,00')
+      expect(block).toHaveTextContent('Inversiones $ 500.000,00')
+      const bar = screen.getByRole('img', { name: 'Efectivo e inversiones' })
+      expect(bar.innerHTML).toContain('bg-sky-500')
+      expect(screen.queryByText('Balance actual')).not.toBeInTheDocument()
+    })
+
+    it('encendido pero sin cotización muestra el efectivo y el aviso', async () => {
+      vi.mocked(fetchFinanceSummary).mockResolvedValue({
+        ...mockSummary,
+        investments_value_ars: null,
+        net_worth_ars: null,
+        investments_missing_rates: ['USD'],
+        include_investments_in_balance: true,
+      })
+      vi.mocked(fetchTransactions).mockResolvedValue(mockTransactions)
+      renderWithProviders(<FinanceWidget />)
+
+      await waitFor(() => expect(screen.getByText('Balance actual')).toBeInTheDocument())
+      expect(screen.getByText('+$380.000')).toBeInTheDocument()
+      expect(screen.getByRole('status')).toHaveTextContent('Cargá la cotización del dólar')
+      expect(screen.queryByTestId('net-worth-block')).not.toBeInTheDocument()
+    })
+  })
 })

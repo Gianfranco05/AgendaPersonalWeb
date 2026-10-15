@@ -2,6 +2,8 @@ import { TrendingUp, TrendingDown, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { LoadingSkeleton } from '../../components/LoadingSkeleton';
 import { useFinanceSummary, useTransactions } from '../../hooks/useFinance';
+import { CASH_COLOR, INVESTMENTS_COLOR } from '../Finance/NetWorthCard';
+import { formatMoney } from '../../utils/investments';
 
 export default function FinanceWidget() {
   const { data: summary, isLoading: loadingSummary } = useFinanceSummary();
@@ -23,6 +25,19 @@ export default function FinanceWidget() {
   const balance = summary.balance;
   const isPositive = balance >= 0;
 
+  // "Sumar inversiones al balance": el balance sigue siendo efectivo; el
+  // patrimonio se muestra aparte, con colores propios (no el verde/rojo de
+  // ingresos y egresos). Sin cotización para valuar, queda el efectivo y el aviso.
+  const includeInvestments = summary.include_investments_in_balance === true;
+  const netWorth = summary.net_worth_ars ?? null;
+  const investmentsValue = summary.investments_value_ars ?? null;
+  const showNetWorth = includeInvestments && netWorth !== null && investmentsValue !== null;
+  const missingRate = includeInvestments && netWorth === null;
+  const cashPart = Math.max(balance, 0);
+  const investedPart = Math.max(investmentsValue ?? 0, 0);
+  const partsSum = cashPart + investedPart;
+  const cashPct = partsSum > 0 ? (cashPart / partsSum) * 100 : 0;
+
   return (
     <div className="card-interactive rounded-xl bg-white dark:bg-slate-800 p-6 shadow-sm">
       <div className="mb-4 flex items-center justify-between">
@@ -36,12 +51,47 @@ export default function FinanceWidget() {
       </div>
 
       {/* Balance */}
-      <div className="mb-4">
-        <span className="text-xs text-gray-500 dark:text-slate-400">Balance actual</span>
-        <p className={`text-2xl font-bold ${isPositive ? 'text-emerald-500' : 'text-rose-500'}`}>
-          {isPositive ? '+' : '-'}${Math.abs(balance).toLocaleString('es-AR')}
-        </p>
-      </div>
+      {showNetWorth ? (
+        <div className="mb-4" data-testid="net-worth-block">
+          <span className="text-xs text-gray-500 dark:text-slate-400">Balance + inversiones</span>
+          <p className="text-2xl font-bold text-gray-800 dark:text-slate-100">{formatMoney(netWorth)}</p>
+          {partsSum > 0 && (
+            <div
+              className="mt-2 flex h-2 overflow-hidden rounded-full bg-gray-100 dark:bg-slate-700"
+              role="img"
+              aria-label="Efectivo e inversiones"
+            >
+              <div className={CASH_COLOR} style={{ width: `${cashPct}%` }} />
+              <div className={INVESTMENTS_COLOR} style={{ width: `${100 - cashPct}%` }} />
+            </div>
+          )}
+          <div className="mt-2 flex justify-between text-xs text-gray-500 dark:text-slate-400">
+            <span className="flex items-center gap-1.5">
+              <span className={`h-2 w-2 rounded-full ${CASH_COLOR}`} />
+              Efectivo {formatMoney(balance)}
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className={`h-2 w-2 rounded-full ${INVESTMENTS_COLOR}`} />
+              Inversiones {formatMoney(investmentsValue)}
+            </span>
+          </div>
+        </div>
+      ) : (
+        <div className="mb-4">
+          <span className="text-xs text-gray-500 dark:text-slate-400">Balance actual</span>
+          <p className={`text-2xl font-bold ${isPositive ? 'text-emerald-500' : 'text-rose-500'}`}>
+            {isPositive ? '+' : '-'}${Math.abs(balance).toLocaleString('es-AR')}
+          </p>
+          {missingRate && (
+            <p role="status" className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+              Cargá la cotización del dólar para sumar tus inversiones.{' '}
+              <Link to="/finances" className="font-medium underline">
+                Ir a Inversiones
+              </Link>
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Income / Expense cards */}
       <div className="mb-4 grid grid-cols-2 gap-3">
