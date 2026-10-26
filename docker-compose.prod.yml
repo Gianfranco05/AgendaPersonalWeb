@@ -89,6 +89,14 @@ services:
       - SENTRY_TRACES_SAMPLE_RATE=${SENTRY_TRACES_SAMPLE_RATE:-0.1}
       - METRICS_TOKEN=${METRICS_TOKEN:-}
       - CURRENT_TERMS_VERSION=${CURRENT_TERMS_VERSION:-1.1}
+      # Datos de mercado (dolar, IPC, cripto): la lista es explicita, sin estas
+      # lineas el valor del .env no llega al contenedor.
+      - MARKET_DATA_ENABLED=${MARKET_DATA_ENABLED:-true}
+      - MARKET_CRYPTO_ENABLED=${MARKET_CRYPTO_ENABLED:-true}
+      - MARKET_FX_REFRESH_MINUTES=${MARKET_FX_REFRESH_MINUTES:-15}
+      - MARKET_CRYPTO_REFRESH_MINUTES=${MARKET_CRYPTO_REFRESH_MINUTES:-10}
+      - MARKET_INFLATION_REFRESH_HOURS=${MARKET_INFLATION_REFRESH_HOURS:-6}
+      - COINGECKO_API_KEY=${COINGECKO_API_KEY:-}
     volumes:
       - data:/app/data
     depends_on:

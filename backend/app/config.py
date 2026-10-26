@@ -76,6 +76,21 @@ class Settings(BaseSettings):
     # ver conteos de requests por ruta/status (reconocimiento de la app).
     METRICS_TOKEN: str = ""
 
+    # Datos de mercado (dolar, IPC, cripto). Un scheduler por proceso consulta
+    # las fuentes publicas y guarda el resultado en la base; los clientes nunca
+    # llaman a esas APIs. MARKET_DATA_ENABLED=false es el kill switch (tests y
+    # deploys sin salida a internet): la app sigue con la ultima cotizacion
+    # guardada o con la manual del usuario.
+    MARKET_DATA_ENABLED: bool = True
+    MARKET_FX_REFRESH_MINUTES: int = 15
+    MARKET_CRYPTO_REFRESH_MINUTES: int = 10
+    MARKET_INFLATION_REFRESH_HOURS: int = 6
+    # CoinGecko: key Demo opcional (header x-cg-demo-api-key). Vacia = acceso
+    # publico, con limites menores. MARKET_CRYPTO_ENABLED=false apaga solo el
+    # provider de cripto (los activos "automaticos" quedan con su ultimo precio).
+    COINGECKO_API_KEY: str = ""
+    MARKET_CRYPTO_ENABLED: bool = True
+
     # Content-Security-Policy for HTML responses. Empty = disabled.
     # Example: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'"
     CONTENT_SECURITY_POLICY: str = ""

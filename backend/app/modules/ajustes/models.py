@@ -29,6 +29,13 @@ class UserPreference(Base):
     fx_usd_ars: Mapped[Decimal | None] = mapped_column(Numeric(14, 4), nullable=True)
     fx_eur_ars: Mapped[Decimal | None] = mapped_column(Numeric(14, 4), nullable=True)
     fx_rates_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # De donde sale la cotizacion con la que se convierten los totales:
+    # usd -> oficial | mep | blue | manual, eur -> oficial | blue | manual.
+    # `manual` usa fx_usd_ars / fx_eur_ars (los de arriba no se tocan nunca).
+    fx_usd_source: Mapped[str] = mapped_column(String(10), default="mep", server_default="mep")
+    fx_eur_source: Mapped[str] = mapped_column(
+        String(10), default="oficial", server_default="oficial"
+    )
     # Solo cambia la presentacion en los clientes; `balance` sigue siendo efectivo.
     include_investments_in_balance: Mapped[bool] = mapped_column(
         Boolean, default=False, server_default=false()
