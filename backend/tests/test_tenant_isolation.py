@@ -249,3 +249,57 @@ async def test_user_b_net_worth_no_cuenta_los_datos_de_user_a(user_a, user_b):
     summary = (await user_b.get("/api/v1/finance/summary")).json()
     assert float(summary["investments_value_ars"]) == 0
     assert float(summary["net_worth_ars"]) == 0
+
+
+# ── Datos de mercado: lo compartido es global, lo personal no se mezcla ─────
+
+
+async def test_fuente_del_dolar_y_rendimiento_real_son_por_usuario(user_a, user_b):
+    from datetime import datetime, timezone
+    from decimal import Decimal
+
+    from app.database import get_db
+    from market_helpers import add_inflation, add_quote, months_back
+
+    override = app.dependency_overrides[get_db]
+    async for db in override():
+        await add_quote(db, "USD", "blue", "1565", as_of=datetime.now(timezone.utc))
+        await add_quote(db, "USD", "mep", "1563.9", as_of=datetime.now(timezone.utc))
+        await add_inflation(db, {m: 2.0 for m in months_back(14)})
+
+    await user_a.put("/api/v1/settings", json={"fx_usd_source": "blue"})
+    assert (await user_b.get("/api/v1/settings")).json()["fx_usd_source"] == "mep"
+    assert (await user_a.get("/api/v1/settings")).json()["fx_usd_source"] == "blue"
+
+    for client in (user_a, user_b):
+        await client.post("/api/v1/finance/investments", json={
+            "asset_type": "fx", "name": "USD", "currency": "USD", "invested_amount": "100",
+        })
+    rates_a = (await user_a.get("/api/v1/finance/net-worth")).json()["rates"]
+    rates_b = (await user_b.get("/api/v1/finance/net-worth")).json()["rates"]
+    assert Decimal(rates_a["usd_ars"]) == Decimal("1565")
+    assert Decimal(rates_b["usd_ars"]) == Decimal("1563.9")
+
+    pf = await user_a.post("/api/v1/finance/investments", json={
+        "asset_type": "stock", "name": "Con fecha", "currency": "ARS", "invested_amount": "1000",
+        "current_value": "1100", "start_date": "2026-09-01",
+    })
+    assert pf.json()["real_return"] is not None
+    summary_a = (await user_a.get("/api/v1/finance/investments/summary")).json()
+    summary_b = (await user_b.get("/api/v1/finance/investments/summary")).json()
+    assert summary_a["real_return_ars"]["included_count"] == 1
+    assert summary_b["real_return_ars"] is None
+
+
+async def test_user_b_no_toca_cripto_automatica_de_user_a(user_a, user_b):
+    created = await user_a.post("/api/v1/finance/investments", json={
+        "asset_type": "crypto", "name": "BTC", "ticker": "BTC", "currency": "USD",
+        "quantity": "1", "invested_amount": "1000", "price_source": "coingecko",
+    })
+    assert created.status_code == 201, created.text
+    url = f"/api/v1/finance/investments/{created.json()['id']}"
+    assert (await user_b.put(url, json={"price_source": "manual", "current_value": "1"})).status_code == 404
+    assert (await user_b.delete(url)).status_code == 404
+    assert (await user_b.get(url)).status_code == 404
+    assert (await user_a.get(url)).json()["price_source"] == "coingecko"
+    assert (await user_b.get("/api/v1/finance/investments")).json() == []

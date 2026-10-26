@@ -266,13 +266,10 @@ def test_formato_es_ar():
     assert format_money_es_ar(D("0")) == "$ 0,00 ARS"
 
 
-def test_no_hay_proveedores_de_precios_en_esta_etapa():
-    assert PRICE_PROVIDERS == {}
-
-
-@pytest.mark.asyncio
-async def test_refresh_quotes_es_un_noop():
-    assert await valuation.refresh_quotes(None, "user-1") == 0
+def test_proveedores_de_precios_registrados():
+    assert set(PRICE_PROVIDERS) == {"coingecko"}
+    assert PRICE_PROVIDERS["coingecko"].supports("BTC")
+    assert not PRICE_PROVIDERS["coingecko"].supports("AAPL")
 
 
 def test_price_quote_tiene_la_forma_esperada():

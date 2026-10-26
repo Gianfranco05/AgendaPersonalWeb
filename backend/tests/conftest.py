@@ -1,3 +1,11 @@
+import os
+
+# Antes de importar la app: ningun test arranca el scheduler de datos de mercado
+# (el lifespan solo lo levanta con esto en true).
+os.environ.setdefault("MARKET_DATA_ENABLED", "false")
+
+import httpx
+import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -17,6 +25,35 @@ from app.modules.finanzas.models import Category, Transaction
 from app.modules.anotaciones.models import Note
 
 TEST_DATABASE_URL = "sqlite+aiosqlite://"
+
+
+@pytest.fixture(autouse=True)
+def _no_real_network(monkeypatch):
+    """Ningun test sale a internet: el transporte real de httpx falla. Los
+    tests de datos de mercado usan `httpx.MockTransport`, que no pasa por aca."""
+
+    async def _blocked_async(self, request):
+        raise AssertionError(f"Un test intento una llamada de red real: {request.method} {request.url}")
+
+    def _blocked_sync(self, request):
+        raise AssertionError(f"Un test intento una llamada de red real: {request.method} {request.url}")
+
+    monkeypatch.setattr(httpx.AsyncHTTPTransport, "handle_async_request", _blocked_async)
+    monkeypatch.setattr(httpx.HTTPTransport, "handle_request", _blocked_sync)
+    yield
+
+
+@pytest.fixture(autouse=True)
+def _market_cache_off(monkeypatch):
+    """Sin cache en proceso entre tests (cada test tiene su propia base)."""
+    from app.modules.mercado import repository as market_repo
+    from app.modules.mercado import service as market_service
+
+    monkeypatch.setattr(market_repo, "FX_CACHE_TTL_SECONDS", 0.0)
+    monkeypatch.setattr(market_repo, "INFLATION_CACHE_TTL_SECONDS", 0.0)
+    market_repo.clear_cache()
+    monkeypatch.setattr(market_service, "_last_retention", None)
+    yield
 
 
 @pytest_asyncio.fixture(autouse=True)

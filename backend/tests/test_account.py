@@ -40,6 +40,19 @@ def test_owned_tables_cubre_todos_los_modelos_con_user_id():
     )
 
 
+def test_tablas_de_mercado_son_globales_y_no_se_exportan_ni_borran():
+    """Cotizaciones, IPC y precios no pertenecen a un usuario: sin `user_id`, y
+    por eso fuera de OWNED_TABLES. Las preferencias nuevas salen en el export
+    porque viajan con `user_preferences`."""
+    mercado = {"fx_quotes", "inflation_monthly", "market_prices", "market_fetch_state"}
+    for nombre in mercado:
+        assert "user_id" not in Base.metadata.tables[nombre].columns
+    registradas = {nombre for nombre, _ in [*OWNED_TABLES, *RETAINED_TABLES]}
+    assert not (mercado & registradas)
+    columnas = Base.metadata.tables["user_preferences"].columns
+    assert "fx_usd_source" in columnas and "fx_eur_source" in columnas
+
+
 async def _seed_datos(db_session, user):
     """Crea al menos una fila en las tablas con relaciones no triviales."""
     categoria = Category(user_id=str(user.id), name="Comida")
