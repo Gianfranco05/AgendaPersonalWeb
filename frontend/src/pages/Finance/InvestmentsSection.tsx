@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Plus, Pencil, Trash2, Archive, ArchiveRestore, LineChart } from 'lucide-react';
 import { LoadingSkeleton } from '../../components/LoadingSkeleton';
+import { useMarketFx } from '../../hooks/useMarket';
 import {
   useInvestments,
   useNetWorth,
@@ -9,14 +10,18 @@ import {
   saveInvestmentSettings,
   type InvestmentStatusFilter,
 } from '../../hooks/useInvestments';
-import type { Investment, InvestmentCurrency } from '../../types';
+import type { Investment, InvestmentCurrency, PortfolioRealReturn } from '../../types';
 import {
   ASSET_TYPES,
   ASSET_TYPE_LABELS,
   formatMoney,
+  formatPct,
   formatQuantity,
   maturityLabel,
   maturityTone,
+  monthLabel,
+  realReturnReasonText,
+  relativeTime,
 } from '../../utils/investments';
 import InvestmentModal from './InvestmentModal';
 import NetWorthCard from './NetWorthCard';
@@ -34,6 +39,103 @@ function groupSubtotal(items: Investment[]): string {
     byCurrency.set(i.currency, (byCurrency.get(i.currency) ?? 0) + i.effective_value);
   }
   return [...byCurrency.entries()].map(([c, v]) => formatMoney(v, c)).join(' · ');
+}
+
+const COINGECKO_URL = 'https://www.coingecko.com';
+
+/** Chip "Real ±x %" con el detalle nominal / inflación y la marca "estimado". */
+function RealReturnInfo({ investment: i }: { investment: Investment }) {
+  const rr = i.real_return;
+  if (!rr) {
+    const reason = realReturnReasonText(i.real_return_unavailable_reason);
+    return reason ? (
+      <p className="mt-2 text-xs text-gray-400 dark:text-slate-500" data-testid="real-return-reason">
+        {reason}
+      </p>
+    ) : null;
+  }
+  const positive = rr.real_pct >= 0;
+  const period = monthLabel(rr.period_end.slice(0, 7));
+  const projection = rr.projected_at_maturity;
+  const hint = rr.estimated
+    ? `El IPC de ${rr.estimated_months.map(monthLabel).join(' y ')} todavía no está publicado: lo estimamos con el último dato.`
+    : null;
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs" data-testid="real-return">
+      <span
+        title={`Nominal ${formatPct(rr.nominal_pct, false)} · Inflación ${formatPct(rr.inflation_pct, false)} (${period})`}
+        className={`rounded-full px-2 py-0.5 font-medium ${
+          positive
+            ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300'
+            : 'bg-rose-50 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300'
+        }`}
+      >
+        Real {formatPct(rr.real_pct)}
+      </span>
+      <span className="text-gray-400 dark:text-slate-500">
+        nominal {formatPct(rr.nominal_pct, false)} · inflación {formatPct(rr.inflation_pct, false)}
+      </span>
+      {rr.estimated && (
+        <span
+          title={hint ?? undefined}
+          className="rounded-full bg-amber-50 dark:bg-amber-500/15 px-2 py-0.5 font-medium text-amber-700 dark:text-amber-300"
+        >
+          estimado
+        </span>
+      )}
+      {projection && (
+        <span className="text-gray-500 dark:text-slate-400">
+          Al vencimiento: real ≈ {formatPct(projection.real_pct)}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/** Cotización automática de cripto: antigüedad y atribución obligatoria. */
+function QuoteInfo({ investment: i }: { investment: Investment }) {
+  if (i.price_source !== 'coingecko') return null;
+  return (
+    <p className="mt-2 text-xs text-gray-500 dark:text-slate-400" data-testid="auto-quote">
+      {i.last_price_at ? (
+        <span className={i.quote_stale ? 'text-amber-600 dark:text-amber-400' : ''}>
+          Cotización automática · {relativeTime(i.last_price_at)}
+          {i.quote_stale ? ' (desactualizada)' : ''}
+        </span>
+      ) : (
+        <span>Esperando cotización…</span>
+      )}
+      {' · '}
+      <a
+        href={COINGECKO_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-brand-indigo hover:underline"
+      >
+        Datos de CoinGecko
+      </a>
+    </p>
+  );
+}
+
+function RealReturnSummary({ data }: { data: PortfolioRealReturn }) {
+  const wins = data.real_pct >= 0;
+  return (
+    <div
+      data-testid="real-return-summary"
+      className="rounded-xl bg-white dark:bg-slate-800 px-5 py-3 text-sm text-gray-700 dark:text-slate-200 shadow-sm"
+    >
+      Tus inversiones en pesos le {wins ? 'ganan' : 'pierden'}{' '}
+      <span className={`font-semibold ${wins ? 'text-emerald-500' : 'text-rose-500'}`}>
+        {formatPct(Math.abs(data.real_pct), false)}
+      </span>{' '}
+      a la inflación ({data.included_count} {data.included_count === 1 ? 'activo' : 'activos'}
+      {data.estimated ? ', estimado' : ''}).
+      <span className="ml-1 text-xs text-gray-400 dark:text-slate-500">
+        Nominal {formatPct(data.nominal_pct, false)} · inflación {formatPct(data.inflation_pct, false)}
+      </span>
+    </div>
+  );
 }
 
 function InvestmentCard({
@@ -146,6 +248,8 @@ function InvestmentCard({
           </span>
         )}
       </div>
+      <QuoteInfo investment={i} />
+      <RealReturnInfo investment={i} />
     </div>
   );
 }
@@ -158,6 +262,7 @@ export default function InvestmentsSection() {
 
   const { data: investments, isLoading, error } = useInvestments(filter);
   const { data: netWorth } = useNetWorth();
+  const { data: market } = useMarketFx();
 
   function handleNew() {
     setEditing(null);
@@ -201,10 +306,9 @@ export default function InvestmentsSection() {
             <h3 className="mb-2 text-sm font-semibold text-gray-800 dark:text-slate-100">Cotización</h3>
             {netWorth ? (
               <FxRatesEditor
-                key={`${netWorth.rates.usd_ars}-${netWorth.rates.eur_ars}-${netWorth.rates.updated_at}`}
-                usdArs={netWorth.rates.usd_ars}
-                eurArs={netWorth.rates.eur_ars}
-                updatedAt={netWorth.rates.updated_at}
+                key={`${netWorth.rates.usd_source}-${netWorth.rates.eur_source}-${netWorth.rates.usd_ars}-${netWorth.rates.eur_ars}-${netWorth.rates.updated_at}`}
+                rates={netWorth.rates}
+                market={market}
                 showEur={hasEur}
               />
             ) : (
@@ -246,6 +350,10 @@ export default function InvestmentsSection() {
           </div>
         </div>
       </div>
+
+      {netWorth?.investments.real_return_ars && (
+        <RealReturnSummary data={netWorth.investments.real_return_ars} />
+      )}
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex rounded-lg border border-gray-200 dark:border-slate-700 p-0.5">

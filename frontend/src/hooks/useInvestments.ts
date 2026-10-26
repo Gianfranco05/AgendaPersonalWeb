@@ -64,10 +64,18 @@ export async function removeInvestment(id: string) {
   await invalidateInvestments();
 }
 
-/** Cotizaciones (null borra) y toggle "Sumar inversiones al balance": viven en
- *  los ajustes del usuario, así que además de los totales se revalida `settings`. */
+/** Cotizaciones (null borra), fuente del dólar/euro y toggle "Sumar inversiones
+ *  al balance": viven en los ajustes del usuario, así que además de los totales
+ *  (patrimonio, resumen, Finanzas) se revalida `settings`. */
 export async function saveInvestmentSettings(
-  data: Pick<Partial<Settings>, 'fx_usd_ars' | 'fx_eur_ars' | 'include_investments_in_balance'>,
+  data: Pick<
+    Partial<Settings>,
+    | 'fx_usd_ars'
+    | 'fx_eur_ars'
+    | 'fx_usd_source'
+    | 'fx_eur_source'
+    | 'include_investments_in_balance'
+  >,
 ) {
   await updateSettings(data);
   await invalidateInvestments(true);

@@ -6,8 +6,12 @@ import InvestmentModal from '../InvestmentModal'
 vi.mock('../../../hooks/useInvestments', () => ({
   saveInvestment: vi.fn(),
 }))
+vi.mock('../../../hooks/useMarket', () => ({
+  useCryptoAssets: vi.fn(),
+}))
 
 import { saveInvestment } from '../../../hooks/useInvestments'
+import { useCryptoAssets } from '../../../hooks/useMarket'
 
 const props = { onClose: vi.fn(), onSaved: vi.fn() }
 
@@ -25,6 +29,16 @@ function fillFixedTerm() {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  vi.mocked(useCryptoAssets).mockReturnValue({
+    data: [
+      { ticker: 'BTC', name: 'Bitcoin' },
+      { ticker: 'ETH', name: 'Ethereum' },
+    ],
+    isLoading: false,
+    error: undefined,
+    isValidating: false,
+    mutate: vi.fn(),
+  } as never)
 })
 
 describe('InvestmentModal', () => {
@@ -128,6 +142,115 @@ describe('InvestmentModal', () => {
       interest_rate_tna: null,
       start_date: null,
       maturity_date: null,
+    })
+  })
+
+  describe('cotización automática de cripto', () => {
+    function pickCrypto(ticker: string) {
+      fireEvent.change(screen.getByLabelText('Tipo'), { target: { value: 'crypto' } })
+      type('Nombre', 'Bitcoin')
+      type(/Ticker/, ticker)
+    }
+
+    it('el switch solo está disponible para tickers de la lista y sugiere los soportados', () => {
+      renderWithProviders(<InvestmentModal investment={null} {...props} />)
+      expect(screen.queryByRole('switch')).not.toBeInTheDocument()
+
+      pickCrypto('FOOCOIN')
+      const toggle = screen.getByRole('switch', { name: 'Cotización automática' })
+      expect(toggle).toBeDisabled()
+      expect(screen.getByText(/No tenemos cotización automática para ese ticker/)).toBeInTheDocument()
+
+      type(/Ticker/, 'btc')
+      expect(toggle).toBeEnabled()
+      const options = [...document.querySelectorAll('#inv-ticker-options option')].map((o) => o.getAttribute('value'))
+      expect(options).toEqual(['BTC', 'ETH'])
+    })
+
+    it('al activarlo oculta el valor actual y exige la cantidad', async () => {
+      renderWithProviders(<InvestmentModal investment={null} {...props} />)
+      pickCrypto('BTC')
+      type('Monto invertido', '30000')
+      expect(screen.getByLabelText(/Valor actual/)).toBeInTheDocument()
+
+      fireEvent.click(screen.getByRole('switch', { name: 'Cotización automática' }))
+      expect(screen.queryByLabelText(/Valor actual/)).not.toBeInTheDocument()
+      expect(screen.getByLabelText('Cantidad')).toBeInTheDocument()
+
+      fireEvent.click(screen.getByText('Crear'))
+      expect(await screen.findByText('La cotización automática necesita la cantidad')).toBeInTheDocument()
+      expect(saveInvestment).not.toHaveBeenCalled()
+    })
+
+    it('guarda con price_source coingecko y sin valor actual', async () => {
+      vi.mocked(saveInvestment).mockResolvedValue(undefined)
+      renderWithProviders(<InvestmentModal investment={null} {...props} />)
+      pickCrypto('btc')
+      type('Monto invertido', '30000')
+      type(/Cantidad/, '0,5')
+      type(/Valor actual/, '99999')
+      fireEvent.click(screen.getByRole('switch', { name: 'Cotización automática' }))
+      fireEvent.click(screen.getByText('Crear'))
+
+      await waitFor(() => expect(saveInvestment).toHaveBeenCalled())
+      expect(vi.mocked(saveInvestment).mock.calls[0][1]).toMatchObject({
+        asset_type: 'crypto',
+        ticker: 'BTC',
+        quantity: 0.5,
+        current_value: null,
+        price_source: 'coingecko',
+      })
+    })
+
+    it('apagado manda price_source manual', async () => {
+      vi.mocked(saveInvestment).mockResolvedValue(undefined)
+      renderWithProviders(<InvestmentModal investment={null} {...props} />)
+      pickCrypto('BTC')
+      type('Monto invertido', '30000')
+      type(/Valor actual/, '31000')
+      fireEvent.click(screen.getByText('Crear'))
+      await waitFor(() => expect(saveInvestment).toHaveBeenCalled())
+      expect(vi.mocked(saveInvestment).mock.calls[0][1]).toMatchObject({
+        current_value: 31000,
+        price_source: 'manual',
+      })
+    })
+
+    it('si cambia el ticker a uno no soportado se apaga solo', async () => {
+      renderWithProviders(<InvestmentModal investment={null} {...props} />)
+      pickCrypto('BTC')
+      const toggle = screen.getByRole('switch', { name: 'Cotización automática' })
+      fireEvent.click(toggle)
+      expect(toggle).toHaveAttribute('aria-checked', 'true')
+      type(/Ticker/, 'FOOCOIN')
+      await waitFor(() => expect(toggle).toHaveAttribute('aria-checked', 'false'))
+    })
+  })
+
+  describe('fecha de compra', () => {
+    it('fuera del plazo fijo se llama "Fecha de compra" y explica para qué sirve', () => {
+      renderWithProviders(<InvestmentModal investment={null} {...props} />)
+      expect(screen.getByLabelText('Fecha de inicio')).toBeInTheDocument()
+      fireEvent.change(screen.getByLabelText('Tipo'), { target: { value: 'stock' } })
+      expect(screen.getByLabelText(/Fecha de compra/)).toBeInTheDocument()
+      expect(screen.getByText(/rendimiento contra la inflación/)).toBeInTheDocument()
+      // Una acción no tiene vencimiento.
+      expect(screen.queryByLabelText(/Vencimiento/)).not.toBeInTheDocument()
+    })
+
+    it('manda la fecha de compra de una acción', async () => {
+      vi.mocked(saveInvestment).mockResolvedValue(undefined)
+      renderWithProviders(<InvestmentModal investment={null} {...props} />)
+      fireEvent.change(screen.getByLabelText('Tipo'), { target: { value: 'stock' } })
+      type('Nombre', 'Apple CEDEAR')
+      type('Monto invertido', '1000')
+      type(/Fecha de compra/, '2026-08-15')
+      fireEvent.click(screen.getByText('Crear'))
+      await waitFor(() => expect(saveInvestment).toHaveBeenCalled())
+      expect(vi.mocked(saveInvestment).mock.calls[0][1]).toMatchObject({
+        start_date: '2026-08-15',
+        maturity_date: null,
+      })
     })
   })
 

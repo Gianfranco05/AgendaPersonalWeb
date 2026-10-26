@@ -115,6 +115,17 @@ describe('invalidación de caché', () => {
     expect(invalidatedKeys()('finance/net-worth')).toBe(true)
   })
 
+  it('cambiar la fuente del dólar manda el PUT y revalida ajustes, patrimonio, resumen y Finanzas', async () => {
+    await saveInvestmentSettings({ fx_usd_source: 'blue' })
+    expect(endpoints.updateSettings).toHaveBeenCalledWith({ fx_usd_source: 'blue' })
+    expect(globalMutate).toHaveBeenCalledWith('settings')
+    const stale = invalidatedKeys()
+    for (const key of ['finance/net-worth', 'finance/investments/summary', 'finance/summary']) {
+      expect(stale(key)).toBe(true)
+    }
+    expect(stale(['finance/investments', 'active'])).toBe(true)
+  })
+
   it('si la API falla no revalida (queda el dato anterior)', async () => {
     vi.mocked(endpoints.createInvestment).mockRejectedValueOnce(new Error('422'))
     await expect(saveInvestment(null, input)).rejects.toThrow('422')

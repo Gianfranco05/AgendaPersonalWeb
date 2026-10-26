@@ -53,10 +53,16 @@ import type {
   InvestmentSummary,
   InvestmentCurrency,
   NetWorth,
+  MarketFx,
+  FxQuote,
+  InflationSeries,
+  CryptoAsset,
+  RealReturn,
+  PortfolioRealReturn,
   AssetType,
 } from '../types';
 import { toLocalDateString } from '../utils/date';
-import { enrichInvestment } from '../utils/investments';
+import { enrichInvestment, MOCK_CRYPTO_PRICES, MOCK_MONTHLY_INFLATION } from '../utils/investments';
 
 const MOCK_ENABLED = import.meta.env.VITE_MOCK_ENABLED === 'true';
 
@@ -1026,6 +1032,8 @@ let mockSettingsState: Settings = {
   fx_usd_ars: null,
   fx_eur_ars: null,
   fx_rates_updated_at: null,
+  fx_usd_source: 'mep',
+  fx_eur_source: 'oficial',
   include_investments_in_balance: false,
 };
 
@@ -1079,6 +1087,22 @@ export async function disconnectGoogleCalendar(): Promise<Settings> {
 
 // La API serializa los Decimal como string; fecha y hora de "hoy" las pone el
 // server a partir de tz_offset_minutes (minutos al este de UTC).
+function mapProjection<T extends { nominal_pct: number; inflation_pct: number; real_pct: number }>(p: T): T {
+  return { ...p, nominal_pct: num(p.nominal_pct), inflation_pct: num(p.inflation_pct), real_pct: num(p.real_pct) };
+}
+
+function mapRealReturn(r: RealReturn | null): RealReturn | null {
+  if (!r) return null;
+  return {
+    ...mapProjection(r),
+    projected_at_maturity: r.projected_at_maturity ? mapProjection(r.projected_at_maturity) : null,
+  };
+}
+
+function mapPortfolioReal(r: PortfolioRealReturn | null | undefined): PortfolioRealReturn | null {
+  return r ? mapProjection(r) : null;
+}
+
 function mapInvestment(i: Investment): Investment {
   return {
     ...i,
@@ -1089,6 +1113,8 @@ function mapInvestment(i: Investment): Investment {
     effective_value: num(i.effective_value),
     gain: num(i.gain),
     gain_pct: numOrNull(i.gain_pct),
+    ...(i.last_price !== undefined && { last_price: numOrNull(i.last_price) }),
+    ...(i.real_return !== undefined && { real_return: mapRealReturn(i.real_return) }),
     fixed_term: i.fixed_term
       ? {
           ...i.fixed_term,
@@ -1114,6 +1140,7 @@ function mapInvestmentSummary(s: InvestmentSummary): InvestmentSummary {
     total_ars: numOrNull(s.total_ars),
     total_usd: numOrNull(s.total_usd),
     upcoming_maturities: s.upcoming_maturities.map((u) => ({ ...u, amount: num(u.amount) })),
+    ...(s.real_return_ars !== undefined && { real_return_ars: mapPortfolioReal(s.real_return_ars) }),
   };
 }
 
@@ -1129,6 +1156,8 @@ function mapNetWorth(n: NetWorth): NetWorth {
       ...n.rates,
       usd_ars: numOrNull(n.rates.usd_ars),
       eur_ars: numOrNull(n.rates.eur_ars),
+      ...(n.rates.usd_buy !== undefined && { usd_buy: numOrNull(n.rates.usd_buy) }),
+      ...(n.rates.eur_buy !== undefined && { eur_buy: numOrNull(n.rates.eur_buy) }),
     },
   };
 }
@@ -1194,6 +1223,16 @@ let mockInvestmentBases: MockInvestmentBase[] = [
   }),
 ];
 
+function mockQuoteFields(source: string | undefined, ticker: string | null | undefined) {
+  if (source !== 'coingecko') return { price_source: 'manual' as const, last_price: null, last_price_at: null };
+  const price = ticker ? MOCK_CRYPTO_PRICES[ticker.toUpperCase()] : undefined;
+  return {
+    price_source: 'coingecko' as const,
+    last_price: price ?? null,
+    last_price_at: price === undefined ? null : new Date().toISOString(),
+  };
+}
+
 function mockInvestmentList(status: 'active' | 'closed' | 'all' = 'active'): Investment[] {
   return mockInvestmentBases
     .filter((b) => status === 'all' || b.status === status)
@@ -1206,8 +1245,97 @@ function mockInvestmentList(status: 'active' | 'closed' | 'all' = 'active'): Inv
     );
 }
 
+// Mock del mercado: cotizaciones fijas "de hoy" (las mismas que se vieron en DolarAPI).
+function mockMarketQuote(
+  kind: FxQuote['kind'],
+  buy: number,
+  sell: number,
+  minutesAgo = 12,
+): FxQuote {
+  const label = kind === 'mep' ? 'MEP' : kind === 'blue' ? 'Blue' : 'Oficial';
+  return {
+    kind,
+    label,
+    buy,
+    sell,
+    provider: 'dolarapi',
+    as_of: new Date(Date.now() - minutesAgo * 60_000).toISOString(),
+    stale: false,
+  };
+}
+
+function mockMarketFx(): MarketFx {
+  return {
+    usd: [
+      mockMarketQuote('oficial', 1500, 1550),
+      mockMarketQuote('mep', 1557.4, 1563.9),
+      mockMarketQuote('blue', 1545, 1565),
+    ],
+    eur: [mockMarketQuote('oficial', 1700.07, 1713.96), mockMarketQuote('blue', 1662, 1698)],
+    last_success_at: new Date(Date.now() - 12 * 60_000).toISOString(),
+    degraded: false,
+  };
+}
+
+/** Cotización efectiva del modo mock según la fuente elegida. */
+function mockEffectiveRates(): NetWorth['rates'] {
+  const market = mockMarketFx();
+  const resolve = (
+    quotes: FxQuote[],
+    source: string,
+    manual: number | null,
+  ): { rate: number | null; buy: number | null; effective: NetWorth['rates']['usd_effective_source']; asOf: string | null; provider: string | null } => {
+    if (source === 'manual') {
+      return { rate: manual, buy: null, effective: manual === null ? null : 'manual', asOf: mockSettingsState.fx_rates_updated_at ?? null, provider: null };
+    }
+    const q = quotes.find((x) => x.kind === source);
+    return q
+      ? { rate: q.sell, buy: q.buy, effective: q.kind, asOf: q.as_of, provider: q.provider }
+      : { rate: manual, buy: null, effective: manual === null ? null : 'manual_fallback', asOf: null, provider: null };
+  };
+  const usdSource = mockSettingsState.fx_usd_source ?? 'mep';
+  const eurSource = mockSettingsState.fx_eur_source ?? 'oficial';
+  const usd = resolve(market.usd, usdSource, mockSettingsState.fx_usd_ars ?? null);
+  const eur = resolve(market.eur, eurSource, mockSettingsState.fx_eur_ars ?? null);
+  return {
+    usd_ars: usd.rate,
+    eur_ars: eur.rate,
+    updated_at: usd.asOf,
+    usd_source: usdSource,
+    usd_effective_source: usd.effective,
+    usd_buy: usd.buy,
+    usd_provider: usd.provider,
+    usd_as_of: usd.asOf,
+    usd_stale: false,
+    eur_source: eurSource,
+    eur_effective_source: eur.effective,
+    eur_buy: eur.buy,
+    eur_provider: eur.provider,
+    eur_as_of: eur.asOf,
+    eur_stale: false,
+  };
+}
+
+function mockPortfolioReal(active: Investment[]): PortfolioRealReturn | null {
+  const items = active.filter((i) => i.real_return);
+  if (items.length === 0) return null;
+  const invested = items.reduce((a, i) => a + i.invested_amount, 0);
+  const value = items.reduce((a, i) => a + i.effective_value, 0);
+  const inflated = items.reduce((a, i) => a + i.invested_amount * (1 + i.real_return!.inflation_pct / 100), 0);
+  const r2 = (n: number) => Math.round(n * 100) / 100;
+  return {
+    nominal_pct: r2((value / invested - 1) * 100),
+    inflation_pct: r2((inflated / invested - 1) * 100),
+    real_pct: r2((value / inflated - 1) * 100),
+    estimated: items.some((i) => i.real_return!.estimated),
+    included_count: items.length,
+    excluded_count: active.filter((i) => i.currency === 'ARS').length - items.length,
+  };
+}
+
 function mockInvestmentSummary(): InvestmentSummary {
-  const rates = { usd: mockSettingsState.fx_usd_ars ?? null, eur: mockSettingsState.fx_eur_ars ?? null };
+  const effective = mockEffectiveRates();
+  const rates = { usd: effective.usd_ars, eur: effective.eur_ars };
   const active = mockInvestmentList('active');
   const order: InvestmentCurrency[] = ['ARS', 'USD', 'USDT', 'EUR'];
   const sub = new Map<InvestmentCurrency, { invested: number; value: number; count: number }>();
@@ -1264,6 +1392,7 @@ function mockInvestmentSummary(): InvestmentSummary {
     total_usd: totalUsd,
     missing_rates: missing,
     count_active: active.length,
+    real_return_ars: mockPortfolioReal(active),
     upcoming_maturities: active
       .filter((i) => i.days_to_maturity !== null && i.days_to_maturity >= 0 && i.days_to_maturity <= 30)
       .sort((a, b) => a.days_to_maturity! - b.days_to_maturity!)
@@ -1282,7 +1411,8 @@ function mockInvestmentSummary(): InvestmentSummary {
 
 function mockNetWorth(): NetWorth {
   const investments = mockInvestmentSummary();
-  const usd = mockSettingsState.fx_usd_ars ?? null;
+  const mockRates = mockEffectiveRates();
+  const usd = mockRates.usd_ars;
   const cash = 380000;
   const cashUsd = usd ? Math.round((cash / usd) * 100) / 100 : null;
   const missing = [...investments.missing_rates];
@@ -1296,11 +1426,7 @@ function mockNetWorth(): NetWorth {
       cashUsd === null || investments.total_usd === null
         ? null
         : Math.round((cashUsd + investments.total_usd) * 100) / 100,
-    rates: {
-      usd_ars: usd,
-      eur_ars: mockSettingsState.fx_eur_ars ?? null,
-      updated_at: mockSettingsState.fx_rates_updated_at ?? null,
-    },
+    rates: mockRates,
     missing_rates: missing,
     include_investments_in_balance: mockSettingsState.include_investments_in_balance ?? false,
   };
@@ -1363,6 +1489,7 @@ export async function createInvestment(input: InvestmentInput): Promise<Investme
       id: `mock-inv-${generateId()}`,
       status: 'active',
       value_updated_at: input.current_value !== null ? new Date().toISOString() : null,
+      ...mockQuoteFields(input.price_source, input.ticker),
     };
     mockInvestmentBases = [...mockInvestmentBases, base];
     return mockDelay(enrichInvestment(base));
@@ -1381,7 +1508,11 @@ export async function updateInvestment(
   if (MOCK_ENABLED) {
     const current = mockInvestmentBases.find((b) => b.id === id);
     if (!current) throw new Error('Inversión no encontrada');
-    const next = { ...current, ...input };
+    const next = {
+      ...current,
+      ...input,
+      ...('price_source' in input ? mockQuoteFields(input.price_source, input.ticker ?? current.ticker) : {}),
+    };
     if ('current_value' in input && input.current_value !== current.current_value) {
       next.value_updated_at = input.current_value === null ? null : new Date().toISOString();
     }
@@ -1401,6 +1532,53 @@ export async function deleteInvestment(id: string): Promise<void> {
     return mockDelay(undefined);
   }
   await apiClient.delete(`/api/v1/finance/investments/${id}`);
+}
+
+// ── Datos de mercado ──
+
+function mapQuote(q: FxQuote): FxQuote {
+  return { ...q, buy: numOrNull(q.buy), sell: num(q.sell) };
+}
+
+export async function fetchMarketFx(): Promise<MarketFx> {
+  if (MOCK_ENABLED) {
+    return mockDelay(mockMarketFx());
+  }
+  const { data } = await apiClient.get<MarketFx>('/api/v1/finance/market/fx');
+  return { ...data, usd: data.usd.map(mapQuote), eur: data.eur.map(mapQuote) };
+}
+
+export async function fetchInflation(months = 12): Promise<InflationSeries> {
+  if (MOCK_ENABLED) {
+    const series = Array.from({ length: months }, (_, k) => {
+      const d = new Date();
+      d.setMonth(d.getMonth() - (months - k));
+      return { period: d.toISOString().slice(0, 7), pct: MOCK_MONTHLY_INFLATION };
+    });
+    return mockDelay({
+      series,
+      last_published_period: series[series.length - 1]?.period ?? null,
+      estimate_pct: MOCK_MONTHLY_INFLATION,
+    });
+  }
+  const { data } = await apiClient.get<InflationSeries>('/api/v1/finance/market/inflation', {
+    params: { months },
+  });
+  return {
+    ...data,
+    series: data.series.map((p) => ({ ...p, pct: num(p.pct) })),
+    estimate_pct: numOrNull(data.estimate_pct),
+  };
+}
+
+export async function fetchCryptoAssets(): Promise<CryptoAsset[]> {
+  if (MOCK_ENABLED) {
+    return mockDelay(
+      Object.keys(MOCK_CRYPTO_PRICES).map((ticker) => ({ ticker, name: ticker })),
+    );
+  }
+  const { data } = await apiClient.get<CryptoAsset[]>('/api/v1/finance/market/crypto-assets');
+  return data;
 }
 
 // ── Cuenta (export y baja) ──

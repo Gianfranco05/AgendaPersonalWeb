@@ -142,8 +142,15 @@ export interface Settings {
   fx_usd_ars?: number | null;
   fx_eur_ars?: number | null;
   fx_rates_updated_at?: string | null;
+  // De dónde sale la cotización con la que se convierten los totales. `manual`
+  // usa fx_usd_ars / fx_eur_ars, que cambiar de fuente nunca borra.
+  fx_usd_source?: FxUsdSource;
+  fx_eur_source?: FxEurSource;
   include_investments_in_balance?: boolean;
 }
+
+export type FxUsdSource = 'oficial' | 'mep' | 'blue' | 'manual';
+export type FxEurSource = 'oficial' | 'blue' | 'manual';
 
 export type TaskStatus = 'pending' | 'in_progress' | 'completed';
 
@@ -508,6 +515,43 @@ export type InvestmentStatus = 'active' | 'closed';
 
 export type ValueSource = 'quote' | 'manual' | 'fixed_term_accrued' | 'invested';
 
+// 'manual' o un proveedor automático registrado en el server (hoy CoinGecko).
+export type PriceSource = 'manual' | 'coingecko';
+
+/** Por qué un activo no tiene rendimiento real. */
+export type RealReturnReason =
+  | 'currency'
+  | 'no_start_date'
+  | 'too_short'
+  | 'no_inflation_data'
+  | 'no_invested_amount';
+
+export interface RealReturnProjection {
+  nominal_pct: number;
+  inflation_pct: number;
+  real_pct: number;
+  estimated: boolean;
+}
+
+/** Rendimiento real (contra la inflación del INDEC) de un activo en pesos. */
+export interface RealReturn extends RealReturnProjection {
+  // "2026-10": meses sin IPC publicado que se estimaron con el último dato.
+  estimated_months: string[];
+  period_start: string;
+  period_end: string;
+  // Solo plazos fijos activos.
+  projected_at_maturity: RealReturnProjection | null;
+}
+
+export interface PortfolioRealReturn {
+  nominal_pct: number;
+  inflation_pct: number;
+  real_pct: number;
+  estimated: boolean;
+  included_count: number;
+  excluded_count: number;
+}
+
 export interface FixedTermInfo {
   term_days: number;
   interest_total: number;
@@ -541,6 +585,14 @@ export interface Investment {
   days_to_maturity: number | null;
   is_matured: boolean;
   fixed_term: FixedTermInfo | null;
+  // Cotización automática (cripto). Opcionales: los mocks viejos no los traen.
+  price_source?: PriceSource;
+  last_price?: number | null;
+  last_price_at?: string | null;
+  quote_provider?: string | null;
+  quote_stale?: boolean | null;
+  real_return?: RealReturn | null;
+  real_return_unavailable_reason?: RealReturnReason | null;
 }
 
 // Lo que se manda al crear/editar. En PUT, `null` en un campo opcional lo borra.
@@ -558,6 +610,7 @@ export interface InvestmentInput {
   institution: string | null;
   notes: string | null;
   notify_maturity: boolean;
+  price_source?: PriceSource;
 }
 
 export interface CurrencyBreakdown {
@@ -592,6 +645,56 @@ export interface InvestmentSummary {
   missing_rates: string[];
   count_active: number;
   upcoming_maturities: UpcomingMaturity[];
+  real_return_ars?: PortfolioRealReturn | null;
+}
+
+/** Cómo se llegó a la cotización: la que pidió el usuario y la que se usó. */
+export type FxEffectiveSource = FxUsdSource | 'manual_fallback' | 'ccl' | null;
+
+export interface NetWorthRates {
+  usd_ars: number | null;
+  eur_ars: number | null;
+  updated_at: string | null;
+  usd_source?: FxUsdSource;
+  usd_effective_source?: FxEffectiveSource;
+  usd_buy?: number | null;
+  usd_provider?: string | null;
+  usd_as_of?: string | null;
+  usd_stale?: boolean;
+  eur_source?: FxEurSource;
+  eur_effective_source?: FxEffectiveSource;
+  eur_buy?: number | null;
+  eur_provider?: string | null;
+  eur_as_of?: string | null;
+  eur_stale?: boolean;
+}
+
+export interface FxQuote {
+  kind: 'oficial' | 'mep' | 'blue';
+  label: string;
+  buy: number | null;
+  sell: number;
+  provider: string;
+  as_of: string;
+  stale: boolean;
+}
+
+export interface MarketFx {
+  usd: FxQuote[];
+  eur: FxQuote[];
+  last_success_at: string | null;
+  degraded: boolean;
+}
+
+export interface InflationSeries {
+  series: { period: string; pct: number }[];
+  last_published_period: string | null;
+  estimate_pct: number | null;
+}
+
+export interface CryptoAsset {
+  ticker: string;
+  name: string;
 }
 
 export interface NetWorth {
@@ -600,7 +703,7 @@ export interface NetWorth {
   investments: InvestmentSummary;
   net_worth_ars: number | null;
   net_worth_usd: number | null;
-  rates: { usd_ars: number | null; eur_ars: number | null; updated_at: string | null };
+  rates: NetWorthRates;
   missing_rates: string[];
   include_investments_in_balance: boolean;
 }

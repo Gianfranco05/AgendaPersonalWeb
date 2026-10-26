@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { X } from 'lucide-react';
 import { saveInvestment } from '../../hooks/useInvestments';
+import { useCryptoAssets } from '../../hooks/useMarket';
 import type { AssetType, Investment, InvestmentCurrency, InvestmentInput } from '../../types';
 import { toLocalDateString } from '../../utils/date';
 import { apiErrorMessage } from '../../utils/apiError';
@@ -23,7 +24,9 @@ const MAX_AMOUNT = 9_999_999_999.99;
 const HAS_QUANTITY: AssetType[] = ['stock', 'crypto', 'bond', 'fund', 'fx'];
 const HAS_TICKER: AssetType[] = ['stock', 'crypto', 'bond', 'fund', 'fx'];
 const HAS_TNA: AssetType[] = ['fixed_term', 'bond', 'other'];
-const HAS_DATES: AssetType[] = ['fixed_term', 'bond', 'fund', 'other'];
+// El vencimiento solo tiene sentido en estos; la fecha de inicio/compra en todos
+// (con ella se calcula el rendimiento contra la inflación).
+const HAS_MATURITY: AssetType[] = ['fixed_term', 'bond', 'fund', 'other'];
 
 // Se usa string en los campos numéricos (coma decimal) y se parsea a mano:
 // z.coerce rompe el tipado de react-hook-form con zodResolver.
@@ -56,6 +59,8 @@ const schema = z
     institution: z.string().max(120, 'Máximo 120 caracteres'),
     notes: z.string().max(2000, 'Máximo 2000 caracteres'),
     notify_maturity: z.boolean(),
+    // Cotización automática (CoinGecko), solo cripto.
+    auto_quote: z.boolean(),
   })
   .superRefine((v, ctx) => {
     const issue = (path: keyof FormData, message: string) =>
@@ -76,6 +81,9 @@ const schema = z
     if (v.interest_rate_tna.trim()) {
       const n = parseDecimal(v.interest_rate_tna);
       if (n === null || n < 0 || n > 999.9999) issue('interest_rate_tna', 'TNA inválida (0 a 999,9999)');
+    }
+    if (v.auto_quote && !v.quantity.trim()) {
+      issue('quantity', 'La cotización automática necesita la cantidad');
     }
     if (v.start_date && v.maturity_date && v.maturity_date < v.start_date) {
       issue('maturity_date', 'El vencimiento no puede ser anterior al inicio');
@@ -121,6 +129,7 @@ function defaultValues(): FormData {
     institution: '',
     notes: '',
     notify_maturity: true,
+    auto_quote: false,
   };
 }
 
@@ -140,12 +149,14 @@ function toForm(i: Investment): FormData {
     institution: i.institution ?? '',
     notes: i.notes ?? '',
     notify_maturity: i.notify_maturity,
+    auto_quote: i.price_source === 'coingecko',
   };
 }
 
 function toInput(v: FormData): InvestmentInput {
   const type = v.asset_type;
-  const hasDates = HAS_DATES.includes(type);
+  const hasMaturity = HAS_MATURITY.includes(type);
+  const auto = v.auto_quote && type === 'crypto';
   return {
     asset_type: type,
     name: v.name.trim(),
@@ -153,13 +164,15 @@ function toInput(v: FormData): InvestmentInput {
     currency: v.currency,
     quantity: HAS_QUANTITY.includes(type) ? parseDecimal(v.quantity) : null,
     invested_amount: parseDecimal(v.invested_amount) ?? 0,
-    current_value: parseDecimal(v.current_value),
+    // Con cotización automática el valor sale de cantidad × precio.
+    current_value: auto ? null : parseDecimal(v.current_value),
     interest_rate_tna: HAS_TNA.includes(type) ? parseDecimal(v.interest_rate_tna) : null,
-    start_date: hasDates && v.start_date ? v.start_date : null,
-    maturity_date: hasDates && v.maturity_date ? v.maturity_date : null,
+    start_date: v.start_date || null,
+    maturity_date: hasMaturity && v.maturity_date ? v.maturity_date : null,
     institution: v.institution.trim() || null,
     notes: v.notes.trim() || null,
     notify_maturity: v.notify_maturity,
+    price_source: auto ? 'coingecko' : 'manual',
   };
 }
 
@@ -193,6 +206,36 @@ export default function InvestmentModal({ investment, onClose, onSaved }: Props)
   const tna = watch('interest_rate_tna');
   const start = watch('start_date');
   const maturity = watch('maturity_date');
+  const ticker = watch('ticker');
+  const autoQuote = watch('auto_quote');
+
+  // Cotización automática: solo cripto con ticker de la lista curada del server.
+  const { data: cryptoAssets } = useCryptoAssets();
+  const supportedTickers = (cryptoAssets ?? []).map((a) => a.ticker);
+  const tickerSupported = supportedTickers.includes(ticker.trim().toUpperCase());
+  const canAutoQuote = type === 'crypto' && tickerSupported;
+  const autoOn = autoQuote && type === 'crypto';
+
+  // Si el ticker o el tipo ya no admiten cotización automática, se apaga.
+  useEffect(() => {
+    if (autoQuote && cryptoAssets && !canAutoQuote) setValue('auto_quote', false);
+  }, [autoQuote, cryptoAssets, canAutoQuote, setValue]);
+
+  // La fecha de hoy que viene por defecto es la del plazo fijo: al pasar a otro
+  // tipo se limpia (una "fecha de compra" inventada falsearía el rendimiento real).
+  const defaultStart = useRef(start);
+  const previousType = useRef(type);
+  useEffect(() => {
+    if (
+      !investment &&
+      previousType.current === 'fixed_term' &&
+      type !== 'fixed_term' &&
+      start === defaultStart.current
+    ) {
+      setValue('start_date', '');
+    }
+    previousType.current = type;
+  }, [investment, type, start, setValue]);
 
   const isFixedTerm = type === 'fixed_term';
   const currencyOptions: InvestmentCurrency[] = isFixedTerm ? ['ARS', 'USD'] : ['ARS', 'USD', 'USDT', 'EUR'];
@@ -220,7 +263,7 @@ export default function InvestmentModal({ investment, onClose, onSaved }: Props)
     }
   }
 
-  const showValueField = !isFixedTerm || manualValue;
+  const showValueField = (!isFixedTerm || manualValue) && !autoOn;
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 px-4 py-8 sm:py-12">
@@ -281,14 +324,25 @@ export default function InvestmentModal({ investment, onClose, onSaved }: Props)
                   {...register('ticker')}
                   type="text"
                   className={inputCls}
-                  placeholder="AAPL"
+                  placeholder={type === 'crypto' ? 'BTC' : 'AAPL'}
+                  list={type === 'crypto' ? 'inv-ticker-options' : undefined}
+                  autoComplete="off"
                 />
+                {type === 'crypto' && (
+                  <datalist id="inv-ticker-options">
+                    {(cryptoAssets ?? []).map((a) => (
+                      <option key={a.ticker} value={a.ticker}>{a.name}</option>
+                    ))}
+                  </datalist>
+                )}
                 {errors.ticker && <p className={errorCls}>{errors.ticker.message}</p>}
               </div>
             )}
             {HAS_QUANTITY.includes(type) && (
               <div>
-                <label htmlFor="inv-quantity" className={labelCls}>Cantidad (opcional)</label>
+                <label htmlFor="inv-quantity" className={labelCls}>
+                  Cantidad{autoOn ? '' : ' (opcional)'}
+                </label>
                 <input
                   id="inv-quantity"
                   {...register('quantity')}
@@ -301,6 +355,42 @@ export default function InvestmentModal({ investment, onClose, onSaved }: Props)
               </div>
             )}
           </div>
+
+          {type === 'crypto' && (
+            <div className="rounded-lg bg-gray-50 dark:bg-slate-700/40 px-3 py-2.5">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p id="inv-auto-label" className="text-sm font-medium text-gray-700 dark:text-slate-200">
+                    Cotización automática
+                  </p>
+                  <p className="mt-0.5 text-xs text-gray-500 dark:text-slate-400">
+                    {canAutoQuote
+                      ? 'El valor se calcula con la cantidad y el precio del mercado. Datos de CoinGecko.'
+                      : ticker.trim()
+                        ? 'No tenemos cotización automática para ese ticker: cargá el valor a mano.'
+                        : 'Elegí un ticker de la lista (BTC, ETH, USDT…) para cotizarlo solo.'}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={autoOn}
+                  aria-labelledby="inv-auto-label"
+                  disabled={!canAutoQuote}
+                  onClick={() => setValue('auto_quote', !autoQuote, { shouldValidate: true })}
+                  className={`relative h-6 w-11 shrink-0 rounded-full transition-colors disabled:opacity-40 ${
+                    autoOn ? 'bg-sky-500' : 'bg-gray-300 dark:bg-slate-600'
+                  }`}
+                >
+                  <span
+                    className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                      autoOn ? 'translate-x-5' : ''
+                    }`}
+                  />
+                </button>
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -358,15 +448,20 @@ export default function InvestmentModal({ investment, onClose, onSaved }: Props)
             </div>
           )}
 
-          {HAS_DATES.includes(type) && (
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="inv-start" className={labelCls}>
-                  Fecha de inicio{isFixedTerm ? '' : ' (opcional)'}
-                </label>
-                <input id="inv-start" {...register('start_date')} type="date" className={inputCls} />
-                {errors.start_date && <p className={errorCls}>{errors.start_date.message}</p>}
-              </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="inv-start" className={labelCls}>
+                {isFixedTerm ? 'Fecha de inicio' : 'Fecha de compra (opcional)'}
+              </label>
+              <input id="inv-start" {...register('start_date')} type="date" className={inputCls} />
+              {!isFixedTerm && (
+                <p className="mt-1 text-xs text-gray-400 dark:text-slate-500">
+                  Sirve para calcular el rendimiento contra la inflación.
+                </p>
+              )}
+              {errors.start_date && <p className={errorCls}>{errors.start_date.message}</p>}
+            </div>
+            {HAS_MATURITY.includes(type) && (
               <div>
                 <label htmlFor="inv-maturity" className={labelCls}>
                   Vencimiento{isFixedTerm ? '' : ' (opcional)'}
@@ -374,8 +469,8 @@ export default function InvestmentModal({ investment, onClose, onSaved }: Props)
                 <input id="inv-maturity" {...register('maturity_date')} type="date" className={inputCls} />
                 {errors.maturity_date && <p className={errorCls}>{errors.maturity_date.message}</p>}
               </div>
-            </div>
-          )}
+            )}
+          </div>
 
           {isFixedTerm && (
             <div

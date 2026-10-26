@@ -1,6 +1,6 @@
 import { AlertTriangle, Landmark } from 'lucide-react';
 import type { NetWorth } from '../../types';
-import { formatMoney } from '../../utils/investments';
+import { describeFxRate, formatMoney } from '../../utils/investments';
 
 // Efectivo e inversiones van en colores propios y distintos del verde de
 // ingresos y el rojo de egresos de las transacciones.
@@ -41,6 +41,19 @@ export default function NetWorthCard({ data }: { data: NetWorth }) {
   ]
     .filter(Boolean)
     .join(' y ');
+
+  // Qué dólar se está usando para convertir (solo cuando el server lo informa).
+  const { rates } = data;
+  const fxLine =
+    rates.usd_source !== undefined
+      ? describeFxRate(
+          'USD',
+          rates.usd_ars,
+          rates.usd_effective_source,
+          rates.usd_provider,
+          rates.usd_as_of ?? rates.updated_at,
+        )
+      : null;
 
   return (
     <div className="rounded-xl bg-white dark:bg-slate-800 p-5 shadow-sm" data-testid="net-worth-card">
@@ -100,6 +113,17 @@ export default function NetWorthCard({ data }: { data: NetWorth }) {
           </tbody>
         </table>
       </div>
+
+      {fxLine && (
+        <p className="mt-3 text-xs text-gray-400 dark:text-slate-500" data-testid="fx-used">
+          {fxLine}
+          {rates.usd_stale && (
+            <span className="ml-2 rounded-full bg-amber-50 dark:bg-amber-500/15 px-2 py-0.5 font-medium text-amber-700 dark:text-amber-300">
+              desactualizada
+            </span>
+          )}
+        </p>
+      )}
 
       {investments.by_currency.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500 dark:text-slate-400">

@@ -105,4 +105,46 @@ describe('NetWorthCard', () => {
     expect(screen.getByTestId('net-worth-card')).toHaveTextContent('$ 3.501.000,00')
     expect(screen.getByRole('status')).toHaveTextContent('montos en USD')
   })
+
+  it('indica qué dólar se usa, de dónde viene y cuándo se actualizó', () => {
+    const data: NetWorth = {
+      ...full,
+      rates: {
+        usd_ars: 1563.9,
+        eur_ars: null,
+        updated_at: new Date(Date.now() - 12 * 60_000).toISOString(),
+        usd_source: 'mep',
+        usd_effective_source: 'mep',
+        usd_provider: 'dolarapi',
+        usd_as_of: new Date(Date.now() - 12 * 60_000).toISOString(),
+        usd_stale: false,
+      },
+    }
+    renderWithProviders(<NetWorthCard data={data} />)
+    expect(screen.getByTestId('fx-used')).toHaveTextContent('Dólar MEP $ 1.563,90 · DolarAPI · hace 12 min')
+    expect(screen.queryByText('desactualizada')).not.toBeInTheDocument()
+  })
+
+  it('marca desactualizada la cotización vieja y nombra la manual', () => {
+    const stale: NetWorth = {
+      ...full,
+      rates: { ...full.rates, usd_source: 'blue', usd_effective_source: 'blue', usd_provider: 'bluelytics', usd_stale: true },
+    }
+    const { unmount } = renderWithProviders(<NetWorthCard data={stale} />)
+    expect(screen.getByTestId('fx-used')).toHaveTextContent('Dólar Blue $ 1.450,50 · Bluelytics')
+    expect(screen.getByText('desactualizada')).toBeInTheDocument()
+    unmount()
+
+    const manual: NetWorth = {
+      ...full,
+      rates: { ...full.rates, usd_source: 'manual', usd_effective_source: 'manual' },
+    }
+    renderWithProviders(<NetWorthCard data={manual} />)
+    expect(screen.getByTestId('fx-used')).toHaveTextContent('Dólar manual $ 1.450,50')
+  })
+
+  it('sin información de fuente (server viejo) no muestra el pie', () => {
+    renderWithProviders(<NetWorthCard data={full} />)
+    expect(screen.queryByTestId('fx-used')).not.toBeInTheDocument()
+  })
 })
