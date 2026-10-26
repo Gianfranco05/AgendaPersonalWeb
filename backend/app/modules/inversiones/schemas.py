@@ -6,7 +6,8 @@ from typing import Annotated, Any, Optional
 
 from pydantic import BaseModel, Field, StringConstraints, field_validator, model_validator
 
-from app.modules.inversiones.valuation import FIXED_TERM, FIXED_TERM_CURRENCIES
+from app.config import settings
+from app.modules.inversiones.valuation import FIXED_TERM, FIXED_TERM_CURRENCIES, PRICE_PROVIDERS
 
 # Mismo tope que `Money` de finanzas (Numeric(12, 2)): un monto mas grande
 # pasaba la validacion y en Postgres reventaba el INSERT con un 500.
@@ -25,8 +26,8 @@ MIN_DATE = date(1970, 1, 1)
 MAX_DATE = date(2100, 12, 31)
 TICKER_RE = re.compile(r"^[A-Z0-9.\-]{1,20}$")
 
-#: Hoy solo se acepta "manual"; un proveedor nuevo se suma a PRICE_PROVIDERS.
-ALLOWED_PRICE_SOURCES = {"manual"}
+#: "manual" o cualquier proveedor registrado en PRICE_PROVIDERS (hoy "coingecko").
+ALLOWED_PRICE_SOURCES = {"manual"} | set(PRICE_PROVIDERS)
 
 
 class AssetType(str, Enum):
@@ -75,8 +76,29 @@ def _check_date(value: Optional[date]) -> Optional[date]:
 
 def _check_price_source(value: Optional[str]) -> Optional[str]:
     if value is not None and value not in ALLOWED_PRICE_SOURCES:
-        raise ValueError("Fuente de precio no soportada (solo 'manual')")
+        allowed = ", ".join(f"'{k}'" for k in sorted(ALLOWED_PRICE_SOURCES))
+        raise ValueError(f"Fuente de precio no soportada (solo {allowed})")
     return value
+
+
+def validate_price_source_state(
+    price_source: str, asset_type: str, ticker: Optional[str], quantity: Any
+) -> None:
+    """Un proveedor automatico exige un activo que sepa cotizar. Se valida
+    sobre el estado resultante (create y update), como las reglas de plazo fijo."""
+    if price_source == "manual":
+        return
+    provider = PRICE_PROVIDERS.get(price_source)
+    if provider is None:
+        raise ValueError("Fuente de precio no soportada")
+    if price_source == "coingecko" and not settings.MARKET_CRYPTO_ENABLED:
+        raise ValueError("La cotización automática de cripto no está disponible por ahora")
+    if asset_type not in provider.supported_types:
+        raise ValueError("La cotización automática solo está disponible para criptomonedas")
+    if not ticker or not provider.supports(ticker):
+        raise ValueError("No tenemos cotización automática para ese ticker")
+    if quantity is None or quantity <= 0:
+        raise ValueError("La cotización automática necesita la cantidad (mayor a 0)")
 
 
 def validate_fixed_term_state(
@@ -142,6 +164,9 @@ class InvestmentCreate(BaseModel):
             self.start_date,
             self.maturity_date,
         )
+        validate_price_source_state(
+            self.price_source, self.asset_type.value, self.ticker, self.quantity
+        )
         return self
 
 
@@ -186,6 +211,34 @@ class InvestmentUpdate(BaseModel):
 # ── Salida ──────────────────────────────────────────────────────────────────
 
 
+class ProjectionOut(BaseModel):
+    nominal_pct: Decimal
+    inflation_pct: Decimal
+    real_pct: Decimal
+    estimated: bool
+
+
+class RealReturnOut(BaseModel):
+    nominal_pct: Decimal
+    inflation_pct: Decimal
+    real_pct: Decimal
+    estimated: bool
+    estimated_months: list[str] = []
+    period_start: date
+    period_end: date
+    #: Solo plazos fijos no vencidos.
+    projected_at_maturity: Optional[ProjectionOut] = None
+
+
+class PortfolioRealReturnOut(BaseModel):
+    nominal_pct: Decimal
+    inflation_pct: Decimal
+    real_pct: Decimal
+    estimated: bool
+    included_count: int
+    excluded_count: int
+
+
 class FixedTermOut(BaseModel):
     term_days: int
     interest_total: Decimal
@@ -226,6 +279,14 @@ class InvestmentOut(BaseModel):
     is_matured: bool
     fixed_term: Optional[FixedTermOut] = None
 
+    #: "CoinGecko" cuando la cotizacion es automatica; null en manual.
+    quote_provider: Optional[str] = None
+    #: `last_price_at` con mas de 1 h; null si no hay cotizacion automatica.
+    quote_stale: Optional[bool] = None
+    real_return: Optional["RealReturnOut"] = None
+    #: currency | no_start_date | too_short | no_inflation_data | no_invested_amount
+    real_return_unavailable_reason: Optional[str] = None
+
 
 class CurrencyBreakdown(BaseModel):
     currency: str
@@ -261,12 +322,31 @@ class InvestmentSummary(BaseModel):
     missing_rates: list[str]
     count_active: int
     upcoming_maturities: list[UpcomingMaturity]
+    #: Rendimiento real de los activos en pesos con fecha de inicio; null si no hay.
+    real_return_ars: Optional[PortfolioRealReturnOut] = None
 
 
 class RatesOut(BaseModel):
     usd_ars: Optional[Decimal] = None
     eur_ars: Optional[Decimal] = None
+    #: `as_of` de la cotizacion USD efectiva (con manual, la fecha que cargo el usuario).
     updated_at: Optional[datetime] = None
+
+    # Cotizacion efectiva por moneda (aditivos). `*_source` es la que pidio el
+    # usuario, `*_effective_source` la que se uso (oficial | mep | blue |
+    # manual | manual_fallback).
+    usd_source: str = "mep"
+    usd_effective_source: Optional[str] = None
+    usd_buy: Optional[Decimal] = None
+    usd_provider: Optional[str] = None
+    usd_as_of: Optional[datetime] = None
+    usd_stale: bool = False
+    eur_source: str = "oficial"
+    eur_effective_source: Optional[str] = None
+    eur_buy: Optional[Decimal] = None
+    eur_provider: Optional[str] = None
+    eur_as_of: Optional[datetime] = None
+    eur_stale: bool = False
 
 
 class NetWorthOut(BaseModel):

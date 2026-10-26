@@ -85,7 +85,7 @@ async def get_summary(
     stats = await service.get_dashboard_stats(current_user.id)
     # Las inversiones se valuan al "hoy" del usuario (devengado de plazos fijos).
     invest = InvestmentService(db)
-    rates, _, include = await invest.get_rates(current_user.id)
+    rates, include = await invest.get_rates(current_user.id)
     investments = await invest.summary(current_user.id, local_today(tz_offset_minutes), rates)
     return FinanceSummary(
         total_income=stats.total_income,

@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from decimal import Decimal
-from typing import Annotated, Optional
+from typing import Annotated, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
@@ -38,6 +38,9 @@ class SettingsResponse(BaseModel):
     fx_usd_ars: Optional[Decimal] = None
     fx_eur_ars: Optional[Decimal] = None
     fx_rates_updated_at: Optional[datetime] = None
+    #: De donde sale la cotizacion con la que se convierten los totales.
+    fx_usd_source: str = "mep"
+    fx_eur_source: str = "oficial"
     include_investments_in_balance: bool = False
 
     model_config = {"from_attributes": True}
@@ -53,6 +56,8 @@ def _to_response(prefs: UserPreference) -> "SettingsResponse":
         fx_usd_ars=_rate(prefs.fx_usd_ars),
         fx_eur_ars=_rate(prefs.fx_eur_ars),
         fx_rates_updated_at=prefs.fx_rates_updated_at,
+        fx_usd_source=prefs.fx_usd_source or "mep",
+        fx_eur_source=prefs.fx_eur_source or "oficial",
         include_investments_in_balance=bool(prefs.include_investments_in_balance),
     )
 
@@ -65,6 +70,10 @@ class SettingsUpdate(BaseModel):
     # null borra la cotizacion; `fx_rates_updated_at` lo pone el server.
     fx_usd_ars: Optional[FxRate] = None
     fx_eur_ars: Optional[FxRate] = None
+    # Cambiar la fuente NO toca fx_usd_ars / fx_eur_ars: volver a "manual"
+    # recupera la cotizacion propia. Un null se ignora (la columna no admite null).
+    fx_usd_source: Optional[Literal["oficial", "mep", "blue", "manual"]] = None
+    fx_eur_source: Optional[Literal["oficial", "blue", "manual"]] = None
     include_investments_in_balance: Optional[bool] = None
 
 
@@ -104,8 +113,9 @@ async def update_settings(
 
     update_data = data.model_dump(exclude_unset=True)
     # La columna no admite null: un null explicito se ignora.
-    if update_data.get("include_investments_in_balance") is None:
-        update_data.pop("include_investments_in_balance", None)
+    for column in ("include_investments_in_balance", "fx_usd_source", "fx_eur_source"):
+        if update_data.get(column) is None:
+            update_data.pop(column, None)
 
     rates_changed = any(
         key in update_data and _rate(update_data[key]) != _rate(getattr(prefs, key))

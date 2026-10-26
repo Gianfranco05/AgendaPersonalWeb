@@ -7,9 +7,14 @@ el float crudo, para no arrastrar 0.1 + 0.2).
 """
 
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from decimal import ROUND_HALF_UP, Decimal
-from typing import Any, NamedTuple, Optional, Protocol
+from typing import Any, Optional
+
+import httpx
+
+from app.modules.mercado.providers.base import PriceProvider, PriceQuote  # noqa: F401
+from app.modules.mercado.providers.coingecko import CoinGeckoProvider, vs_currency_for
 
 ZERO = Decimal("0")
 CENT = Decimal("0.01")
@@ -213,30 +218,99 @@ def format_money_es_ar(amount: Decimal, currency: str = "ARS") -> str:
 
 # ── Punto de extension: cotizaciones automaticas ────────────────────────────
 
-
-class PriceQuote(NamedTuple):
-    price: Decimal
-    currency: str
-    as_of: datetime
+#: Proveedores de precios registrados. Sumar uno = implementar `PriceProvider`
+#: (mercado/providers/base.py) y agregarlo aca: el esquema no cambia.
+PRICE_PROVIDERS: dict[str, PriceProvider] = {"coingecko": CoinGeckoProvider()}
 
 
-class PriceProvider(Protocol):
-    """Un proveedor de precios (CoinGecko, BYMA...). Sumar uno = implementar la
-    clase y registrarla en `PRICE_PROVIDERS`; el esquema no cambia porque el
-    modelo ya guarda `ticker`, `price_source`, `last_price` y `last_price_at`.
+async def refresh_quotes(
+    db: Any, client: Optional[httpx.AsyncClient] = None, user_id: Optional[str] = None
+) -> int:
+    """Actualiza `last_price` de los activos con proveedor automatico.
+
+    Es global (no por usuario): toma los pares `(ticker, moneda)` distintos en
+    uso, los cotiza en una sola consulta por proveedor y actualiza todos los
+    activos de esos pares. Sin pares no sale a la red. `user_id` (opcional)
+    restringe los activos, solo para tests. Devuelve los activos actualizados.
     """
+    from sqlalchemy import and_, select, update
 
-    key: str
-    supported_types: frozenset[str]
+    from app.modules.inversiones.models import Investment
+    from app.modules.mercado.models import MarketPrice
+    from app.modules.mercado.providers.base import make_client
+    from app.modules.mercado.repository import clear_cache
 
-    async def quote(self, ticker: str, currency: str) -> Optional[PriceQuote]: ...
+    updated = 0
+    for key, provider in PRICE_PROVIDERS.items():
+        conditions = [
+            Investment.price_source == key,
+            Investment.status == "active",
+            Investment.ticker.is_not(None),
+        ]
+        if user_id is not None:
+            conditions.append(Investment.user_id == user_id)
+        rows = (
+            await db.execute(
+                select(Investment.ticker, Investment.currency).where(and_(*conditions)).distinct()
+            )
+        ).all()
+        pairs = {(t, c) for t, c in rows if provider.supports(t)}
+        # Se cierra la transaccion de lectura antes de salir a la red.
+        await db.commit()
+        if not pairs:
+            continue
 
+        own_client = client is None
+        http = client or make_client()
+        try:
+            quotes = await provider.quote_many(pairs, http)
+        finally:
+            if own_client:
+                await http.aclose()
 
-#: Vacio en esta etapa: la valuacion es manual y no hay llamadas HTTP externas.
-PRICE_PROVIDERS: dict[str, PriceProvider] = {}
-
-
-async def refresh_quotes(db: Any, user_id: str) -> int:
-    """Actualiza `last_price` de los activos con proveedor automatico. No-op
-    hoy (no hay proveedores): devuelve la cantidad de activos actualizados."""
-    return 0
+        now = datetime.now(timezone.utc)
+        for (ticker, currency), quote in quotes.items():
+            vs = vs_currency_for(currency)
+            stored = (
+                await db.execute(
+                    select(MarketPrice).where(
+                        and_(
+                            MarketPrice.provider == key,
+                            MarketPrice.symbol == ticker,
+                            MarketPrice.vs_currency == vs,
+                        )
+                    )
+                )
+            ).scalar_one_or_none()
+            if stored is None:
+                db.add(
+                    MarketPrice(
+                        provider=key,
+                        symbol=ticker,
+                        vs_currency=vs,
+                        price=quote.price,
+                        source_updated_at=quote.as_of,
+                        fetched_at=now,
+                    )
+                )
+            else:
+                stored.price = quote.price
+                stored.source_updated_at = quote.as_of
+                stored.fetched_at = now
+            update_conditions = [
+                Investment.price_source == key,
+                Investment.status == "active",
+                Investment.ticker == ticker,
+                Investment.currency == currency,
+            ]
+            if user_id is not None:
+                update_conditions.append(Investment.user_id == user_id)
+            result = await db.execute(
+                update(Investment)
+                .where(and_(*update_conditions))
+                .values(last_price=quote.price, last_price_at=quote.as_of)
+            )
+            updated += result.rowcount or 0
+        await db.commit()
+        clear_cache()
+    return updated

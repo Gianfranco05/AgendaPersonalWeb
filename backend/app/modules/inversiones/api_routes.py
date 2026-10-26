@@ -36,7 +36,8 @@ async def list_investments(
         current_user.id, status_filter, asset_type.value if asset_type else None
     )
     today = local_today(tz_offset_minutes)
-    return [to_out(inv, today) for inv in items]
+    series = await service.inflation_series()
+    return [to_out(inv, today, series) for inv in items]
 
 
 # Declarada antes de `/investments/{id}`: si no, "summary" se leeria como un id.
@@ -56,10 +57,11 @@ async def get_investment(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    investment = await InvestmentService(db).get(investment_id, current_user.id)
+    service = InvestmentService(db)
+    investment = await service.get(investment_id, current_user.id)
     if not investment:
         raise HTTPException(status_code=404, detail="Inversión no encontrada")
-    return to_out(investment, local_today(tz_offset_minutes))
+    return to_out(investment, local_today(tz_offset_minutes), await service.inflation_series())
 
 
 @router.post("/investments", response_model=InvestmentOut, status_code=status.HTTP_201_CREATED)
@@ -68,11 +70,12 @@ async def create_investment(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    investment = await InvestmentService(db).create(current_user.id, data)
+    service = InvestmentService(db)
+    investment = await service.create(current_user.id, data)
     # Sin tz del cliente en el POST, el devengado se calcula con el offset que
     # el cliente guardo en el activo (o el de Argentina si no mando ninguno).
     offset = investment.timezone_offset_minutes if investment.timezone_offset_minutes is not None else -180
-    return to_out(investment, local_today(offset))
+    return to_out(investment, local_today(offset), await service.inflation_series())
 
 
 @router.put("/investments/{investment_id}", response_model=InvestmentOut)
@@ -88,7 +91,7 @@ async def update_investment(
         raise HTTPException(status_code=404, detail="Inversión no encontrada")
     updated = await service.update(investment, data)
     offset = updated.timezone_offset_minutes if updated.timezone_offset_minutes is not None else -180
-    return to_out(updated, local_today(offset))
+    return to_out(updated, local_today(offset), await service.inflation_series())
 
 
 @router.delete("/investments/{investment_id}", status_code=status.HTTP_204_NO_CONTENT)
