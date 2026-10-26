@@ -127,6 +127,47 @@ async def test_callback_creates_new_user_and_redirect_carries_working_tokens(cli
     assert me.status_code == 200
     assert me.json()["email"] == email
 
+    # La edad y los Terminos se declaran en el gate del cliente, no aca: la
+    # cuenta nueva queda sin aceptar y sin edad confirmada.
+    assert user.terms_accepted_version is None
+    assert user.age_confirmed_at is None
+    assert me.json()["terms_accepted_version"] is None
+    assert me.json()["age_confirmed"] is False
+
+    # Al aceptar en el gate con la casilla (version + confirm_age) queda todo.
+    gate = await client.post(
+        "/auth/api/accept-terms",
+        json={"version": settings.CURRENT_TERMS_VERSION, "confirm_age": True},
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert gate.status_code == 200
+    assert gate.json()["age_confirmed"] is True
+    me = await client.get("/auth/api/me", headers={"Authorization": f"Bearer {access_token}"})
+    assert me.json()["terms_accepted_version"] == settings.CURRENT_TERMS_VERSION
+    assert me.json()["age_confirmed"] is True
+
+
+@pytest.mark.asyncio
+async def test_callback_cuenta_existente_conserva_la_edad_confirmada(
+    client, db_session, test_user
+):
+    from datetime import datetime, timezone
+
+    test_user.age_confirmed_at = datetime(2026, 9, 1, 12, 0, tzinfo=timezone.utc)
+    test_user.terms_accepted_version = settings.CURRENT_TERMS_VERSION
+    await db_session.commit()
+
+    patch_flow, patch_verify = _mock_google_exchange(test_user.email)
+    response = await _callback(client, patch_flow, patch_verify)
+    assert response.status_code == 303
+
+    await db_session.refresh(test_user)
+    assert test_user.age_confirmed_at is not None
+    assert test_user.terms_accepted_version == settings.CURRENT_TERMS_VERSION
+    access_token = response.headers["location"].split("access_token=")[1].split("&")[0]
+    me = await client.get("/auth/api/me", headers={"Authorization": f"Bearer {access_token}"})
+    assert me.json()["age_confirmed"] is True
+
 
 @pytest.mark.asyncio
 async def test_callback_logs_into_existing_account_by_email_without_duplicating(
@@ -257,7 +298,7 @@ async def test_callback_encuentra_la_cuenta_sin_importar_mayusculas(client, db_s
 
 @pytest.mark.asyncio
 async def test_register_no_permite_el_mismo_email_con_otras_mayusculas(client):
-    body = {"email": "dup@example.com", "full_name": "Dup", "password": "secreta1", "accept_terms": True}
+    body = {"email": "dup@example.com", "full_name": "Dup", "password": "secreta1", "accept_terms": True, "confirm_age": True}
     assert (await client.post("/auth/api/register", json=body)).status_code == 201
     again = await client.post("/auth/api/register", json={**body, "email": "DUP@example.com"})
     assert again.status_code == 400

@@ -104,49 +104,24 @@ async def login(
     return response
 
 
+# El registro por formulario HTML se apago: crea cuentas sin pasar por la
+# aceptacion de Terminos ni la declaracion de edad minima (16+), que solo exige
+# la API JSON (POST /auth/api/register) desde la SPA y mobile. Las dos rutas
+# quedan solo como redireccion a la pagina de registro de la SPA, para que un
+# link o marcador viejo (incluido el de login.html) no caiga en un 404/405.
+def _spa_register_redirect() -> RedirectResponse:
+    base = settings.PUBLIC_BASE_URL.rstrip("/")
+    return RedirectResponse(url=f"{base}/register", status_code=303)
+
+
 @router.get("/register")
-async def register_page(request: Request):
-    return templates.TemplateResponse(request, "auth/register.html", {"error": None})
+async def register_page():
+    return _spa_register_redirect()
 
 
-@router.post("/register", dependencies=[Depends(rate_limit_auth)])
-async def register(
-    request: Request,
-    email: str = Form(...),
-    full_name: str = Form(...),
-    password: str = Form(...),
-    password_confirm: str = Form(...),
-    db: AsyncSession = Depends(get_db),
-):
-    if password != password_confirm:
-        return templates.TemplateResponse(request, "auth/register.html", {"error": "Las contraseñas no coinciden"}, status_code=400)
-
-    if len(password) < 8:
-        return templates.TemplateResponse(request, "auth/register.html", {"error": "La contraseña debe tener al menos 8 caracteres"}, status_code=400)
-
-    from app.modules.auth.models import User
-    from sqlalchemy import select
-
-    result = await db.execute(select(User).where(User.email == email))
-    existing = result.scalar_one_or_none()
-
-    if existing:
-        return templates.TemplateResponse(request, "auth/register.html", {"error": "Este email ya está registrado"}, status_code=400)
-
-    user = User(
-        email=email,
-        full_name=full_name,
-        password_hash=hash_password(password),
-    )
-
-    db.add(user)
-    await db.commit()
-    await db.refresh(user)
-
-    response = RedirectResponse(url="/finanzas/", status_code=303)
-    _set_auth_cookie(response, user.id, "violet")
-    await _issue_refresh_cookie(response, request, user.id, db)
-    return response
+@router.post("/register")
+async def register():
+    return _spa_register_redirect()
 
 
 async def _logout_response(request: Request, db) -> RedirectResponse:

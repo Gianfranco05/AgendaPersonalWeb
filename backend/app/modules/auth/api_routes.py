@@ -25,6 +25,15 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/auth/api", tags=["auth-json"])
 
 
+AGE_CONFIRMATION_ERROR = "Tenés que confirmar que tenés 16 años o más"
+
+
+def _require_age_confirmed(v: bool) -> bool:
+    if not v:
+        raise ValueError(AGE_CONFIRMATION_ERROR)
+    return v
+
+
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
@@ -42,6 +51,10 @@ class RegisterRequest(BaseModel):
     # implique siempre "aceptaste la version vigente" — sin esto, alguien
     # podria pegarle directo a la API salteando el checkbox del cliente.
     accept_terms: bool
+    # Declaracion de edad minima (16+), mismo criterio que accept_terms: sin
+    # default a proposito, para que un cliente viejo que no la muestra falle con
+    # 422 en vez de registrar una declaracion que la persona nunca vio.
+    confirm_age: bool
 
     @field_validator("password")
     @classmethod
@@ -57,6 +70,11 @@ class RegisterRequest(BaseModel):
             raise ValueError("Tenés que aceptar los Términos y la Política de Privacidad")
         return v
 
+    @field_validator("confirm_age")
+    @classmethod
+    def must_confirm_age(cls, v):
+        return _require_age_confirmed(v)
+
 
 class UserOut(BaseModel):
     id: str
@@ -70,6 +88,9 @@ class UserOut(BaseModel):
     # de duplicarse como constante en cada cliente (web, mobile).
     terms_accepted_version: Optional[str] = None
     current_terms_version: str = Field(default_factory=lambda: settings.CURRENT_TERMS_VERSION)
+    # True si users.age_confirmed_at no es null. Solo el booleano: la fecha no
+    # hace falta en los clientes (queda en el export de cuenta).
+    age_confirmed: bool = False
 
 
 class AuthResponse(BaseModel):
@@ -81,6 +102,7 @@ class AuthResponse(BaseModel):
     token_type: str = "bearer"
     terms_accepted_version: Optional[str] = None
     current_terms_version: str = Field(default_factory=lambda: settings.CURRENT_TERMS_VERSION)
+    age_confirmed: bool = False
 
 
 class RefreshRequest(BaseModel):
@@ -141,6 +163,29 @@ async def _find_user_by_email(db: AsyncSession, email: str) -> Optional[User]:
     terminaban siendo dos cuentas distintas para la misma persona."""
     result = await db.execute(select(User).where(func.lower(User.email) == email.lower()))
     return result.scalars().first()
+
+
+def _user_out(user: User) -> UserOut:
+    return UserOut(
+        id=str(user.id),
+        email=user.email,
+        full_name=user.full_name,
+        is_verified=user.is_verified,
+        terms_accepted_version=user.terms_accepted_version,
+        age_confirmed=user.age_confirmed_at is not None,
+    )
+
+
+def _auth_response(user: User, access_token: str, refresh_token: str) -> AuthResponse:
+    return AuthResponse(
+        id=str(user.id),
+        email=user.email,
+        full_name=user.full_name,
+        access_token=access_token,
+        refresh_token=refresh_token,
+        terms_accepted_version=user.terms_accepted_version,
+        age_confirmed=user.age_confirmed_at is not None,
+    )
 
 
 def _set_access_cookie(response: Response, access_token: str) -> None:
@@ -206,14 +251,7 @@ async def api_login(
         await db.commit()
 
     access_token, refresh_token = await _issue_session(db, response, request, user)
-    return AuthResponse(
-        id=str(user.id),
-        email=user.email,
-        full_name=user.full_name,
-        access_token=access_token,
-        refresh_token=refresh_token,
-        terms_accepted_version=user.terms_accepted_version,
-    )
+    return _auth_response(user, access_token, refresh_token)
 
 
 @router.post("/register", status_code=status.HTTP_201_CREATED, response_model=AuthResponse, dependencies=[Depends(rate_limit_auth)])
@@ -230,13 +268,16 @@ async def api_register(
             detail="Este email ya está registrado",
         )
 
+    now = datetime.now(timezone.utc)
     user = User(
         email=data.email.lower(),
         full_name=data.full_name,
         password_hash=hash_password(data.password),
         # accept_terms=True ya lo garantizo el validator del schema.
         terms_accepted_version=settings.CURRENT_TERMS_VERSION,
-        terms_accepted_at=datetime.now(timezone.utc),
+        terms_accepted_at=now,
+        # confirm_age=True tambien lo garantizo el validator del schema.
+        age_confirmed_at=now,
     )
     db.add(user)
     await db.commit()
@@ -248,25 +289,12 @@ async def api_register(
     await send_verification_email(user.email, verify_token)
 
     access_token, refresh_token = await _issue_session(db, response, request, user)
-    return AuthResponse(
-        id=str(user.id),
-        email=user.email,
-        full_name=user.full_name,
-        access_token=access_token,
-        refresh_token=refresh_token,
-        terms_accepted_version=user.terms_accepted_version,
-    )
+    return _auth_response(user, access_token, refresh_token)
 
 
 @router.get("/me", response_model=UserOut)
 async def api_me(current_user: User = Depends(get_current_user)):
-    return UserOut(
-        id=str(current_user.id),
-        email=current_user.email,
-        full_name=current_user.full_name,
-        is_verified=current_user.is_verified,
-        terms_accepted_version=current_user.terms_accepted_version,
-    )
+    return _user_out(current_user)
 
 
 @router.patch("/me", response_model=UserOut)
@@ -279,13 +307,7 @@ async def api_update_me(
     db.add(current_user)
     await db.commit()
     await db.refresh(current_user)
-    return UserOut(
-        id=str(current_user.id),
-        email=current_user.email,
-        full_name=current_user.full_name,
-        is_verified=current_user.is_verified,
-        terms_accepted_version=current_user.terms_accepted_version,
-    )
+    return _user_out(current_user)
 
 
 class AcceptTermsRequest(BaseModel):
@@ -295,6 +317,16 @@ class AcceptTermsRequest(BaseModel):
     # aceptacion en vez de guardar silenciosamente que acepto "la vigente" —
     # eso invalidaria la evidencia de que acepto el texto que en verdad leyo.
     version: str
+    # Misma declaracion de edad que en el registro. Se exige siempre (aunque el
+    # usuario ya la tenga guardada): la casilla del gate la incluye en todos los
+    # casos, asi el contrato es uno solo y un cliente viejo falla en vez de
+    # aceptar sin haber mostrado la edad.
+    confirm_age: bool
+
+    @field_validator("confirm_age")
+    @classmethod
+    def must_confirm_age(cls, v):
+        return _require_age_confirmed(v)
 
 
 @router.post("/accept-terms", response_model=UserOut)
@@ -308,18 +340,17 @@ async def api_accept_terms(
             status_code=status.HTTP_409_CONFLICT,
             detail="Los Términos cambiaron. Actualizá la app antes de continuar.",
         )
+    now = datetime.now(timezone.utc)
     current_user.terms_accepted_version = data.version
-    current_user.terms_accepted_at = datetime.now(timezone.utc)
+    current_user.terms_accepted_at = now
+    # Solo la primera declaracion: las aceptaciones de versiones siguientes no
+    # la pisan (la fecha de cada aceptacion ya queda en terms_accepted_at).
+    if current_user.age_confirmed_at is None:
+        current_user.age_confirmed_at = now
     db.add(current_user)
     await db.commit()
     await db.refresh(current_user)
-    return UserOut(
-        id=str(current_user.id),
-        email=current_user.email,
-        full_name=current_user.full_name,
-        is_verified=current_user.is_verified,
-        terms_accepted_version=current_user.terms_accepted_version,
-    )
+    return _user_out(current_user)
 
 
 @router.post("/refresh", response_model=TokenResponse, dependencies=[Depends(rate_limit_auth)])
@@ -425,13 +456,7 @@ async def api_verify_email(
     db.add(user)
     await db.commit()
     await db.refresh(user)
-    return UserOut(
-        id=str(user.id),
-        email=user.email,
-        full_name=user.full_name,
-        is_verified=user.is_verified,
-        terms_accepted_version=user.terms_accepted_version,
-    )
+    return _user_out(user)
 
 
 @router.post("/forgot-password", dependencies=[Depends(rate_limit_auth)])

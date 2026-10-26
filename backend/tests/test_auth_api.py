@@ -21,6 +21,7 @@ async def test_api_register_returns_access_token(client):
         "full_name": "Mobile User",
         "password": "mobilepass123",
         "accept_terms": True,
+        "confirm_age": True,
     })
     assert response.status_code == 201
     data = response.json()

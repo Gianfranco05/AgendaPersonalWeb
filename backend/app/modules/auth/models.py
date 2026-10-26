@@ -35,6 +35,13 @@ class User(Base):
     terms_accepted_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    # Cuando la persona declaro tener 16 anios o mas (edad minima de los
+    # Terminos). Se guarda la PRIMERA declaracion y no se pisa en aceptaciones
+    # posteriores. None = todavia no la declaro (cuenta de Google nueva o cuenta
+    # anterior a este campo): el cliente muestra el gate hasta que la confirme.
+    age_confirmed_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

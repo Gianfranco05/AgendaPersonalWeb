@@ -565,6 +565,7 @@ async def user_b(api_auth_client):
                 "full_name": "B",
                 "password": "testpass123",
                 "accept_terms": True,
+                "confirm_age": True,
             },
         )
         assert resp.status_code == 201, resp.text

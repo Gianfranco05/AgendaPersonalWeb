@@ -135,6 +135,18 @@ async def test_export_incluye_los_datos_del_usuario(
 
 
 @pytest.mark.asyncio
+async def test_export_incluye_age_confirmed_at(api_auth_client, db_session, test_user):
+    from datetime import datetime, timezone
+
+    test_user.age_confirmed_at = datetime(2026, 10, 26, 15, 30, tzinfo=timezone.utc)
+    await db_session.commit()
+
+    response = await api_auth_client.get("/api/v1/me/export")
+    assert response.status_code == 200
+    assert response.json()["user"]["age_confirmed_at"].startswith("2026-10-26")
+
+
+@pytest.mark.asyncio
 async def test_export_no_incluye_credenciales(api_auth_client, db_session, test_user):
     await _seed_datos(db_session, test_user)
 

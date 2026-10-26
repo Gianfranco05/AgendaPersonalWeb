@@ -34,6 +34,7 @@ async def test_register_returns_refresh_token(client):
         "full_name": "Nuevo",
         "password": "password123",
         "accept_terms": True,
+        "confirm_age": True,
     })
     assert resp.status_code == 201
     assert resp.json()["refresh_token"]
@@ -162,6 +163,7 @@ async def test_user_cannot_revoke_another_users_session(logged_in):
             "full_name": "Otro",
             "password": "password123",
             "accept_terms": True,
+            "confirm_age": True,
         })
         resp = await other.delete(f"/auth/api/sessions/{session_id}")
         assert resp.status_code == 404

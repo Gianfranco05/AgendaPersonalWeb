@@ -52,7 +52,7 @@ class Settings(BaseSettings):
     # los que ya habian aceptado una version anterior) la proxima vez que
     # abran la app — es la forma de notificar un cambio significativo de
     # terminos sin depender de que alguien lea un mail.
-    CURRENT_TERMS_VERSION: str = "1.0"
+    CURRENT_TERMS_VERSION: str = "1.1"
 
     ALLOWED_ORIGINS: str = (
         "http://localhost:8000,http://127.0.0.1:8000,"
