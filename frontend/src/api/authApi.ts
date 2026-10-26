@@ -26,6 +26,9 @@ export async function register(
     email,
     password,
     accept_terms: acceptTerms,
+    // Una sola casilla ("Tengo 16 años o más y acepto…") cubre las dos
+    // declaraciones: el backend las pide por separado para poder auditarlas.
+    confirm_age: acceptTerms,
   });
 }
 
@@ -54,6 +57,9 @@ export async function updateProfile(fullName: string): Promise<AuthUser> {
 }
 
 export async function acceptTerms(version: string): Promise<AuthUser> {
-  const { data } = await apiClient.post<AuthUser>('/auth/api/accept-terms', { version });
+  const { data } = await apiClient.post<AuthUser>('/auth/api/accept-terms', {
+    version,
+    confirm_age: true,
+  });
   return data;
 }

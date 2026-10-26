@@ -7,11 +7,15 @@ import PublicFooter from '../../components/PublicFooter';
  * Gate obligatorio: se muestra cuando `user.terms_accepted_version` no
  * coincide con `user.current_terms_version` (cuenta nueva creada por Google,
  * que no pasa por el checkbox del registro normal, o versión de términos que
- * subió mientras el usuario ya tenía sesión). Ver el redirect en ProtectedRoute.
+ * subió mientras el usuario ya tenía sesión) o cuando `user.age_confirmed` es
+ * false (todavía no declaró tener 16 años o más). Ver el redirect en
+ * ProtectedRoute. Una sola casilla cubre la edad y los Términos.
  */
 export default function AcceptTermsPage() {
   const navigate = useNavigate();
-  const { acceptTerms, logout } = useAuthStore();
+  const { user, acceptTerms, logout } = useAuthStore();
+  // null = cuenta nueva (Google): nunca aceptó nada, no es una "actualización".
+  const isNewAccount = !user || user.terms_accepted_version === null;
   const [checked, setChecked] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -39,11 +43,12 @@ export default function AcceptTermsPage() {
     <div className="flex min-h-screen flex-col items-center justify-center bg-gray-50 px-4 py-10 dark:bg-slate-900">
       <div className="w-full max-w-md rounded-xl bg-white p-8 shadow-sm dark:bg-slate-800">
         <h1 className="text-xl font-bold text-gray-800 dark:text-slate-100">
-          Actualizamos nuestros Términos
+          {isNewAccount ? 'Antes de empezar' : 'Actualizamos nuestros Términos'}
         </h1>
         <p className="mt-2 text-sm text-gray-500 dark:text-slate-400">
-          Antes de seguir usando Can_cen, necesitamos que confirmes que leíste y
-          aceptás los Términos y Condiciones y la Política de Privacidad vigentes.
+          {isNewAccount
+            ? 'Para usar Can_cen necesitamos que confirmes tu edad y aceptes los Términos y Condiciones y la Política de Privacidad.'
+            : 'Antes de seguir usando Can_cen, necesitamos que confirmes tu edad y aceptes los Términos y Condiciones y la Política de Privacidad vigentes.'}
         </p>
 
         <p className="mt-4 text-sm text-gray-600 dark:text-slate-300">
@@ -69,8 +74,14 @@ export default function AcceptTermsPage() {
             onChange={(e) => setChecked(e.target.checked)}
             className="mt-0.5 h-4 w-4 rounded border-brand-border text-brand-indigo focus:ring-brand-indigo"
           />
-          <span>Leí y acepto los Términos y Condiciones y la Política de Privacidad.</span>
+          <span>
+            Tengo 16 años o más y acepto los Términos y Condiciones y la Política de
+            Privacidad.
+          </span>
         </label>
+        <p className="mt-1 pl-6 text-xs text-gray-500 dark:text-slate-400">
+          Si tenés menos de 18, necesitás el consentimiento de tu madre, padre o tutor.
+        </p>
 
         <button
           type="button"

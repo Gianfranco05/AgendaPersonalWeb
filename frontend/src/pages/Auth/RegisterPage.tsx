@@ -14,7 +14,7 @@ const registerSchema = z.object({
   email: z.string().email('Email inválido'),
   password: z.string().min(6, 'La contraseña debe tener al menos 6 caracteres'),
   acceptTerms: z.boolean().refine((v) => v === true, {
-    message: 'Tenés que aceptar los Términos y la Política de Privacidad',
+    message: 'Tenés que confirmar tu edad y aceptar los Términos para continuar',
   }),
 });
 
@@ -134,7 +134,7 @@ export default function RegisterPage() {
                   className="mt-0.5 h-4 w-4 rounded border-brand-border text-brand-indigo focus:ring-brand-indigo"
                 />
                 <span>
-                  Acepto los{' '}
+                  Tengo 16 años o más y acepto los{' '}
                   <Link to="/terms" className="hover:underline" target="_blank" rel="noopener noreferrer">
                     Términos y Condiciones
                   </Link>{' '}
@@ -145,6 +145,9 @@ export default function RegisterPage() {
                   .
                 </span>
               </label>
+              <p className="mt-1 pl-6 text-xs text-gray-400 dark:text-slate-500">
+                Si tenés menos de 18, necesitás el consentimiento de tu madre, padre o tutor.
+              </p>
               {errors.acceptTerms && (
                 <p className="mt-1 text-xs text-red-500">{errors.acceptTerms.message}</p>
               )}

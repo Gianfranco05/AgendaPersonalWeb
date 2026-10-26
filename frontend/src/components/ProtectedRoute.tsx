@@ -22,7 +22,12 @@ export default function ProtectedRoute({ skipTermsGate = false }: ProtectedRoute
     return <Navigate to="/login" replace />;
   }
 
-  if (!skipTermsGate && user && user.terms_accepted_version !== user.current_terms_version) {
+  // Gate: versión de términos distinta de la vigente O edad sin declarar.
+  if (
+    !skipTermsGate &&
+    user &&
+    (user.terms_accepted_version !== user.current_terms_version || user.age_confirmed === false)
+  ) {
     return <Navigate to="/accept-terms" replace />;
   }
 

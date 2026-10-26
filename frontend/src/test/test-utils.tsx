@@ -37,6 +37,7 @@ export function createMockAuthStore(overrides?: Partial<{
     full_name: string
     terms_accepted_version: string | null
     current_terms_version: string
+    age_confirmed: boolean
   } | null
   isAuthenticated: boolean
   isLoading: boolean
@@ -48,6 +49,7 @@ export function createMockAuthStore(overrides?: Partial<{
       full_name: 'Test User',
       terms_accepted_version: '1.0',
       current_terms_version: '1.0',
+      age_confirmed: true,
     },
     isAuthenticated: true,
     isLoading: false,

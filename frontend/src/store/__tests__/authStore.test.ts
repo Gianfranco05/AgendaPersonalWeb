@@ -22,6 +22,7 @@ const user = {
   full_name: 'A B',
   terms_accepted_version: '1',
   current_terms_version: '1',
+  age_confirmed: true,
 }
 
 beforeEach(() => {

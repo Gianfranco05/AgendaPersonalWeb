@@ -31,6 +31,7 @@ describe('Layout', () => {
           full_name: 'Gianfranco Ferraro',
           terms_accepted_version: '1.0',
           current_terms_version: '1.0',
+          age_confirmed: true,
         },
       }),
     )
