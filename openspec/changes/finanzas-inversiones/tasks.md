@@ -72,20 +72,20 @@
 
 ## 8. Mobile — API, tipos y hooks (`C:\Proyectos\vida-personal-mobile`)
 
-- [ ] 8.1 [mobile] Tipos en `src/types` (inversiones, net worth, settings y summary extendidos)
-- [ ] 8.2 [mobile] `src/api/endpoints.ts`: endpoints de inversiones y net-worth; escrituras con `queued('...')` y `timezone_offset_minutes: -new Date().getTimezoneOffset()`; lecturas con `tz_offset_minutes`
-- [ ] 8.3 [mobile] `src/hooks/useInvestments.ts` con revalidación de inversiones, net-worth, summary y settings (patrón de `useFinance.ts`)
+- [x] 8.1 [mobile] Tipos en `src/types` (inversiones, net worth, settings y summary extendidos)
+- [x] 8.2 [mobile] `src/api/endpoints.ts`: endpoints de inversiones y net-worth; escrituras con `queued('...')` y `timezone_offset_minutes: -new Date().getTimezoneOffset()`; lecturas con `tz_offset_minutes`
+- [x] 8.3 [mobile] `src/hooks/useInvestments.ts` con revalidación de inversiones, net-worth, summary y settings (patrón de `useFinance.ts`)
 
 ## 9. Mobile — UI (`C:\Proyectos\vida-personal-mobile`)
 
-- [ ] 9.1 [mobile] `src/screens/InvestmentsScreen.tsx`: tarjeta de Patrimonio, fila de cotización editable, `Switch` "Sumar inversiones al balance", `SectionList` por tipo con tarjeta por activo (valor, ganancia ±%, TNA, "vence en X días"), estados vacío/cargando/error
-- [ ] 9.2 [mobile] Formulario en `BottomSheet`: `PickerField` (tipo, moneda), `TextField` con `keyboardType="decimal-pad"` + `parseDecimal`, `DateField` inicio/vencimiento, switch "Avisarme del vencimiento", vista previa de plazo fijo, editar/cerrar/borrar con `Alert` de confirmación
-- [ ] 9.3 [mobile] Registrar `Investments` en `FinanceStack` (`src/navigation/TabNavigator.tsx`, `FinanceStackParamList`) y abrir el sheet con `useCreateParam` cuando llega `create`
-- [ ] 9.4 [mobile] `src/screens/FinanceScreen.tsx`: tile "Inversiones" (`chart-line`) en `TOOLS` y ajustar la grilla 2×2 para 5 herramientas
-- [ ] 9.5 [mobile] `src/components/QuickCreateSheet.tsx`: opción "Inversión" → `FinanceTab` › `Investments` con `create: true`
-- [ ] 9.6 [mobile] `src/components/BalanceCard.tsx` + `DashboardScreen.tsx`: con el toggle ON, `net_worth_ars`, rótulo "Balance + inversiones", barra de dos tramos Efectivo/Inversiones en color distinto; aviso si falta cotización; OFF sin cambios
-- [ ] 9.7 [mobile] Tap en notificación: listener `addNotificationResponseReceivedListener` + `getLastNotificationResponseAsync` que con `type === 'investment_maturity'` navega a Finanzas › Inversiones
-- [ ] 9.8 [mobile] `npx tsc --noEmit` y tests existentes del repo mobile en verde
+- [x] 9.1 [mobile] `src/screens/InvestmentsScreen.tsx`: tarjeta de Patrimonio, fila de cotización editable, `Switch` "Sumar inversiones al balance", `SectionList` por tipo con tarjeta por activo (valor, ganancia ±%, TNA, "vence en X días"), estados vacío/cargando/error
+- [x] 9.2 [mobile] Formulario en `BottomSheet`: `PickerField` (tipo, moneda), `TextField` con `keyboardType="decimal-pad"` + `parseDecimal`, `DateField` inicio/vencimiento, switch "Avisarme del vencimiento", vista previa de plazo fijo, editar/cerrar/borrar con `Alert` de confirmación
+- [x] 9.3 [mobile] Registrar `Investments` en `FinanceStack` (`src/navigation/TabNavigator.tsx`, `FinanceStackParamList`) y abrir el sheet con `useCreateParam` cuando llega `create`
+- [x] 9.4 [mobile] `src/screens/FinanceScreen.tsx`: tile "Inversiones" (`chart-line`) en `TOOLS` y ajustar la grilla 2×2 para 5 herramientas
+- [x] 9.5 [mobile] `src/components/QuickCreateSheet.tsx`: opción "Inversión" → `FinanceTab` › `Investments` con `create: true`
+- [x] 9.6 [mobile] `src/components/BalanceCard.tsx` + `DashboardScreen.tsx`: con el toggle ON, `net_worth_ars`, rótulo "Balance + inversiones", barra de dos tramos Efectivo/Inversiones en color distinto; aviso si falta cotización; OFF sin cambios
+- [x] 9.7 [mobile] Tap en notificación: listener `addNotificationResponseReceivedListener` + `getLastNotificationResponseAsync` que con `type === 'investment_maturity'` navega a Finanzas › Inversiones
+- [x] 9.8 [mobile] `npx tsc --noEmit` y tests existentes del repo mobile en verde
 
 ## 10. Verificación contra el backend real (no mock)
 
