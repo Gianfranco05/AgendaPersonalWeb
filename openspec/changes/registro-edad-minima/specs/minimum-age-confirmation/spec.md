@@ -15,16 +15,16 @@
 - **WHEN** a client sends `POST /auth/api/register` with `accept_terms = true` and `confirm_age = true`
 - **THEN** the system SHALL respond 201, the response SHALL include `age_confirmed = true` and `terms_accepted_version` equal to the current version, and the stored user SHALL have a non-null `age_confirmed_at`
 
-### Requirement: Legacy HTML registration requires the same declaration
-The legacy form `POST /auth/register` SHALL require the combined checkbox (age + terms). Without it, the system SHALL re-render the form with status 400 and the error "Tenés que confirmar que tenés 16 años o más y aceptar los Términos", and SHALL NOT create the user. With it, the created user SHALL have `terms_accepted_version`, `terms_accepted_at` and `age_confirmed_at` set.
+### Requirement: Legacy HTML registration is disabled
+`GET /auth/register` and `POST /auth/register` SHALL NOT render the legacy form nor create users. Both SHALL respond 303 redirecting to the SPA registration page (`{PUBLIC_BASE_URL}/register`). The legacy HTML login and logout SHALL keep working.
 
-#### Scenario: Legacy form without the checkbox
-- **WHEN** a client posts the legacy register form without the checkbox field
-- **THEN** the system SHALL respond 400 and SHALL NOT create the user
+#### Scenario: Legacy form page
+- **WHEN** a client requests `GET /auth/register`
+- **THEN** the system SHALL respond 303 with `Location` pointing to the SPA `/register`
 
-#### Scenario: Legacy form with the checkbox
-- **WHEN** a client posts the legacy register form with the checkbox checked
-- **THEN** the user SHALL be created with `age_confirmed_at` and the current `terms_accepted_version`
+#### Scenario: Legacy form submission
+- **WHEN** a client posts the legacy register form with valid data
+- **THEN** the system SHALL respond 303 to the SPA `/register` and SHALL NOT create any user
 
 ### Requirement: Accepting terms requires the minimum-age declaration
 `POST /auth/api/accept-terms` SHALL require `confirm_age = true` in addition to `version`. If `confirm_age` is missing or `false`, the system SHALL respond 422 and SHALL NOT change `terms_accepted_version`, `terms_accepted_at` or `age_confirmed_at`. The existing version check (409 when `version` is not the current one) SHALL still apply. On success, the system SHALL set `age_confirmed_at` to the current UTC time only if it was null, and SHALL NOT overwrite an earlier confirmation.
@@ -79,7 +79,7 @@ The web app (`ProtectedRoute`) and the mobile app (`RootNavigator`) SHALL redire
 - **THEN** the app SHALL NOT show the gate
 
 ### Requirement: Single combined checkbox in registration and gate
-The registration forms (web `RegisterPage`, mobile `RegisterScreen`, legacy HTML form) and the terms gates (web `AcceptTermsPage`, mobile `AcceptTermsScreen`) SHALL show one checkbox labeled "Tengo 16 años o más y acepto los Términos y Condiciones y la Política de Privacidad." (the mobile gate SHALL keep its mention of the Política de Reembolsos), with links to each document, and below it the helper text "Si tenés menos de 18, necesitás el consentimiento de tu madre, padre o tutor." The submit action SHALL stay disabled (or fail client-side validation) until the checkbox is checked, and checking it SHALL send both `accept_terms = true` (register only) and `confirm_age = true`.
+The registration forms (web `RegisterPage`, mobile `RegisterScreen`) and the terms gates (web `AcceptTermsPage`, mobile `AcceptTermsScreen`) SHALL show one checkbox labeled "Tengo 16 años o más y acepto los Términos y Condiciones y la Política de Privacidad." (the mobile gate SHALL keep its mention of the Política de Reembolsos), with links to each document, and below it the helper text "Si tenés menos de 18, necesitás el consentimiento de tu madre, padre o tutor." The submit action SHALL stay disabled (or fail client-side validation) until the checkbox is checked, and checking it SHALL send both `accept_terms = true` (register only) and `confirm_age = true`.
 
 #### Scenario: Submit without checking
 - **WHEN** the person tries to register or accept without checking the box

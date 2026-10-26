@@ -3,7 +3,7 @@
 - **Aceptación de términos hoy** (`backend/app/modules/auth/`): `users.terms_accepted_version` + `terms_accepted_at` (migración `015_terms_acceptance`). `POST /auth/api/register` exige `accept_terms: bool` sin default (ausente = 422) y un validator que rechaza `false`; graba la versión vigente (`settings.CURRENT_TERMS_VERSION`, hoy `"1.0"`). `POST /auth/api/accept-terms` recibe `{version}` y devuelve 409 si no es la vigente (el cliente manda la versión que está mostrando). `UserOut`/`AuthResponse` exponen `terms_accepted_version` y `current_terms_version`.
 - **Gate en los clientes** (no hay bloqueo en el server): web `ProtectedRoute` redirige a `/accept-terms` si `terms_accepted_version !== current_terms_version` (versión que viene del server); `AcceptTermsPage` manda `current_terms_version` del server. Mobile `RootNavigator` compara contra `CURRENT_TERMS_VERSION` **embebida** en `src/lib/legalText.ts` y salta el gate en sesión offline (`isOfflineSession`); `AcceptTermsScreen` manda la versión embebida.
 - **Alta con Google** (`GET /auth/api/google/callback`): crea `User` sin `terms_accepted_version` → el cliente muestra el gate. Es el único lugar donde una cuenta de Google puede declarar la edad: no hay formulario propio, y el botón de Google existe tanto en Login como en Register.
-- **Registro HTML legacy** (`backend/app/modules/auth/routes.py::register` + `templates/auth/register.html`): sigue montado y nginx de prod proxya `/auth/` al backend, así que `POST /auth/register` crea cuentas sin términos (y ahora sin edad). Tiene tests en `backend/tests/test_auth.py` y `test_html_routes.py`.
+- **Registro HTML legacy** (`backend/app/modules/auth/routes.py::register` + `templates/auth/register.html`): sigue montado y nginx de prod proxya `/auth/` al backend, así que `POST /auth/register` crea cuentas sin términos (y ahora sin edad). Tiene tests en `backend/tests/test_auth.py` y `test_html_routes.py`. **Decisión del usuario: se apaga** (ver D7).
 - **Configuración**: `docker-compose.prod.yml` pasa `CURRENT_TERMS_VERSION=${CURRENT_TERMS_VERSION:-1.0}`: el default del compose pisa el de `config.py`, así que una suba de versión tiene que tocarse ahí también (más `backend/.env.example` y `.env.prod.example`).
 - **Export de cuenta** (`backend/app/modules/cuenta/service.py`) serializa la fila completa de `users` con `_serialize_row`: una columna nueva entra sola.
 - **Texto legal** en tres espejos a mano: `legal/terminos-y-condiciones.md` (Versión 1.0, 24/09/2026), `frontend/src/pages/Legal/TermsPage.tsx`, mobile `src/lib/legalText.ts`. Todos ya dicen "al menos 16 años" y lo del consentimiento para menores de 18; la Política de Privacidad también.
@@ -11,7 +11,7 @@
 ## Goals / Non-Goals
 
 **Goals:**
-- Que ninguna cuenta nueva (email/contraseña, Google, legacy HTML) pueda usar la app sin haber declarado tener 16+.
+- Que ninguna cuenta nueva (email/contraseña, Google) pueda usar la app sin haber declarado tener 16+.
 - Exigirlo en el server en los dos endpoints que registran consentimiento, con constancia de fecha.
 - Pedírselo a las cuentas existentes en la próxima entrada, sin migración de datos manual.
 - UI simple: una casilla, texto claro en es-AR.
@@ -37,7 +37,7 @@ Al tildarla el cliente manda `accept_terms: true` y `confirm_age: true` (en el g
 
 Columna `DateTime(timezone=True)`, nullable, en `users` (mismo modelo que `terms_accepted_at`). Nada de booleano aparte: `age_confirmed = age_confirmed_at IS NOT NULL`.
 
-- Se setea en `register` (JSON y legacy) y en `accept-terms` **solo si está en null**: conserva la primera declaración (la edad solo crece; la fecha relevante es la del alta o la primera vez que se pidió). La fecha de cada aceptación de versión ya queda en `terms_accepted_at`.
+- Se setea en `register` y en `accept-terms` **solo si está en null**: conserva la primera declaración (la edad solo crece; la fecha relevante es la del alta o la primera vez que se pidió). La fecha de cada aceptación de versión ya queda en `terms_accepted_at`.
 - *Alternativa*: guardarla "junto" a la aceptación pisándola cada vez. Descartada: perdería la fecha de la declaración original sin ganar nada.
 - *Alternativa*: tabla de historial `terms_acceptances` (versión, fecha, edad). Más fiel como evidencia, pero cambia el modelo actual y no se pidió; queda como mejora futura.
 - La API expone solo `age_confirmed: bool` en `UserOut` y `AuthResponse` (no hace falta mandar la fecha a los clientes). El export de cuenta la incluye solo por serializar la fila.
@@ -68,9 +68,9 @@ Se sube `CURRENT_TERMS_VERSION` a **1.1** porque el texto de la sección 2 cambi
 - Hay que subirlo en: `backend/app/config.py`, `docker-compose.prod.yml` (`${CURRENT_TERMS_VERSION:-1.1}`), `backend/.env.example`, `.env.prod.example`, mobile `legalText.ts`, y el encabezado de los tres textos.
 - *Alternativa*: no subir versión y no tocar el texto (D5 alcanza para pedir la edad). Más liviano, pero la declaración no quedaría escrita en los Términos que se aceptan. Ver Preguntas abiertas.
 
-### D7. Registro HTML legacy
+### D7. Registro HTML legacy: se apaga y redirige a la SPA
 
-`POST /auth/register` recibe un campo de formulario `accept_terms_and_age` (checkbox único, mismo texto de D1). Sin él → 400 con el template y el error "Tenés que confirmar que tenés 16 años o más y aceptar los Términos". Con él → crea el usuario con `terms_accepted_version`, `terms_accepted_at` y `age_confirmed_at`. Se actualizan `register.html` y los tests legacy existentes. Se elige endurecerlo (cambio chico) en vez de apagarlo para no romper el flujo HTML; apagarlo queda como pregunta abierta.
+**Decisión del usuario** (reemplaza la propuesta original de endurecerlo con una casilla). `GET /auth/register` y `POST /auth/register` ya no muestran el formulario ni crean usuarios: ambos responden **303** a `{PUBLIC_BASE_URL}/register` (la misma base pública que usan los links de los mails; en prod nginx sirve SPA y backend en el mismo origen y en dev apunta a Vite). La ruta POST se conserva solo como redirección (sin leer el formulario, sin crear nada) para que un cliente viejo no reciba un 405 confuso. Se borra `templates/auth/register.html`; el link "Registrate aqui" de `login.html` sigue apuntando a `/auth/register` y por la redirección cae en la SPA. Login y logout HTML legacy no cambian. Los tests legacy de registro se reemplazan por tests de la redirección; no cambia nginx ni la guarda de rutas públicas (las rutas HTML no son `/api/v1`).
 
 ### D8. Migración
 
@@ -95,10 +95,10 @@ Archivo nuevo `backend/migrations/versions/0NN_age_confirmation.py`: `op.add_col
 
 - Ninguna funcional con los changes hermanos. Solo comparte `backend/migrations/versions/` (numeración) con los que agreguen migraciones, y `RootNavigator.tsx` mobile con `app-bloqueo-y-bienvenida` (bloqueo de app / bienvenida): el gate de términos tiene que seguir evaluándose antes de la bienvenida post-registro; si ambos tocan el mismo bloque, el segundo en implementarse hace el merge.
 
-## Open Questions
+## Decisiones del usuario (ex Open Questions)
 
-1. **Una casilla o dos**: propuesta una sola ("Tengo 16 años o más y acepto los Términos y Condiciones y la Política de Privacidad."). ¿OK, o preferís separar la edad en otra casilla?
-2. **Subir a la versión 1.1 de los Términos** para escribir la declaración en el texto (todos re-aceptan una vez). Recomendación: sí. Alternativa: no tocar el texto ni la versión y pedir solo la edad vía `age_confirmed`.
-3. **Registro HTML legacy** (`/auth/register`): propuesta endurecerlo con la misma casilla. ¿Preferís apagarlo y redirigir a `/register` de la SPA, ya que nadie debería usarlo?
-4. **¿Mobile ya está en manos de usuarios reales?** Si hay builds instaladas fuera de las pruebas, van a necesitar actualizar para registrarse/aceptar (422/409). Recomendación: asumir que no y salir con backend + build mobile juntos.
-5. **Constancia**: se guarda solo la fecha de la primera declaración (`age_confirmed_at`). ¿Hace falta un historial por versión (tabla de aceptaciones)? Recomendación: no por ahora.
+1. Una sola casilla: "Tengo 16 años o más y acepto los Términos y Condiciones y la Política de Privacidad." (+ ayuda de menores de 18). Confirmado.
+2. Subir a la versión 1.1 de los Términos con la declaración escrita; todos re-aceptan una vez. Confirmado.
+3. Registro HTML legacy: **se apaga y redirige a `/register` de la SPA** (no se endurece). Ver D7.
+4. Sin usuarios reales en builds mobile viejas: backend y build mobile salen juntos.
+5. Sin historial por versión: solo `age_confirmed_at` de la primera declaración.
