@@ -7,7 +7,7 @@ import LegalLayout from './LegalLayout';
  */
 export default function TermsPage() {
   return (
-    <LegalLayout title="Términos y Condiciones" updatedAt="7 de agosto de 2026">
+    <LegalLayout title="Términos y Condiciones" updatedAt="26 de octubre de 2026 (versión 1.1)">
       <p className="rounded-lg bg-amber-50 dark:bg-amber-900/20 px-4 py-3 text-xs text-amber-800 dark:text-amber-300">
         Borrador pendiente de revisión legal. Completá los campos entre corchetes
         antes de publicar.
@@ -30,6 +30,11 @@ export default function TermsPage() {
             Necesitás una dirección de email válida y tener al menos 16 años.
             Si sos menor de 18, necesitás el consentimiento de tu madre, padre
             o tutor legal.
+          </li>
+          <li>
+            Al crear tu cuenta o aceptar estos Términos declarás que tenés al
+            menos 16 años y, si sos menor de 18, que contás con el
+            consentimiento de tu madre, padre o tutor legal.
           </li>
           <li>
             Sos responsable de mantener tu contraseña en secreto y de la actividad

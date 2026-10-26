@@ -1,7 +1,7 @@
 # Términos y Condiciones de Uso — Can_cen
 
-**Última actualización:** 24 de septiembre de 2026
-**Versión:** 1.0
+**Última actualización:** 26 de octubre de 2026
+**Versión:** 1.1
 
 > Este documento es un borrador técnico, redactado a partir del funcionamiento real de la aplicación. No reemplaza el asesoramiento de un abogado — revisalo con uno antes de publicarlo como vinculante, especialmente por el manejo de datos de salud/financieros y de pagos reales.
 
@@ -14,6 +14,8 @@ Estos Términos regulan el uso de la aplicación web y móvil (en conjunto, "la 
 ## 2. Quién puede usar el Servicio
 
 Tenés que tener al menos **16 años** para crear una cuenta. Si sos menor de 18, necesitás el consentimiento de tu madre, padre o tutor legal para usar el Servicio.
+
+Al crear tu cuenta o aceptar estos Términos declarás que tenés al menos 16 años y, si sos menor de 18, que contás con el consentimiento de tu madre, padre o tutor legal.
 
 Sos responsable de que la información que nos das al registrarte sea verdadera, y de mantener actualizada tu dirección de email.
 
