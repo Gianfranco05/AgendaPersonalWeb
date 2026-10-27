@@ -85,11 +85,11 @@
 
 ## 11. Verificación contra el backend real (no mock)
 
-- [ ] 11.1 Aplicar la migración en Postgres (PGlite vía npm o docker) con `upgrade`/`downgrade`/`upgrade`, y correr por API un CRUD de recurrentes, confirmación y renovación: montos límite y enums inválidos dan 422, no 500; borrar categoría/cuenta usada por una recurrencia funciona en Postgres
-- [ ] 11.2 Backend real con 2+ workers de gunicorn (con y sin Redis): recurrencia diaria con offset ajustado para caer en la ventana → una sola transacción y una sola push por ciclo; reiniciar el proceso no duplica
-- [ ] 11.3 Simular caída: frenar el backend, mover `next_occurrence_date` 3 días atrás y levantar → 4 transacciones con fechas originales y una push resumen
-- [ ] 11.4 Web con `VITE_MOCK_ENABLED=false`: crear sueldo mensual, alquiler, Netflix y luz con confirmación; vista previa con día 31; pausar/reanudar; confirmar la luz editando monto; badge y filtro en transacciones; borrar una plantilla y ver que sus transacciones siguen
-- [ ] 11.5 Web: renovar un plazo fijo vencido en ambos modos (con ingreso del interés) y ver Patrimonio, el historial y que el anterior quedó cerrado
+- [x] 11.1 Aplicar la migración en Postgres (PGlite vía npm o docker) con `upgrade`/`downgrade`/`upgrade`, y correr por API un CRUD de recurrentes, confirmación y renovación: montos límite y enums inválidos dan 422, no 500; borrar categoría/cuenta usada por una recurrencia funciona en Postgres
+- [x] 11.2 Backend real con 2+ workers de gunicorn (con y sin Redis): recurrencia diaria con offset ajustado para caer en la ventana → una sola transacción y una sola push por ciclo; reiniciar el proceso no duplica
+- [x] 11.3 Simular caída: frenar el backend, mover `next_occurrence_date` 3 días atrás y levantar → 4 transacciones con fechas originales y una push resumen
+- [x] 11.4 Web con `VITE_MOCK_ENABLED=false`: crear sueldo mensual, alquiler, Netflix y luz con confirmación; vista previa con día 31; pausar/reanudar; confirmar la luz editando monto; badge y filtro en transacciones; borrar una plantilla y ver que sus transacciones siguen
+- [x] 11.5 Web: renovar un plazo fijo vencido en ambos modos (con ingreso del interés) y ver Patrimonio, el historial y que el anterior quedó cerrado
 - [ ] 11.6 Mobile (build lan o Expo contra el backend real): tile y "+" → Recurrentes, alta con coma decimal, confirmación desde la push (tap en caliente y en frío), cola offline de una confirmación sin duplicar, "Renovar" en Inversiones
-- [ ] 11.7 Export de cuenta contiene las tablas nuevas; borrar una cuenta de prueba con recurrencias, pendientes y renovaciones no deja filas
-- [ ] 11.8 Correr `openspec validate finanzas-recurrentes --strict` y marcar las tareas completadas
+- [x] 11.7 Export de cuenta contiene las tablas nuevas; borrar una cuenta de prueba con recurrencias, pendientes y renovaciones no deja filas
+- [x] 11.8 Correr `openspec validate finanzas-recurrentes --strict` y marcar las tareas completadas

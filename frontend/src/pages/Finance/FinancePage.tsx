@@ -223,7 +223,7 @@ export default function FinancePage() {
           className="flex w-full items-center gap-2 rounded-xl border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 px-4 py-3 text-left text-sm font-medium text-amber-800 dark:text-amber-200"
         >
           <Repeat size={16} />
-          Tenés {pendingCount} {pendingCount === 1 ? 'movimiento' : 'movimientos'} recurrentes para confirmar
+          Tenés {pendingCount} {pendingCount === 1 ? 'movimiento recurrente' : 'movimientos recurrentes'} para confirmar
         </button>
       )}
 
