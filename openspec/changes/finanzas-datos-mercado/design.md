@@ -164,7 +164,7 @@ Mismo contrato: `src/types/index.ts`, `src/api/endpoints.ts` (`fetchMarketFx`, `
 ## Dependencias
 
 - **`finanzas-inversiones`**: este change se apoya en su código (ya implementado) y modifica dos de sus requisitos (deltas de `finance-investments` y `finance-net-worth`). Debe archivarse **antes** que este, o el archive de este fallará al no encontrar los requisitos a modificar. Sus tareas pendientes (verificación manual 10.x) no bloquean el diseño.
-- **Migración**: `019_market_data` con `down_revision = "018_investments"` asumiendo que es el próximo número libre. Otros changes hermanos (`finanzas-recurrentes`, `registro-edad-minima`, `app-bloqueo-y-bienvenida`, …) también pueden agregar migraciones: al implementar se toma el siguiente número libre y el `down_revision` del head vigente, y se verifica un solo head.
+- **Migración**: `020_market_data` con `down_revision = "019_age_confirmation"` (el head al implementar; `registro-edad-minima` tomó el 019). Otros changes hermanos (`finanzas-recurrentes`, `registro-edad-minima`, `app-bloqueo-y-bienvenida`, …) también pueden agregar migraciones: al implementar se toma el siguiente número libre y el `down_revision` del head vigente, y se verifica un solo head.
 - **`finanzas-exportar-importar`**: si importa inversiones reutilizando `InvestmentCreate`, debe aceptar `price_source = "coingecko"` (lo hereda solo) y no exportar las tablas globales de mercado. Las preferencias nuevas viajan con `user_preferences`.
 - **`widgets-android`**: si muestra patrimonio o dólar, consume `/finance/net-worth` o `/finance/market/fx`; no requiere nada extra de este change.
 - Sin relación con `buscador-global`, `habitos-recordatorios-inteligentes`, `app-bloqueo-y-bienvenida`, `registro-edad-minima`, `finanzas-recurrentes`.
@@ -185,10 +185,10 @@ Mismo contrato: `src/types/index.ts`, `src/api/endpoints.ts` (`fetchMarketFx`, `
 
 ## Migration Plan
 
-1. Deploy backend con `019_market_data` (crea las 4 tablas, siembra `market_fetch_state`, agrega `fx_usd_source`/`fx_eur_source` con `manual` para quien ya tenía cotización). Cambios aditivos: clientes viejos siguen viendo los mismos campos (y `rates.updated_at` sigue teniendo sentido).
+1. Deploy backend con `020_market_data` (crea las 4 tablas, siembra `market_fetch_state`, agrega `fx_usd_source`/`fx_eur_source` con `manual` para quien ya tenía cotización). Cambios aditivos: clientes viejos siguen viendo los mismos campos (y `rates.updated_at` sigue teniendo sentido).
 2. El primer ciclo del scheduler (≤ 60 s) carga dólar, euro y la serie del IPC completa; cripto recién cuando haya activos con `coingecko`.
 3. Deploy web; build EAS mobile.
-4. Rollback: `alembic downgrade 018_investments` borra las tablas de mercado y las dos columnas (los usuarios vuelven a su cotización manual, que nunca se tocó) y revertir el deploy. Las inversiones con `price_source = "coingecko"` deben pasarse a `manual` antes del downgrade (lo hace el propio `downgrade` con un `UPDATE`).
+4. Rollback: `alembic downgrade 019_age_confirmation` borra las tablas de mercado y las dos columnas (los usuarios vuelven a su cotización manual, que nunca se tocó) y revertir el deploy. Las inversiones con `price_source = "coingecko"` deben pasarse a `manual` antes del downgrade (lo hace el propio `downgrade` con un `UPDATE`).
 
 ## Open Questions
 
@@ -200,3 +200,24 @@ Mismo contrato: `src/types/index.ts`, `src/api/endpoints.ts` (`fetchMarketFx`, `
 6. **Otros tipos de dólar** (CCL, cripto, tarjeta, mayorista): se guardan pero la UI ofrece solo oficial/MEP/blue. Recomendación: así; sumar CCL si alguien lo pide.
 7. **Lista de cripto soportadas**: recomendación: las ~22 de D6 (top por capitalización + stablecoins); ampliar a pedido.
 8. **Fila de euro**: solo si hay activos en EUR (hereda la pregunta 3 de `finanzas-inversiones`). Recomendación: sí, solo con activos en EUR.
+
+## Decisiones de producto confirmadas e implementación (2026-10-27)
+
+Respuestas del usuario a las preguntas abiertas, tal como quedaron implementadas:
+
+1. **Dólar por defecto**: MEP para usuarios nuevos; quien ya tenía una cotización manual queda en `manual`.
+2. **Precio de conversión**: la **venta**, con la compra al lado.
+3. **CoinGecko**: plan Demo + atribución "Datos de CoinGecko" + `COINGECKO_API_KEY` opcional por env. El provider se apaga con `MARKET_CRYPTO_ENABLED=false` (el scheduler no consulta cripto, `/crypto-assets` devuelve `[]` y no se aceptan altas con `coingecko`; los activos existentes conservan su último precio). `MARKET_DATA_ENABLED=false` apaga todo el scheduler. Acciones/CEDEARs fuera de alcance.
+4. **Rendimiento real**: solo activos en ARS por ahora.
+5. **Meses sin IPC**: se estiman con el último dato publicado y el resultado sale "estimado".
+6. **Tipos de dólar**: se guardan todos, la UI muestra Oficial / MEP / Blue.
+7. **Fila de euro**: solo si hay activos en EUR.
+
+Diferencias de implementación respecto del diseño original:
+
+- `PriceProvider.quote_many(pairs, client)` recibe los pares `{(ticker, moneda)}` y el `httpx.AsyncClient` (inyectable para tests) en vez de `(tickers, currencies)`; `refresh_quotes(db, client=None, user_id=None)`.
+- `get_rates()` devuelve `(ResolvedRates, include_investments)`; `ResolvedRates` extiende `Rates` con un `RateInfo` por moneda.
+- `stale` se calcula solo para cotizaciones automáticas (la manual del usuario no se marca: los clientes ya muestran su antigüedad).
+- `MarketPrice`/`FxQuote` guardan `Numeric`; los jobs reciben la sesión y el cliente por parámetro (`refresh_fx(db, client, now)`).
+- La fecha de inicio pasa a ser "Fecha de compra" y se acepta en todos los tipos de activo (el vencimiento sigue solo en plazo fijo, bonos, fondos y otros).
+- El motivo `no_invested_amount` se suma a los motivos de `real_return_unavailable_reason`.
