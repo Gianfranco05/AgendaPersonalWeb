@@ -9,6 +9,7 @@ from app.core.security import get_user_id_from_request
 from app.core.templates import templates
 from app.database import get_db
 from app.modules.finanzas.models import BankAccount
+from app.modules.finanzas.repository import BankAccountRepository
 
 router = APIRouter(prefix="/finanzas", tags=["finanzas"])
 
@@ -221,6 +222,5 @@ async def eliminar_cuenta(
     )
     account = result.scalar_one_or_none()
     if account:
-        await db.delete(account)
-        await db.commit()
+        await BankAccountRepository(db).delete(account)
     return RedirectResponse(url="/finanzas/cuentas/", status_code=303)

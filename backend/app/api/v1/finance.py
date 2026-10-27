@@ -114,6 +114,7 @@ async def list_transactions(
     date_to: Optional[date] = None,
     transaction_type: Optional[str] = None,
     category_id: Optional[str] = None,
+    recurrence_id: Optional[str] = None,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -126,6 +127,7 @@ async def list_transactions(
         date_to=date_to,
         transaction_type=transaction_type,
         category_id=category_id,
+        recurrence_id=recurrence_id,
     )
     page = (skip // limit) + 1
     return PaginatedResponse(

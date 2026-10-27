@@ -66,11 +66,12 @@ class FinanzasService:
         if await self.category_repo.get_by_id(str(category_id), str(user_id)) is None:
             raise HTTPException(status_code=404, detail="Categoría no encontrada")
 
-    async def create_transaction(
-        self, user_id: UUID, data: TransactionCreate
-    ) -> Transaction:
+    async def build_transaction(self, user_id: UUID, data: TransactionCreate) -> Transaction:
+        """Arma la transaccion (valida enums y que la categoria sea propia) sin
+        agregarla a la sesion ni hacer `commit`: quien la usa decide cuando
+        confirmar (ej. las recurrentes la crean junto con el cursor)."""
         await self._ensure_own_category(user_id, data.category_id)
-        transaction = Transaction(
+        return Transaction(
             user_id=user_id,
             amount=data.amount,
             currency=data.currency,
@@ -90,6 +91,11 @@ class FinanzasService:
             notes=data.notes,
             category_id=str(data.category_id) if data.category_id else None,
         )
+
+    async def create_transaction(
+        self, user_id: UUID, data: TransactionCreate
+    ) -> Transaction:
+        transaction = await self.build_transaction(user_id, data)
         return await self.transaction_repo.create(transaction)
 
     async def get_transactions(
@@ -101,9 +107,10 @@ class FinanzasService:
         date_to: Optional[date] = None,
         transaction_type: Optional[str] = None,
         category_id: Optional[UUID] = None,
+        recurrence_id: Optional[str] = None,
     ):
         return await self.transaction_repo.get_all(
-            user_id, skip, limit, date_from, date_to, transaction_type, category_id
+            user_id, skip, limit, date_from, date_to, transaction_type, category_id, recurrence_id
         )
 
     async def get_transactions_paginated(
@@ -115,12 +122,13 @@ class FinanzasService:
         date_to: Optional[date] = None,
         transaction_type: Optional[str] = None,
         category_id: Optional[UUID] = None,
+        recurrence_id: Optional[str] = None,
     ) -> tuple:
         items = await self.transaction_repo.get_all(
-            user_id, skip, limit, date_from, date_to, transaction_type, category_id
+            user_id, skip, limit, date_from, date_to, transaction_type, category_id, recurrence_id
         )
         total = await self.transaction_repo.count(
-            user_id, date_from, date_to, transaction_type, category_id
+            user_id, date_from, date_to, transaction_type, category_id, recurrence_id
         )
         return items, total
 

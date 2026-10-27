@@ -4,7 +4,7 @@
 - **Creación**: `FinanzasService.create_transaction` valida que la categoría sea del usuario y el repo hace `commit` adentro. Los borrados de categoría y cuenta (`CategoryRepository.delete`, `BankAccountRepository.delete`) desvinculan a mano lo que las apunta porque las FK no tienen `ON DELETE` (en Postgres daba 500; SQLite no aplica FKs y lo escondía).
 - **Schedulers**: `recordatorios/scheduler.py` e `inversiones/scheduler.py` corren un loop por worker de gunicorn desde el `lifespan` de `backend/app/main.py`. El de inversiones usa una **ventana horaria local** (09:00–21:59) + marca persistente con `UPDATE ... WHERE` y `rowcount == 1` para que solo un worker actúe, y `claim_once` de Redis como capa barata opcional. El huso horario es `timezone_offset_minutes` por fila (minutos al este de UTC, lo manda el cliente en cada escritura; fallback −180).
 - **Inversiones**: `backend/app/modules/inversiones/` (change `finanzas-inversiones`, implementado en la rama pero no archivado): `Investment` con `status active|closed`, plazo fijo calculado en `valuation.py` (`valuate(inv, today).fixed_term.amount_at_maturity`), `days_to_maturity` según `tz_offset_minutes`. Su pregunta abierta 4 dejó "Renovar" fuera; este change la resuelve.
-- **Guardas**: `OWNED_TABLES` en `backend/app/modules/cuenta/service.py` (test que falla si una tabla con `user_id` no está), `test_infra.py::test_no_api_route_is_public_by_accident`, `test_tenant_isolation.py`, montos con `Money` (±9.999.999.999,99). Migraciones Alembic, head `018_investments`.
+- **Guardas**: `OWNED_TABLES` en `backend/app/modules/cuenta/service.py` (test que falla si una tabla con `user_id` no está), `test_infra.py::test_no_api_route_is_public_by_accident`, `test_tenant_isolation.py`, montos con `Money` (±9.999.999.999,99). Migraciones Alembic, head `018_investments` al proponer (al implementar: `020_market_data`).
 - **Clientes**: web `frontend/` (`FinancePage.tsx` con pestañas, `TransactionModal` como patrón RHF + Zod sin `z.coerce`, modo mock), mobile `C:\Proyectos\vida-personal-mobile` (`FinanceScreen` con `TOOLS`/`TOOL_ROWS` que ya maneja cantidad impar, `QuickCreateSheet`, `BottomSheet`, `DateField`, `NumberStepper`, `FilterChips`, `queued(...)` para la cola offline, `src/lib/notifications.ts::targetFromData` para el tap de push).
 
 ## Goals / Non-Goals
@@ -197,11 +197,11 @@ Router `prefix="/finance/recurring"`, `tags=["finance"]`, todas con `get_current
 
 ### D12. Export y borrado de cuenta
 
-`OWNED_TABLES` suma, **antes** de `categories` y `bank_accounts` (por las FK) y después de `transactions` (que ya va primero): `("recurring_occurrences", RecurringOccurrence)` y luego `("recurring_transactions", RecurringTransaction)`. `investments` (FK a sí misma) se borra en un único `DELETE ... WHERE user_id` (Postgres verifica la FK al final de la sentencia; se prueba en Postgres). La guarda de `test_account.py` falla si se olvida.
+`OWNED_TABLES` suma `("recurring_occurrences", RecurringOccurrence)` **antes** de `transactions` (la ocurrencia apunta a la transacción y a su plantilla por FK) y `("recurring_transactions", RecurringTransaction)` justo después de `transactions` y **antes** de `categories` y `bank_accounts` (la plantilla apunta a ambas). `investments` (FK a sí misma) se borra en un único `DELETE ... WHERE user_id` (Postgres verifica la FK al final de la sentencia; se prueba en Postgres). La guarda de `test_account.py` falla si se olvida.
 
-### D13. Migración `019_recurring_transactions`
+### D13. Migración `021_recurring_transactions`
 
-`down_revision = "018_investments"`. `create_table` de las dos tablas con checks, índices y la única; `create_index ix_transactions_recurring_parent_id`; `add_column investments.renewed_from_id` + FK + índice único (con `batch_alter_table` para SQLite). `downgrade` inverso. Verificar `alembic heads` = un solo head y `upgrade/downgrade/upgrade` en SQLite **y** Postgres (PGlite vía npm, como en `finanzas-inversiones`).
+`down_revision = "020_market_data"` (el head real al implementar; se renumeró desde 019). `create_table` de las dos tablas con checks, índices y la única; `create_index ix_transactions_recurring_parent_id`; `add_column investments.renewed_from_id` + FK + índice único (con `batch_alter_table` para SQLite). `downgrade` inverso. Verificar `alembic heads` = un solo head y `upgrade/downgrade/upgrade` en SQLite **y** Postgres (PGlite vía npm, como en `finanzas-inversiones`).
 
 ### D14. Web (`frontend/`)
 
@@ -238,10 +238,10 @@ Router `prefix="/finance/recurring"`, `tags=["finance"]`, todas con `get_current
 
 ## Migration Plan
 
-1. Deploy backend con `019_recurring_transactions` (`alembic upgrade head` en el entrypoint). Cambios aditivos: clientes viejos ignoran `recurrence_id`, `renewed_*` y `can_renew`.
+1. Deploy backend con `021_recurring_transactions` (`alembic upgrade head` en el entrypoint). Cambios aditivos: clientes viejos ignoran `recurrence_id`, `renewed_*` y `can_renew`.
 2. Deploy web.
 3. Build EAS mobile. Hasta que se instale, las recurrencias creadas desde la web funcionan igual (generación en el server; las push llegan a la app vieja y solo la abren).
-4. Rollback: `alembic downgrade 018_investments` borra las tablas nuevas, el índice y `renewed_from_id` (las transacciones ya generadas quedan como transacciones normales con `is_recurring = true`); revertir el deploy quita el scheduler.
+4. Rollback: `alembic downgrade 020_market_data` borra las tablas nuevas, el índice y `renewed_from_id` (las transacciones ya generadas quedan como transacciones normales con `is_recurring = true`); revertir el deploy quita el scheduler.
 
 ## Dependencias
 

@@ -12,6 +12,7 @@ from sqlalchemy import (
     ForeignKey,
     Numeric,
     DateTime,
+    Index,
     func,
 )
 from sqlalchemy.orm import Mapped, mapped_column
@@ -47,6 +48,10 @@ class IsoText(TypeDecorator):
 
 class Transaction(Base):
     __tablename__ = "transactions"
+    __table_args__ = (
+        # "Movimientos de esta recurrencia" (filtro `recurrence_id`).
+        Index("ix_transactions_recurring_parent_id", "recurring_parent_id"),
+    )
 
     id: Mapped[str] = mapped_column(
         String(36), primary_key=True, default=lambda: str(uuid4())
@@ -92,6 +97,12 @@ class Transaction(Base):
     category_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("categories.id"), nullable=True
     )
+
+    @property
+    def recurrence_id(self) -> str | None:
+        """Plantilla recurrente que genero este movimiento (None si es manual
+        o si la plantilla se borro)."""
+        return self.recurring_parent_id
 
 
 class Category(Base):

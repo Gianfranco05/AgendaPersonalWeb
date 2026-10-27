@@ -54,6 +54,9 @@ class Investment(Base):
         Index("ix_investments_user_status", "user_id", "status"),
         # Lo recorre el scheduler de avisos de vencimiento.
         Index("ix_investments_status_maturity", "status", "maturity_date"),
+        # Una inversion se renueva una sola vez: lo garantiza la base (varios
+        # NULL conviven en SQLite y en Postgres).
+        Index("uq_investments_renewed_from", "renewed_from_id", unique=True),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
@@ -97,6 +100,11 @@ class Investment(Base):
     #: rehabilite los avisos sin resetear nada.
     eve_notice_for: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     day_notice_for: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+
+    #: Si es la renovacion de un plazo fijo, el que se renovo.
+    renewed_from_id: Mapped[Optional[str]] = mapped_column(
+        String(36), ForeignKey("investments.id"), nullable=True
+    )
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(

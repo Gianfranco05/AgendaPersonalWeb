@@ -1,27 +1,27 @@
 ## 1. Backend — Modelo y migración
 
-- [ ] 1.1 Crear `backend/app/modules/recurrentes/__init__.py` y `models.py` con `RecurringTransaction` y `RecurringOccurrence` (columnas, checks, índices y `UniqueConstraint(recurrence_id, occurrence_date)` de design D2; `Date` real, `DateTime(timezone=True)`, `Numeric(12,2)`; `interval_count`, nunca `interval`)
-- [ ] 1.2 Agregar `renewed_from_id` (FK a `investments.id`, índice único) a `Investment` en `backend/app/modules/inversiones/models.py`
-- [ ] 1.3 Registrar los modelos nuevos donde se importan para Alembic/`Base.metadata`
-- [ ] 1.4 Crear `backend/migrations/versions/019_recurring_transactions.py` (`down_revision = "018_investments"`; si otro change hermano ya ocupó `019`, renumerar y encadenar): tablas, `ix_transactions_recurring_parent_id`, `investments.renewed_from_id` con `batch_alter_table`; `downgrade` inverso
-- [ ] 1.5 Verificar `alembic heads` = un solo head y `upgrade head` / `downgrade 018_investments` / `upgrade head` en SQLite
+- [x] 1.1 Crear `backend/app/modules/recurrentes/__init__.py` y `models.py` con `RecurringTransaction` y `RecurringOccurrence` (columnas, checks, índices y `UniqueConstraint(recurrence_id, occurrence_date)` de design D2; `Date` real, `DateTime(timezone=True)`, `Numeric(12,2)`; `interval_count`, nunca `interval`)
+- [x] 1.2 Agregar `renewed_from_id` (FK a `investments.id`, índice único) a `Investment` en `backend/app/modules/inversiones/models.py`
+- [x] 1.3 Registrar los modelos nuevos donde se importan para Alembic/`Base.metadata`
+- [x] 1.4 Crear `backend/migrations/versions/021_recurring_transactions.py` (`down_revision = "020_market_data"`; renumerada desde 019 porque otros changes ocuparon 019 y 020): tablas, `ix_transactions_recurring_parent_id`, `investments.renewed_from_id` con `batch_alter_table`; `downgrade` inverso
+- [x] 1.5 Verificar `alembic heads` = un solo head y `upgrade head` / `downgrade 020_market_data` / `upgrade head` en SQLite
 
 ## 2. Backend — Reglas de calendario
 
-- [ ] 2.1 `recurrentes/rules.py` (puro, sin DB): `Rule`, `compute_anchor(rule, start_date, from_date)`, `occurrence(rule, anchor, k)` desde el ancla con ajuste a último día del mes y 29/02 → 28/02, `next_after`, `first_on_or_after`, `occurrences_between` respetando `end_date`
-- [ ] 2.2 `rule_label(rule)` en español ("Todos los meses el día 5", "Cada 2 meses el día 10", "Todas las semanas los lunes", "Cada 15 días", "Todos los años el 15/03", sufijo "(o el último día del mes)" para día > 28)
-- [ ] 2.3 Helper `local_today(offset)` / `local_now(offset)` con fallback −180 (reusar el de `inversiones/valuation.py` si aplica)
+- [x] 2.1 `recurrentes/rules.py` (puro, sin DB): `Rule`, `compute_anchor(rule, start_date, from_date)`, `occurrence(rule, anchor, k)` desde el ancla con ajuste a último día del mes y 29/02 → 28/02, `next_after`, `first_on_or_after`, `occurrences_between` respetando `end_date`
+- [x] 2.2 `rule_label(rule)` en español ("Todos los meses el día 5", "Cada 2 meses el día 10", "Todas las semanas los lunes", "Cada 15 días", "Todos los años el 15/03", sufijo "(o el último día del mes)" para día > 28)
+- [x] 2.3 Helper `local_today(offset)` / `local_now(offset)` con fallback −180 (reusar el de `inversiones/valuation.py` si aplica)
 
 ## 3. Backend — Schemas, repository, service y API
 
-- [ ] 3.1 `recurrentes/schemas.py`: `RecurringCreate`/`RecurringUpdate` (reusar `Money` y `_check_enum` de `finanzas/schemas.py`; límites de `interval_count` por frecuencia; campos de regla obligatorios según frecuencia y en null los demás; `amount` null solo con `requires_confirmation`; fechas 1970–2100; offset −840..840; `generate_past`), `RecurringOut` (`state`, `rule_label`, `pending_count`, `last_amount`), `RecurringDetailOut`, `PreviewIn/Out`, `UpcomingOut`, `OccurrenceOut`, `ConfirmIn`
-- [ ] 3.2 Extraer de `FinanzasService.create_transaction` un builder sin `commit` (`build_transaction`) que valida enums y categoría propia; `create_transaction` lo usa y mantiene su comportamiento
-- [ ] 3.3 `recurrentes/repository.py`: toda query filtrada por `user_id`; `get`, `list(status)`, `create`, `update`, `delete` (borra ocurrencias y desvincula `transactions.recurring_parent_id`), `advance_cursor` (CAS con `rowcount`), `list_due(utc_today)`, ocurrencias pendientes, `claim_occurrence_status` (CAS `pending → confirmed/skipped`), última confirmada
-- [ ] 3.4 `recurrentes/service.py`: `materialize(rec, local_today, apply_window=False)` en una transacción (D5) con tope de 62 días/ocurrencias (D7), copia de cuenta/categoría a la transacción (D8), pendientes con `suggested_amount` (D6); crear (con `generate_past` y 422 si > 120), editar (recalcular ancla si cambia la regla), pausar, reanudar, borrar, preview, upcoming, confirmar/saltear idempotentes (200 repetido, 409 cruzado), actualizar el offset de la recurrencia en cada escritura
-- [ ] 3.5 `recurrentes/api_routes.py`: router `prefix="/finance/recurring"` con las rutas de design D10 (estáticas `/preview`, `/upcoming`, `/occurrences` antes de `/{id}`), todas con `get_current_user`; incluir en `backend/app/api/v1/router.py`
-- [ ] 3.6 `backend/app/api/v1/finance.py` + `finanzas/repository.py` + `finanzas/schemas.py`: filtro `recurrence_id` en `GET /finance/transactions` (y en `count`) y campo `recurrence_id` en `TransactionResponse`
-- [ ] 3.7 `CategoryRepository.delete` y `BankAccountRepository.delete`: desvincular `recurring_transactions.category_id` / `bank_account_id`
-- [ ] 3.8 Sumar `("recurring_occurrences", RecurringOccurrence)` y `("recurring_transactions", RecurringTransaction)` a `OWNED_TABLES` (`backend/app/modules/cuenta/service.py`) antes de `categories` y `bank_accounts`
+- [x] 3.1 `recurrentes/schemas.py`: `RecurringCreate`/`RecurringUpdate` (reusar `Money` y `_check_enum` de `finanzas/schemas.py`; límites de `interval_count` por frecuencia; campos de regla obligatorios según frecuencia y en null los demás; `amount` null solo con `requires_confirmation`; fechas 1970–2100; offset −840..840; `generate_past`), `RecurringOut` (`state`, `rule_label`, `pending_count`, `last_amount`), `RecurringDetailOut`, `PreviewIn/Out`, `UpcomingOut`, `OccurrenceOut`, `ConfirmIn`
+- [x] 3.2 Extraer de `FinanzasService.create_transaction` un builder sin `commit` (`build_transaction`) que valida enums y categoría propia; `create_transaction` lo usa y mantiene su comportamiento
+- [x] 3.3 `recurrentes/repository.py`: toda query filtrada por `user_id`; `get`, `list(status)`, `create`, `update`, `delete` (borra ocurrencias y desvincula `transactions.recurring_parent_id`), `advance_cursor` (CAS con `rowcount`), `list_due(utc_today)`, ocurrencias pendientes, `claim_occurrence_status` (CAS `pending → confirmed/skipped`), última confirmada
+- [x] 3.4 `recurrentes/service.py`: `materialize(rec, local_today, apply_window=False)` en una transacción (D5) con tope de 62 días/ocurrencias (D7), copia de cuenta/categoría a la transacción (D8), pendientes con `suggested_amount` (D6); crear (con `generate_past` y 422 si > 120), editar (recalcular ancla si cambia la regla), pausar, reanudar, borrar, preview, upcoming, confirmar/saltear idempotentes (200 repetido, 409 cruzado), actualizar el offset de la recurrencia en cada escritura
+- [x] 3.5 `recurrentes/api_routes.py`: router `prefix="/finance/recurring"` con las rutas de design D10 (estáticas `/preview`, `/upcoming`, `/occurrences` antes de `/{id}`), todas con `get_current_user`; incluir en `backend/app/api/v1/router.py`
+- [x] 3.6 `backend/app/api/v1/finance.py` + `finanzas/repository.py` + `finanzas/schemas.py`: filtro `recurrence_id` en `GET /finance/transactions` (y en `count`) y campo `recurrence_id` en `TransactionResponse`
+- [x] 3.7 `CategoryRepository.delete` y `BankAccountRepository.delete`: desvincular `recurring_transactions.category_id` / `bank_account_id`
+- [x] 3.8 Sumar `("recurring_occurrences", RecurringOccurrence)` y `("recurring_transactions", RecurringTransaction)` a `OWNED_TABLES` (`backend/app/modules/cuenta/service.py`) antes de `categories` y `bank_accounts`
 
 ## 4. Backend — Scheduler y push
 
@@ -37,10 +37,10 @@
 
 ## 6. Backend — Tests
 
-- [ ] 6.1 `backend/tests/test_recurring_rules.py` (puros): día 31 en abril/febrero/bisiesto, día 30 en febrero 2028, vuelta a 31 en marzo sin arrastre, bimestral anclado en el primer match, semanal por día de la semana y cada 2 semanas, cada 15 días, anual 29/02, `end_date` inclusive y cursor null, `rule_label`
-- [ ] 6.2 `backend/tests/test_recurring.py`: CRUD, validaciones 422 (monto 0 / > tope, enums inválidos como "Efectivo", regla incompleta, `interval_count` fuera de rango, fin < inicio, sin monto y sin confirmación), categoría/cuenta ajena → 404, creación el día debido genera en el request, `generate_past` (4 transacciones) y > 120 → 422, preview y upcoming
-- [ ] 6.3 Semántica: pausar/reanudar sin generar lo pausado, editar monto no toca lo generado, cambio de regla recalcula ancla, borrar plantilla conserva transacciones desvinculadas, borrar transacción generada no la regenera, borrar categoría/cuenta desvincula, filtro `recurrence_id` y campo en `TransactionResponse`
-- [ ] 6.4 Pendientes: `suggested_amount` (plantilla y luego último confirmado), confirmar con monto editado, confirmar dos veces → una transacción, saltear, confirmar salteada → 409, pendientes no suman al balance ni presupuestos
+- [x] 6.1 `backend/tests/test_recurring_rules.py` (puros): día 31 en abril/febrero/bisiesto, día 30 en febrero 2028, vuelta a 31 en marzo sin arrastre, bimestral anclado en el primer match, semanal por día de la semana y cada 2 semanas, cada 15 días, anual 29/02, `end_date` inclusive y cursor null, `rule_label`
+- [x] 6.2 `backend/tests/test_recurring.py`: CRUD, validaciones 422 (monto 0 / > tope, enums inválidos como "Efectivo", regla incompleta, `interval_count` fuera de rango, fin < inicio, sin monto y sin confirmación), categoría/cuenta ajena → 404, creación el día debido genera en el request, `generate_past` (4 transacciones) y > 120 → 422, preview y upcoming
+- [x] 6.3 Semántica: pausar/reanudar sin generar lo pausado, editar monto no toca lo generado, cambio de regla recalcula ancla, borrar plantilla conserva transacciones desvinculadas, borrar transacción generada no la regenera, borrar categoría/cuenta desvincula, filtro `recurrence_id` y campo en `TransactionResponse`
+- [x] 6.4 Pendientes: `suggested_amount` (plantilla y luego último confirmado), confirmar con monto editado, confirmar dos veces → una transacción, saltear, confirmar salteada → 409, pendientes no suman al balance ni presupuestos
 - [ ] 6.5 `backend/tests/test_recurring_scheduler.py`: 09:00 local genera y 08:59 no; offset −180 con fecha UTC distinta; offset +600; null → −180; fuera de ventana no genera; catch-up de 3 días (4 transacciones con fechas originales); tope de 62; plantilla pausada o terminada no genera
 - [ ] 6.6 Idempotencia: dos `_tick` concurrentes (`asyncio.gather`) → una transacción; ciclos repetidos → una; "reinicio" sin Redis → no regenera; fallo a mitad (mock que levanta en la 2.ª transacción) → rollback total y reintento en el ciclo siguiente
 - [ ] 6.7 Push (mock de `send_to_user`): una push por usuario y ciclo con textos y `data` correctos, resumen agrupado, `notify = false` sin push, generación por API sin push, Expo caído no afecta lo generado, usuario sin tokens

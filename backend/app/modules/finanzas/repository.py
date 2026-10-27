@@ -14,6 +14,7 @@ from app.modules.finanzas.models import (
     BankAccount,
     Budget,
 )
+from app.modules.recurrentes.models import RecurringTransaction
 
 
 class TransactionRepository:
@@ -29,6 +30,7 @@ class TransactionRepository:
         date_to: Optional[date] = None,
         transaction_type: Optional[str] = None,
         category_id: Optional[str] = None,
+        recurrence_id: Optional[str] = None,
     ) -> Sequence[Transaction]:
         query = select(Transaction).where(
             and_(
@@ -45,6 +47,8 @@ class TransactionRepository:
             query = query.where(Transaction.type == transaction_type)
         if category_id:
             query = query.where(Transaction.category_id == category_id)
+        if recurrence_id:
+            query = query.where(Transaction.recurring_parent_id == recurrence_id)
 
         query = query.order_by(Transaction.transaction_date.desc())
         query = query.offset(skip).limit(limit)
@@ -59,6 +63,7 @@ class TransactionRepository:
         date_to: Optional[date] = None,
         transaction_type: Optional[str] = None,
         category_id: Optional[str] = None,
+        recurrence_id: Optional[str] = None,
     ) -> int:
         query = select(func.count()).where(
             and_(
@@ -75,6 +80,8 @@ class TransactionRepository:
             query = query.where(Transaction.type == transaction_type)
         if category_id:
             query = query.where(Transaction.category_id == category_id)
+        if recurrence_id:
+            query = query.where(Transaction.recurring_parent_id == recurrence_id)
 
         result = await self.db.execute(query)
         return result.scalar() or 0
@@ -300,6 +307,12 @@ class CategoryRepository:
         await self.db.execute(
             update(Category).where(Category.parent_id == category.id).values(parent_id=None)
         )
+        # Las plantillas recurrentes siguen vivas, solo sin categoria.
+        await self.db.execute(
+            update(RecurringTransaction)
+            .where(RecurringTransaction.category_id == category.id)
+            .values(category_id=None)
+        )
         # Un presupuesto sin categoria no tiene sentido: se va con ella.
         await self.db.execute(delete(Budget).where(Budget.category_id == category.id))
         await self.db.delete(category)
@@ -372,5 +385,12 @@ class BankAccountRepository:
         return account
 
     async def delete(self, account: BankAccount) -> None:
+        # Las FK no tienen ON DELETE: en Postgres borrar una cuenta usada por
+        # una plantilla recurrente fallaba con 500 (SQLite no aplica FKs).
+        await self.db.execute(
+            update(RecurringTransaction)
+            .where(RecurringTransaction.bank_account_id == account.id)
+            .values(bank_account_id=None)
+        )
         await self.db.delete(account)
         await self.db.commit()

@@ -25,6 +25,7 @@ from app.modules.billing.models import StripeCustomer
 from app.modules.eventos.models import Event
 from app.modules.finanzas.models import BankAccount, Budget, Category, Transaction
 from app.modules.inversiones.models import Investment
+from app.modules.recurrentes.models import RecurringOccurrence, RecurringTransaction
 from app.modules.fitness.models import Exercise, WorkoutSession
 from app.modules.biblioteca.models import Book
 from app.modules.estudio.models import Exam, Subject
@@ -53,7 +54,11 @@ logger = logging.getLogger(__name__)
 # en prod y pasa en CI. Por eso el orden es explicito y no depende de cascades.
 OWNED_TABLES: list[tuple[str, Any]] = [
     # Hijos primero: apuntan a categories / goals / notes.
+    # Las ocurrencias apuntan a transactions y a su plantilla: van antes que ambas.
+    ("recurring_occurrences", RecurringOccurrence),
     ("transactions", Transaction),
+    # La plantilla apunta a categories y bank_accounts: va antes que ellas.
+    ("recurring_transactions", RecurringTransaction),
     ("budgets", Budget),
     ("habit_records", HabitRecord),
     ("exams", Exam),

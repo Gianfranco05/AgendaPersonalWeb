@@ -101,6 +101,7 @@ class TransactionResponse(TransactionBase):
     id: UUID
     user_id: UUID
     is_recurring: bool
+    recurrence_id: Optional[str] = None
     is_deleted: bool
     created_at: datetime
     updated_at: datetime
