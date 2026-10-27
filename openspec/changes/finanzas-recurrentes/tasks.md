@@ -25,15 +25,15 @@
 
 ## 4. Backend — Scheduler y push
 
-- [ ] 4.1 `recurrentes/scheduler.py`: `_tick(now_utc)` que lista recurrencias debidas, filtra por ventana local 09:00–21:59 y fecha local, y llama a `materialize` por recurrencia atrapando y logueando errores individuales
-- [ ] 4.2 `recurrentes/notifications.py`: armar los mensajes de design D9 (uno, pendiente, resumen agrupado por usuario y ciclo) con `format_money_es_ar`; enviar con `PushService.send_to_user` solo para `notify = true` y solo lo commiteado por ese worker; errores logueados
-- [ ] 4.3 `run_recurring_scheduler()` alineado al minuto y arrancarlo/cancelarlo en el `lifespan` de `backend/app/main.py` junto a los otros dos
+- [x] 4.1 `recurrentes/scheduler.py`: `_tick(now_utc)` que lista recurrencias debidas, filtra por ventana local 09:00–21:59 y fecha local, y llama a `materialize` por recurrencia atrapando y logueando errores individuales
+- [x] 4.2 `recurrentes/notifications.py`: armar los mensajes de design D9 (uno, pendiente, resumen agrupado por usuario y ciclo) con `format_money_es_ar`; enviar con `PushService.send_to_user` solo para `notify = true` y solo lo commiteado por ese worker; errores logueados
+- [x] 4.3 `run_recurring_scheduler()` alineado al minuto y arrancarlo/cancelarlo en el `lifespan` de `backend/app/main.py` junto a los otros dos
 
 ## 5. Backend — Renovación de plazo fijo
 
-- [ ] 5.1 `inversiones/schemas.py`: `RenewFixedTermIn` (modo, TNA, `term_days` o `maturity_date` coherentes, `start_date`, `amount_collected` con `Money`, `register_interest_income`, categoría/cuenta/medio de pago del ingreso, offset), `RenewOut`, `RenewalChainOut`; `InvestmentOut` suma `renewed_from_id`, `renewed_to_id`, `can_renew`
-- [ ] 5.2 `inversiones/service.py`: `renew()` atómico (precondiciones de design D11, cerrar el anterior con `current_value = amount_collected`, crear el nuevo con `renewed_from_id`, ingreso opcional por el interés vía `build_transaction`), 409 si ya se renovó (incluida la `IntegrityError` de la única), `renewals()` con tope 100, bloquear reabrir una inversión renovada, desvincular `renewed_from_id` al borrar el anterior, `renewed_to_id` calculado con una query por lista
-- [ ] 5.3 `inversiones/api_routes.py`: `POST /finance/investments/{id}/renew` y `GET /finance/investments/{id}/renewals`, con `get_current_user`
+- [x] 5.1 `inversiones/schemas.py`: `RenewFixedTermIn` (modo, TNA, `term_days` o `maturity_date` coherentes, `start_date`, `amount_collected` con `Money`, `register_interest_income`, categoría/cuenta/medio de pago del ingreso, offset), `RenewOut`, `RenewalChainOut`; `InvestmentOut` suma `renewed_from_id`, `renewed_to_id`, `can_renew`
+- [x] 5.2 `inversiones/service.py`: `renew()` atómico (precondiciones de design D11, cerrar el anterior con `current_value = amount_collected`, crear el nuevo con `renewed_from_id`, ingreso opcional por el interés vía `build_transaction`), 409 si ya se renovó (incluida la `IntegrityError` de la única), `renewals()` con tope 100, bloquear reabrir una inversión renovada, desvincular `renewed_from_id` al borrar el anterior, `renewed_to_id` calculado con una query por lista
+- [x] 5.3 `inversiones/api_routes.py`: `POST /finance/investments/{id}/renew` y `GET /finance/investments/{id}/renewals`, con `get_current_user`
 
 ## 6. Backend — Tests
 
@@ -41,12 +41,12 @@
 - [x] 6.2 `backend/tests/test_recurring.py`: CRUD, validaciones 422 (monto 0 / > tope, enums inválidos como "Efectivo", regla incompleta, `interval_count` fuera de rango, fin < inicio, sin monto y sin confirmación), categoría/cuenta ajena → 404, creación el día debido genera en el request, `generate_past` (4 transacciones) y > 120 → 422, preview y upcoming
 - [x] 6.3 Semántica: pausar/reanudar sin generar lo pausado, editar monto no toca lo generado, cambio de regla recalcula ancla, borrar plantilla conserva transacciones desvinculadas, borrar transacción generada no la regenera, borrar categoría/cuenta desvincula, filtro `recurrence_id` y campo en `TransactionResponse`
 - [x] 6.4 Pendientes: `suggested_amount` (plantilla y luego último confirmado), confirmar con monto editado, confirmar dos veces → una transacción, saltear, confirmar salteada → 409, pendientes no suman al balance ni presupuestos
-- [ ] 6.5 `backend/tests/test_recurring_scheduler.py`: 09:00 local genera y 08:59 no; offset −180 con fecha UTC distinta; offset +600; null → −180; fuera de ventana no genera; catch-up de 3 días (4 transacciones con fechas originales); tope de 62; plantilla pausada o terminada no genera
-- [ ] 6.6 Idempotencia: dos `_tick` concurrentes (`asyncio.gather`) → una transacción; ciclos repetidos → una; "reinicio" sin Redis → no regenera; fallo a mitad (mock que levanta en la 2.ª transacción) → rollback total y reintento en el ciclo siguiente
-- [ ] 6.7 Push (mock de `send_to_user`): una push por usuario y ciclo con textos y `data` correctos, resumen agrupado, `notify = false` sin push, generación por API sin push, Expo caído no afecta lo generado, usuario sin tokens
-- [ ] 6.8 `backend/tests/test_fixed_term_renewal.py`: ambos modos con 1.000.000 / 30 % / 30 días (1.024.657,53), `amount_collected` editado, ingreso de 24.657,53 con y sin flag, no vencido → 422, no plazo fijo/cerrado → 422, ajeno → 404, doble renovación → 409, fechas y montos inválidos → 422, historial de 4 tramos, reabrir renovada → 422, borrar anterior/renovación, avisos de vencimiento solo para el nuevo
-- [ ] 6.9 Aislamiento: sumar recurrentes, ocurrencias (confirmar/saltear) y renovación a `test_tenant_isolation.py` (→ 404) y verificar que listas, upcoming y pendientes no mezclan usuarios
-- [ ] 6.10 `test_account.py`: el export incluye `recurring_transactions` y `recurring_occurrences` propios y no ajenos; el borrado no deja filas (incluida una cadena de inversiones renovadas); la guarda de `OWNED_TABLES` pasa
+- [x] 6.5 `backend/tests/test_recurring_scheduler.py`: 09:00 local genera y 08:59 no; offset −180 con fecha UTC distinta; offset +600; null → −180; fuera de ventana no genera; catch-up de 3 días (4 transacciones con fechas originales); tope de 62; plantilla pausada o terminada no genera
+- [x] 6.6 Idempotencia: dos `_tick` concurrentes (`asyncio.gather`) → una transacción; ciclos repetidos → una; "reinicio" sin Redis → no regenera; fallo a mitad (mock que levanta en la 2.ª transacción) → rollback total y reintento en el ciclo siguiente
+- [x] 6.7 Push (mock de `send_to_user`): una push por usuario y ciclo con textos y `data` correctos, resumen agrupado, `notify = false` sin push, generación por API sin push, Expo caído no afecta lo generado, usuario sin tokens
+- [x] 6.8 `backend/tests/test_fixed_term_renewal.py`: ambos modos con 1.000.000 / 30 % / 30 días (1.024.657,53), `amount_collected` editado, ingreso de 24.657,53 con y sin flag, no vencido → 422, no plazo fijo/cerrado → 422, ajeno → 404, doble renovación → 409, fechas y montos inválidos → 422, historial de 4 tramos, reabrir renovada → 422, borrar anterior/renovación, avisos de vencimiento solo para el nuevo
+- [x] 6.9 Aislamiento: sumar recurrentes, ocurrencias (confirmar/saltear) y renovación a `test_tenant_isolation.py` (→ 404) y verificar que listas, upcoming y pendientes no mezclan usuarios
+- [x] 6.10 `test_account.py`: el export incluye `recurring_transactions` y `recurring_occurrences` propios y no ajenos; el borrado no deja filas (incluida una cadena de inversiones renovadas); la guarda de `OWNED_TABLES` pasa
 - [ ] 6.11 Confirmar que `test_infra.py::test_no_api_route_is_public_by_accident` pasa sin rutas públicas nuevas y correr `python -m pytest -q` completo sin regresiones
 
 ## 7. Web — API, tipos y hooks (`frontend/`)

@@ -132,6 +132,23 @@ RESOURCES = [
         "path": "/api/v1/finance/investments/{id}",
     },
     {
+        "name": "recurring transaction",
+        "create": ("POST", "/api/v1/finance/recurring", {
+            "type": "income",
+            "name": "Sueldo A",
+            "amount": "100",
+            "frequency": "monthly",
+            "day_of_month": 5,
+            "start_date": "2099-01-01",
+        }),
+        "detail": [
+            ("GET", "{id}", None),
+            ("PUT", "{id}", {"name": "hackeada"}),
+            ("DELETE", "{id}", None),
+        ],
+        "path": "/api/v1/finance/recurring/{id}",
+    },
+    {
         "name": "note",
         "create": ("POST", "/api/v1/notes", {"title": "Nota A", "content": "contenido"}),
         "detail": [
@@ -303,3 +320,66 @@ async def test_user_b_no_toca_cripto_automatica_de_user_a(user_a, user_b):
     assert (await user_b.get(url)).status_code == 404
     assert (await user_a.get(url)).json()["price_source"] == "coingecko"
     assert (await user_b.get("/api/v1/finance/investments")).json() == []
+
+
+async def test_user_b_no_toca_las_recurrentes_de_user_a(user_a, user_b):
+    created = await user_a.post("/api/v1/finance/recurring", json={
+        "type": "expense", "name": "Luz", "amount": "25000", "requires_confirmation": True,
+        "frequency": "daily", "start_date": "2000-01-01", "generate_past": False,
+    })
+    # Inicio lejano en el pasado sin backfill: arranca hoy y deja un pendiente.
+    assert created.status_code == 201, created.text
+    rec_id = created.json()["id"]
+    base = f"/api/v1/finance/recurring/{rec_id}"
+    for method, suffix in (("POST", "/pause"), ("POST", "/resume")):
+        assert (await user_b.request(method, base + suffix, json={})).status_code == 404
+
+    occ_id = (await user_a.get("/api/v1/finance/recurring/occurrences")).json()[0]["id"]
+    occ_url = f"/api/v1/finance/recurring/occurrences/{occ_id}"
+    assert (await user_b.post(occ_url + "/confirm", json={"amount": "1"})).status_code == 404
+    assert (await user_b.post(occ_url + "/skip", json={})).status_code == 404
+
+    # Nada cambio para el dueño: sigue pendiente y sin transacciones.
+    assert (await user_a.get("/api/v1/finance/recurring/occurrences")).json()[0]["status"] == "pending"
+    assert (await user_a.get("/api/v1/finance/transactions")).json()["total"] == 0
+
+
+async def test_las_listas_de_recurrentes_no_mezclan_usuarios(user_a, user_b):
+    for client, name in ((user_a, "Pendiente de A"), (user_b, "Pendiente de B")):
+        resp = await client.post("/api/v1/finance/recurring", json={
+            "type": "expense", "name": name, "amount": "10", "requires_confirmation": True,
+            "frequency": "daily", "start_date": "2000-01-01",
+        })
+        assert resp.status_code == 201, resp.text
+        resp = await client.post("/api/v1/finance/recurring", json={
+            "type": "income", "name": f"Sueldo {name}", "amount": "10",
+            "frequency": "monthly", "day_of_month": 5, "start_date": "2000-01-01",
+        })
+        assert resp.status_code == 201, resp.text
+
+    for client, own, other in ((user_a, "de A", "de B"), (user_b, "de B", "de A")):
+        listed = (await client.get("/api/v1/finance/recurring")).json()
+        assert {r["name"] for r in listed} == {f"Pendiente {own}", f"Sueldo Pendiente {own}"}
+        pending = (await client.get("/api/v1/finance/recurring/occurrences")).json()
+        assert [p["name"] for p in pending] == [f"Pendiente {own}"]
+        upcoming = (await client.get("/api/v1/finance/recurring/upcoming")).json()
+        assert all(other not in i["name"] for i in upcoming["items"])
+        assert any(own in i["name"] for i in upcoming["items"])
+
+
+async def test_user_b_no_renueva_ni_ve_renovaciones_de_user_a(user_a, user_b):
+    from datetime import date, timedelta
+
+    today = date.today()
+    created = await user_a.post("/api/v1/finance/investments", json={
+        "asset_type": "fixed_term", "name": "PF A", "currency": "ARS", "invested_amount": "1000",
+        "interest_rate_tna": "30",
+        "start_date": (today - timedelta(days=40)).isoformat(),
+        "maturity_date": (today - timedelta(days=5)).isoformat(),
+    })
+    assert created.status_code == 201, created.text
+    url = f"/api/v1/finance/investments/{created.json()['id']}"
+    body = {"mode": "principal_and_interest", "interest_rate_tna": "28", "term_days": 30}
+    assert (await user_b.post(url + "/renew", json=body)).status_code == 404
+    assert (await user_b.get(url + "/renewals")).status_code == 404
+    assert (await user_a.get(url)).json()["status"] == "active"

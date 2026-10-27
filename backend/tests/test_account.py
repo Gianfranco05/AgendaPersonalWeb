@@ -13,6 +13,7 @@ from app.modules.cuenta.service import OWNED_TABLES, RETAINED_TABLES
 from app.modules.fitness.models import Exercise, WorkoutSession
 from app.modules.finanzas.models import Category, Transaction
 from app.modules.inversiones.models import Investment
+from app.modules.recurrentes.models import RecurringOccurrence, RecurringTransaction
 from app.modules.metas.models import Goal, HabitRecord
 from app.modules.tareas.models import Task
 
@@ -98,17 +99,76 @@ async def _seed_datos(db_session, user):
     )
 
     db_session.add(Task(user_id=str(user.id), title="Comprar pan"))
+    plazo = Investment(
+        user_id=str(user.id),
+        asset_type="fixed_term",
+        name="Plazo fijo",
+        currency="ARS",
+        invested_amount=1000000,
+        interest_rate_tna=30,
+        start_date=date(2026, 10, 1),
+        maturity_date=date(2026, 10, 31),
+    )
+    db_session.add(plazo)
+    await db_session.flush()
+    # Cadena de renovacion: el borrado tiene que sacar a las dos (FK a si misma).
     db_session.add(
         Investment(
             user_id=str(user.id),
             asset_type="fixed_term",
-            name="Plazo fijo",
+            name="Plazo fijo (renovado)",
             currency="ARS",
-            invested_amount=1000000,
-            interest_rate_tna=30,
-            start_date=date(2026, 10, 1),
-            maturity_date=date(2026, 10, 31),
+            status="closed",
+            invested_amount=1024657.53,
+            interest_rate_tna=28,
+            start_date=date(2026, 10, 31),
+            maturity_date=date(2026, 11, 30),
+            renewed_from_id=plazo.id,
         )
+    )
+    recurrente = RecurringTransaction(
+        user_id=str(user.id),
+        type="expense",
+        name="Luz",
+        amount=25000,
+        category_id=categoria.id,
+        frequency="monthly",
+        day_of_month=10,
+        start_date=date(2026, 8, 1),
+        anchor_date=date(2026, 8, 10),
+        next_occurrence_date=date(2026, 9, 10),
+        requires_confirmation=True,
+    )
+    db_session.add(recurrente)
+    await db_session.flush()
+    generada = Transaction(
+        user_id=str(user.id),
+        product_name="Luz",
+        amount=25000,
+        type="expense",
+        transaction_date="2026-08-10",
+        is_recurring=True,
+        recurring_parent_id=recurrente.id,
+    )
+    db_session.add(generada)
+    await db_session.flush()
+    db_session.add_all(
+        [
+            RecurringOccurrence(
+                user_id=str(user.id),
+                recurrence_id=recurrente.id,
+                occurrence_date=date(2026, 8, 10),
+                status="confirmed",
+                transaction_id=generada.id,
+            ),
+            RecurringOccurrence(
+                user_id=str(user.id),
+                recurrence_id=recurrente.id,
+                occurrence_date=date(2026, 9, 10),
+                status="pending",
+                suggested_amount=25000,
+            ),
+        ]
     )
     db_session.add(StripeCustomer(user_id=str(user.id), stripe_customer_id="cus_test"))
     db_session.add(ModulePurchase(user_id=str(user.id), module_key="study", amount_paid=1500))
@@ -128,18 +188,24 @@ async def test_export_incluye_los_datos_del_usuario(
 
     data = response.json()
     assert data["user"]["email"] == test_user.email
-    assert len(data["transactions"]) == 1
-    assert data["transactions"][0]["product_name"] == "Almuerzo"
+    assert len(data["transactions"]) == 2
+    assert {t["product_name"] for t in data["transactions"]} == {"Almuerzo", "Luz"}
+    assert len(data["recurring_transactions"]) == 1
+    assert data["recurring_transactions"][0]["name"] == "Luz"
+    assert data["recurring_transactions"][0]["next_occurrence_date"] == "2026-09-10"
+    assert len(data["recurring_occurrences"]) == 2
     # Numeric(12,2) sale como Decimal en Postgres: el export tiene que
     # entregarlo como numero JSON, no romper al serializar.
     assert data["transactions"][0]["amount"] == pytest.approx(1500.50)
     assert len(data["habit_records"]) == 1
     assert len(data["tasks"]) == 1
     # Date y Numeric salen como JSON valido (no son serializables a secas).
-    assert len(data["investments"]) == 1
-    assert data["investments"][0]["name"] == "Plazo fijo"
-    assert data["investments"][0]["maturity_date"] == "2026-10-31"
-    assert data["investments"][0]["invested_amount"] == pytest.approx(1000000)
+    assert len(data["investments"]) == 2
+    plazo = next(i for i in data["investments"] if i["name"] == "Plazo fijo")
+    assert plazo["maturity_date"] == "2026-10-31"
+    assert plazo["invested_amount"] == pytest.approx(1000000)
+    renovado = next(i for i in data["investments"] if i["name"] == "Plazo fijo (renovado)")
+    assert renovado["renewed_from_id"] == plazo["id"]
     # Exercise no tiene user_id: se escopa por las sesiones del usuario.
     assert len(data["exercises"]) == 1
     assert data["exercises"][0]["name"] == "Sentadilla"
@@ -223,6 +289,45 @@ async def test_export_no_incluye_inversiones_de_otro_usuario(
 
     response = await api_auth_client.get("/api/v1/me/export")
     assert response.json()["investments"] == []
+
+
+@pytest.mark.asyncio
+async def test_export_no_incluye_recurrentes_de_otro_usuario(
+    api_auth_client, db_session, test_user
+):
+    otro = User(
+        email="recurrente@example.com",
+        password_hash=hash_password("otra-password"),
+        full_name="Otro",
+    )
+    db_session.add(otro)
+    await db_session.flush()
+    rec = RecurringTransaction(
+        user_id=str(otro.id),
+        type="income",
+        name="Sueldo ajeno",
+        amount=100,
+        frequency="monthly",
+        day_of_month=5,
+        start_date=date(2026, 11, 1),
+        anchor_date=date(2026, 11, 5),
+        next_occurrence_date=date(2026, 11, 5),
+    )
+    db_session.add(rec)
+    await db_session.flush()
+    db_session.add(
+        RecurringOccurrence(
+            user_id=str(otro.id),
+            recurrence_id=rec.id,
+            occurrence_date=date(2026, 11, 5),
+            status="pending",
+        )
+    )
+    await db_session.commit()
+
+    data = (await api_auth_client.get("/api/v1/me/export")).json()
+    assert data["recurring_transactions"] == []
+    assert data["recurring_occurrences"] == []
 
 
 @pytest.mark.asyncio

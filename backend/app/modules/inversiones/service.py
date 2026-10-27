@@ -1,15 +1,22 @@
+import logging
 from dataclasses import dataclass, field, replace
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from types import SimpleNamespace
 from typing import Mapping, Optional
+from uuid import UUID, uuid4
 
 from fastapi import HTTPException, status
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.clock import local_today
 from app.modules.ajustes.models import UserPreference
+from app.modules.finanzas.models import Transaction
 from app.modules.finanzas.repository import TransactionRepository
+from app.modules.finanzas.schemas import TransactionCreate
+from app.modules.finanzas.service import FinanzasService
 from app.modules.inversiones.models import Investment
 from app.modules.inversiones.repository import InvestmentRepository
 from app.modules.inversiones.schemas import (
@@ -20,10 +27,15 @@ from app.modules.inversiones.schemas import (
     InvestmentSummary,
     InvestmentUpdate,
     NetWorthOut,
+    MAX_DATE,
     PortfolioRealReturnOut,
     ProjectionOut,
     RatesOut,
     RealReturnOut,
+    RenewalChainOut,
+    RenewalTermOut,
+    RenewFixedTermIn,
+    RenewMode,
     TypeBreakdown,
     UpcomingMaturity,
     validate_fixed_term_state,
@@ -47,6 +59,12 @@ from app.modules.mercado.rates import RateInfo, resolve_rate
 from app.modules.mercado.repository import MarketRepository, as_utc
 from app.modules.mercado.service import ensure_state_rows
 
+logger = logging.getLogger(__name__)
+
+#: Argentina: el mercado de la app. Se usa cuando el cliente no mando el offset.
+DEFAULT_TZ_OFFSET_MINUTES = -180
+RENEWAL_CHAIN_MAX = 100
+
 #: `last_price_at` con mas de esto = cotizacion automatica desactualizada.
 QUOTE_STALE_SECONDS = 3600
 UPCOMING_DAYS = 30
@@ -63,6 +81,10 @@ _REQUIRED_FIELDS = {
     "price_source",
     "status",
 }
+
+
+def _unprocessable(message: str) -> HTTPException:
+    return HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=message)
 
 
 def _enum_values(data: dict) -> dict:
@@ -158,7 +180,10 @@ def _quote_info(inv: Investment, now: datetime) -> tuple[Optional[str], Optional
 
 
 def to_out(
-    inv: Investment, today: date, series: Optional[Mapping[date, Decimal]] = None
+    inv: Investment,
+    today: date,
+    series: Optional[Mapping[date, Decimal]] = None,
+    renewed_to_id: Optional[str] = None,
 ) -> InvestmentOut:
     val = valuate(inv, today)
     ft = val.fixed_term
@@ -202,6 +227,15 @@ def to_out(
         )
         if ft
         else None,
+        renewed_from_id=inv.renewed_from_id,
+        renewed_to_id=renewed_to_id,
+        can_renew=(
+            inv.asset_type == FIXED_TERM
+            and inv.status == "active"
+            and val.days_to_maturity is not None
+            and val.days_to_maturity <= 0
+            and renewed_to_id is None
+        ),
         quote_provider=quote_provider,
         quote_stale=quote_stale,
         real_return=_real_return_out(rr) if rr else None,
@@ -240,6 +274,14 @@ class InvestmentService:
         for key in _REQUIRED_FIELDS:
             if key in changes and changes[key] is None:
                 del changes[key]
+
+        if (
+            changes.get("status") == "active"
+            and investment.status == "closed"
+            and investment.id in (await self.repo.renewal_map(investment.user_id))
+        ):
+            # Reabrirlo sumaria el mismo capital dos veces (el viejo y su renovacion).
+            raise _unprocessable("Este plazo fijo ya se renovó: no se puede reabrir")
 
         # Las reglas cruzadas se validan sobre el estado resultante, no sobre
         # el payload: cambiar solo el vencimiento tiene que mirar el inicio.
@@ -321,6 +363,200 @@ class InvestmentService:
 
     async def delete(self, investment: Investment) -> None:
         await self.repo.delete(investment)
+
+    # ── Renovacion de plazo fijo ────────────────────────────────────────────
+
+    async def renewal_map(self, user_id: str) -> dict[str, str]:
+        return await self.repo.renewal_map(user_id)
+
+    async def renew(
+        self, investment: Investment, data: RenewFixedTermIn
+    ) -> tuple[Investment, Investment, Optional[str]]:
+        """Cierra un plazo fijo vencido y crea su renovacion, todo en una
+        transaccion. Devuelve (cerrado, nuevo, id del ingreso por el interes)."""
+        user_id = investment.user_id
+        offset = (
+            data.timezone_offset_minutes
+            if data.timezone_offset_minutes is not None
+            else investment.timezone_offset_minutes
+            if investment.timezone_offset_minutes is not None
+            else DEFAULT_TZ_OFFSET_MINUTES
+        )
+        today = local_today(offset)
+
+        if investment.asset_type != FIXED_TERM:
+            raise _unprocessable("Solo se pueden renovar los plazos fijos")
+        # Antes de mirar el estado: un reintento (cola offline) de una renovacion
+        # ya hecha tiene que dar 409 y no 422 por "cerrado".
+        if investment.id in (await self.repo.renewal_map(user_id)):
+            raise HTTPException(status.HTTP_409_CONFLICT, "Este plazo fijo ya se renovó")
+        if investment.status != "active":
+            raise _unprocessable("Este plazo fijo ya está cerrado")
+        if investment.maturity_date is None or investment.maturity_date > today:
+            raise _unprocessable("Todavía no venció: se puede renovar desde el día del vencimiento")
+
+        start = data.start_date or today
+        if start < investment.maturity_date or start > today:
+            raise _unprocessable(
+                "El inicio de la renovación tiene que estar entre el vencimiento anterior y hoy"
+            )
+        if data.maturity_date is not None:
+            maturity = data.maturity_date
+            if data.term_days is not None and (maturity - start).days != data.term_days:
+                raise _unprocessable("El plazo en días no coincide con la fecha de vencimiento")
+        else:
+            maturity = start + timedelta(days=data.term_days)
+        if maturity <= start:
+            raise _unprocessable("El vencimiento tiene que ser posterior al inicio")
+        if maturity > MAX_DATE:
+            raise _unprocessable("El vencimiento no puede ser posterior a 2100")
+
+        invested = round2(to_decimal(investment.invested_amount))
+        fixed_term = valuate(investment, today).fixed_term
+        if fixed_term is None:
+            raise _unprocessable("Este plazo fijo no tiene TNA o fechas para calcular el cobro")
+        computed = fixed_term.amount_at_maturity
+        collected = round2(data.amount_collected) if data.amount_collected is not None else computed
+        principal_only = data.mode == RenewMode.PRINCIPAL_ONLY
+        if principal_only:
+            if collected < invested:
+                raise _unprocessable("El monto cobrado no puede ser menor al capital: el interés sería negativo")
+            new_invested = invested
+        else:
+            if collected <= 0:
+                raise _unprocessable("El monto cobrado tiene que ser mayor a 0")
+            new_invested = collected
+
+        interest = collected - invested
+        income_tx = None
+        if principal_only and data.register_interest_income and interest > 0:
+            income_tx = await self._interest_transaction(investment, data, interest, start)
+
+        closed_id, name = investment.id, investment.name
+        try:
+            investment.status = "closed"
+            investment.current_value = collected
+            investment.value_updated_at = datetime.now(timezone.utc)
+            renewed = Investment(
+                user_id=user_id,
+                asset_type=FIXED_TERM,
+                name=investment.name,
+                currency=investment.currency,
+                invested_amount=new_invested,
+                interest_rate_tna=data.interest_rate_tna,
+                start_date=start,
+                maturity_date=maturity,
+                institution=investment.institution,
+                notes=investment.notes,
+                status="active",
+                notify_maturity=investment.notify_maturity,
+                timezone_offset_minutes=investment.timezone_offset_minutes
+                if data.timezone_offset_minutes is None
+                else data.timezone_offset_minutes,
+                renewed_from_id=closed_id,
+            )
+            self.db.add(renewed)
+            if income_tx is not None:
+                self.db.add(income_tx)
+            await self.db.flush()
+            await self.db.commit()
+        except IntegrityError:
+            # La unica de `renewed_from_id` cortó una renovacion simultanea.
+            await self.db.rollback()
+            raise HTTPException(status.HTTP_409_CONFLICT, "Este plazo fijo ya se renovó")
+        except Exception:
+            await self.db.rollback()
+            raise
+        await self.db.refresh(investment)
+        await self.db.refresh(renewed)
+        logger.info("Plazo fijo %s (%s) renovado", closed_id, name)
+        return investment, renewed, income_tx.id if income_tx is not None else None
+
+    async def _interest_transaction(
+        self, investment: Investment, data: RenewFixedTermIn, interest: Decimal, start: date
+    ) -> Transaction:
+        finance = FinanzasService(self.db)
+        user_id = investment.user_id
+        await finance._ensure_own_category(user_id, data.income_category_id)
+        bank = None
+        if data.income_bank_account_id is not None:
+            bank = await finance.bank_account_repo.get_by_id(data.income_bank_account_id, user_id)
+            if bank is None:
+                raise HTTPException(status_code=404, detail="Cuenta no encontrada")
+        tx_data = TransactionCreate(
+            amount=interest,
+            currency=investment.currency,
+            type="income",
+            transaction_date=start,
+            bank_entity_name=(bank.bank_name or bank.name) if bank else "",
+            account_type=bank.account_type if bank else "cash",
+            account_last4=bank.last4 if bank else "",
+            payment_method=data.income_payment_method,
+            product_name=f"Interés plazo fijo: {investment.name}"[:255],
+            merchant_name=investment.institution or "",
+            category_id=UUID(data.income_category_id) if data.income_category_id else None,
+        )
+        tx = await finance.build_transaction(user_id, tx_data)
+        tx.id = str(uuid4())
+        return tx
+
+    async def renewals(self, investment: Investment) -> RenewalChainOut:
+        """La cadena de renovaciones que contiene `investment`, de la mas vieja
+        a la mas nueva (tope 100)."""
+        user_id = investment.user_id
+        forward = await self.repo.renewal_map(user_id)  # {renovada: renovacion}
+        backward = {new: old for old, new in forward.items()}
+        chain = [investment.id]
+        seen = {investment.id}
+        cursor = investment.id
+        while cursor in backward and backward[cursor] not in seen and len(chain) < RENEWAL_CHAIN_MAX:
+            cursor = backward[cursor]
+            seen.add(cursor)
+            chain.insert(0, cursor)
+        cursor = investment.id
+        while cursor in forward and forward[cursor] not in seen and len(chain) < RENEWAL_CHAIN_MAX:
+            cursor = forward[cursor]
+            seen.add(cursor)
+            chain.append(cursor)
+        rows = await self.repo.get_many(user_id, chain)
+
+        items: list[RenewalTermOut] = []
+        accumulated = ZERO
+        for inv_id in chain:
+            inv = rows.get(inv_id)
+            if inv is None:
+                continue
+            invested = round2(to_decimal(inv.invested_amount))
+            ft = None
+            if inv.interest_rate_tna is not None and inv.start_date and inv.maturity_date:
+                if inv.maturity_date > inv.start_date:
+                    ft = valuate(inv, inv.maturity_date).fixed_term
+            if inv.status == "closed" and inv.current_value is not None:
+                at_maturity = round2(to_decimal(inv.current_value))
+                interest = at_maturity - invested
+                accumulated += interest
+            elif ft is not None:
+                at_maturity, interest = ft.amount_at_maturity, ft.interest_total
+            else:
+                at_maturity, interest = None, None
+            items.append(
+                RenewalTermOut(
+                    id=inv.id,
+                    name=inv.name,
+                    status=inv.status,
+                    start_date=inv.start_date,
+                    maturity_date=inv.maturity_date,
+                    term_days=ft.term_days if ft else None,
+                    invested_amount=invested,
+                    interest_rate_tna=to_decimal(inv.interest_rate_tna),
+                    amount_at_maturity=at_maturity,
+                    interest=interest,
+                    renewed_from_id=inv.renewed_from_id,
+                )
+            )
+        return RenewalChainOut(
+            items=items, accumulated_interest=round2(accumulated), currency=investment.currency
+        )
 
     # ── Cotizaciones y preferencias ─────────────────────────────────────────
 

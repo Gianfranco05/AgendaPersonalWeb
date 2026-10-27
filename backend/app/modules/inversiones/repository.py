@@ -57,7 +57,36 @@ class InvestmentRepository:
         await self.db.refresh(investment)
         return investment
 
+    async def renewal_map(self, user_id: str) -> dict[str, str]:
+        """{id de la renovada: id de su renovacion} de todas las del usuario."""
+        result = await self.db.execute(
+            select(Investment.renewed_from_id, Investment.id).where(
+                and_(Investment.user_id == user_id, Investment.renewed_from_id.is_not(None))
+            )
+        )
+        return {row[0]: row[1] for row in result.all()}
+
+    async def get_many(self, user_id: str, ids: Sequence[str]) -> dict[str, Investment]:
+        if not ids:
+            return {}
+        result = await self.db.execute(
+            select(Investment).where(and_(Investment.user_id == user_id, Investment.id.in_(ids)))
+        )
+        return {inv.id: inv for inv in result.scalars().all()}
+
     async def delete(self, investment: Investment) -> None:
+        # La renovacion de este plazo fijo (si la hay) queda sin "renovado desde":
+        # las FK no tienen ON DELETE y en Postgres borrar el anterior fallaria.
+        await self.db.execute(
+            update(Investment)
+            .where(
+                and_(
+                    Investment.renewed_from_id == investment.id,
+                    Investment.user_id == investment.user_id,
+                )
+            )
+            .values(renewed_from_id=None)
+        )
         await self.db.execute(
             delete(Investment).where(
                 and_(Investment.id == investment.id, Investment.user_id == investment.user_id)

@@ -279,6 +279,11 @@ class InvestmentOut(BaseModel):
     is_matured: bool
     fixed_term: Optional[FixedTermOut] = None
 
+    #: Renovaciones de plazo fijo: el que se renovo, el que lo renovo y si se puede renovar ya.
+    renewed_from_id: Optional[str] = None
+    renewed_to_id: Optional[str] = None
+    can_renew: bool = False
+
     #: "CoinGecko" cuando la cotizacion es automatica; null en manual.
     quote_provider: Optional[str] = None
     #: `last_price_at` con mas de 1 h; null si no hay cotizacion automatica.
@@ -358,3 +363,79 @@ class NetWorthOut(BaseModel):
     rates: RatesOut
     missing_rates: list[str]
     include_investments_in_balance: bool
+
+
+# ── Renovacion de plazo fijo ────────────────────────────────────────────────
+
+
+class RenewMode(str, Enum):
+    PRINCIPAL_AND_INTEREST = "principal_and_interest"
+    PRINCIPAL_ONLY = "principal_only"
+
+
+class RenewFixedTermIn(BaseModel):
+    """Renovar un plazo fijo vencido (o que vence hoy). Las reglas que dependen
+    de la fecha local y de la inversion (vencimiento, inicio, interes) las
+    valida el service."""
+
+    mode: RenewMode
+    interest_rate_tna: Annotated[
+        Decimal, Field(gt=Decimal("0"), le=Decimal("999.9999"), decimal_places=4)
+    ]
+    term_days: Optional[Annotated[int, Field(ge=1, le=3650)]] = None
+    maturity_date: Optional[date] = None
+    start_date: Optional[date] = None
+    #: Lo que el banco acredito. Por defecto, el monto al vencimiento calculado.
+    amount_collected: Optional[Amount] = None
+    register_interest_income: bool = False
+    income_category_id: Optional[str] = None
+    income_bank_account_id: Optional[str] = None
+    income_payment_method: str = "transfer"
+    timezone_offset_minutes: Optional[TzOffset] = None
+
+    @field_validator("start_date", "maturity_date")
+    @classmethod
+    def _dates(cls, v):
+        return _check_date(v)
+
+    @field_validator("income_payment_method")
+    @classmethod
+    def _payment_method(cls, v):
+        from app.modules.finanzas.schemas import _check_enum
+
+        return _check_enum("payment_method", v)
+
+    @model_validator(mode="after")
+    def _term(self):
+        if self.term_days is None and self.maturity_date is None:
+            raise ValueError("Indicá el plazo en días o la fecha de vencimiento")
+        return self
+
+
+class RenewOut(BaseModel):
+    closed: "InvestmentOut"
+    renewed: "InvestmentOut"
+    interest_transaction_id: Optional[str] = None
+
+
+class RenewalTermOut(BaseModel):
+    id: str
+    name: str
+    status: str
+    start_date: Optional[date] = None
+    maturity_date: Optional[date] = None
+    term_days: Optional[int] = None
+    invested_amount: Decimal
+    interest_rate_tna: Optional[Decimal] = None
+    #: Cobrado al vencer (tramos cerrados) o monto al vencimiento (tramo vigente).
+    amount_at_maturity: Optional[Decimal] = None
+    #: Interes cobrado (cerrados) o previsto (vigente).
+    interest: Optional[Decimal] = None
+    renewed_from_id: Optional[str] = None
+
+
+class RenewalChainOut(BaseModel):
+    items: list[RenewalTermOut]
+    #: Suma de los intereses ya cobrados en los tramos cerrados.
+    accumulated_interest: Decimal
+    currency: str
