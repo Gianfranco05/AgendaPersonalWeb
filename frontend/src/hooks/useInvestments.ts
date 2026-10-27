@@ -8,8 +8,11 @@ import {
   updateInvestment,
   deleteInvestment,
   updateSettings,
+  renewInvestment,
+  fetchRenewals,
 } from '../api/endpoints';
-import type { Investment, InvestmentInput, Settings } from '../types';
+import { isFinanceDataKey } from './financeKeys';
+import type { Investment, InvestmentInput, RenewFixedTermInput, Settings } from '../types';
 
 export type InvestmentStatusFilter = 'active' | 'closed';
 
@@ -18,6 +21,7 @@ const SUMMARY_KEY = 'finance/investments/summary';
 const NET_WORTH_KEY = 'finance/net-worth';
 const FINANCE_SUMMARY_KEY = 'finance/summary';
 const SETTINGS_KEY = 'settings';
+const RENEWALS_KEY = 'finance/investments/renewals';
 
 export function useInvestments(status: InvestmentStatusFilter = 'active') {
   return useApiSWR([LIST_KEY, status], () => fetchInvestments({ status }));
@@ -27,6 +31,11 @@ export function useInvestmentSummary() {
   return useApiSWR(SUMMARY_KEY, fetchInvestmentSummary);
 }
 
+/** Historial de renovaciones de un plazo fijo (se pide solo si hay `id`). */
+export function useRenewals(id: string | null) {
+  return useApiSWR(id ? [RENEWALS_KEY, id] : null, () => fetchRenewals(id as string));
+}
+
 export function useNetWorth() {
   return useApiSWR(NET_WORTH_KEY, fetchNetWorth);
 }
@@ -34,7 +43,7 @@ export function useNetWorth() {
 // Cualquier cambio en una inversión mueve la lista (activas y cerradas), el
 // resumen, el patrimonio y el resumen de Finanzas (Dashboard).
 function isInvestmentKey(key: unknown): boolean {
-  if (Array.isArray(key)) return key[0] === LIST_KEY;
+  if (Array.isArray(key)) return key[0] === LIST_KEY || key[0] === RENEWALS_KEY;
   return key === SUMMARY_KEY || key === NET_WORTH_KEY || key === FINANCE_SUMMARY_KEY;
 }
 
@@ -79,4 +88,14 @@ export async function saveInvestmentSettings(
 ) {
   await updateSettings(data);
   await invalidateInvestments(true);
+}
+
+/** Renueva un plazo fijo vencido: cierra el actual y crea el nuevo. Además de
+ *  inversiones y patrimonio se revalidan las transacciones, el resumen, los
+ *  presupuestos y los reportes (el interés puede registrarse como ingreso). */
+export async function renewFixedTerm(id: string, data: RenewFixedTermInput) {
+  const result = await renewInvestment(id, data);
+  await invalidateInvestments();
+  await globalMutate(isFinanceDataKey);
+  return result;
 }

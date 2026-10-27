@@ -60,8 +60,21 @@ import type {
   RealReturn,
   PortfolioRealReturn,
   AssetType,
+  Recurring,
+  RecurringDetail,
+  RecurringInput,
+  RecurringRule,
+  RecurringPreview,
+  Occurrence,
+  Upcoming,
+  ConfirmOccurrenceInput,
+  RenewFixedTermInput,
+  RenewResult,
+  RenewalChain,
+  RenewalTerm,
 } from '../types';
-import { toLocalDateString } from '../utils/date';
+import { parseDateOnly, toLocalDateString } from '../utils/date';
+import { nextRuleDates, ruleLabel } from '../utils/recurring';
 import { enrichInvestment, MOCK_CRYPTO_PRICES, MOCK_MONTHLY_INFLATION } from '../utils/investments';
 
 const MOCK_ENABLED = import.meta.env.VITE_MOCK_ENABLED === 'true';
@@ -151,6 +164,7 @@ export async function fetchTransactions(params?: {
   category?: string;
   date_from?: string;
   date_to?: string;
+  recurrence_id?: string;
 }): Promise<TransactionsResponse> {
   if (MOCK_ENABLED) {
     // Misma forma que la API real (category_id + valores del enum de
@@ -182,6 +196,7 @@ export async function fetchTransactions(params?: {
       ...(params?.category && { category_id: params.category }),
       ...(params?.date_from && { date_from: params.date_from }),
       ...(params?.date_to && { date_to: params.date_to }),
+      ...(params?.recurrence_id && { recurrence_id: params.recurrence_id }),
     },
   });
   return { ...data, items: data.items.map(mapTransaction) };
@@ -1233,10 +1248,33 @@ function mockQuoteFields(source: string | undefined, ticker: string | null | und
   };
 }
 
+// Renovaciones del mock: {id renovado -> id de su renovación} y la inversa.
+const mockRenewals = new Map<string, string>();
+const mockRenewedFrom = new Map<string, string>();
+
+function addLocalDays(d: Date, days: number): Date {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate() + days);
+}
+
+function withRenewalFields(i: Investment): Investment {
+  const renewedTo = mockRenewals.get(i.id) ?? null;
+  return {
+    ...i,
+    renewed_from_id: mockRenewedFrom.get(i.id) ?? null,
+    renewed_to_id: renewedTo,
+    can_renew:
+      i.asset_type === 'fixed_term' &&
+      i.status === 'active' &&
+      i.days_to_maturity !== null &&
+      i.days_to_maturity <= 0 &&
+      renewedTo === null,
+  };
+}
+
 function mockInvestmentList(status: 'active' | 'closed' | 'all' = 'active'): Investment[] {
   return mockInvestmentBases
     .filter((b) => status === 'all' || b.status === status)
-    .map((b) => enrichInvestment(b))
+    .map((b) => withRenewalFields(enrichInvestment(b)))
     .sort(
       (a, b) =>
         a.asset_type.localeCompare(b.asset_type) ||
@@ -1532,6 +1570,425 @@ export async function deleteInvestment(id: string): Promise<void> {
     return mockDelay(undefined);
   }
   await apiClient.delete(`/api/v1/finance/investments/${id}`);
+}
+
+// ── Movimientos recurrentes ──
+
+function mapRecurring<T extends Recurring>(r: T): T {
+  return { ...r, amount: numOrNull(r.amount), last_amount: numOrNull(r.last_amount) };
+}
+
+function mapOccurrence(o: Occurrence): Occurrence {
+  return {
+    ...o,
+    suggested_amount: numOrNull(o.suggested_amount),
+    ...(o.transaction ? { transaction: mapTransaction(o.transaction) } : {}),
+  };
+}
+
+function mapUpcoming(u: Upcoming): Upcoming {
+  return {
+    ...u,
+    items: u.items.map((i) => ({ ...i, amount: numOrNull(i.amount) })),
+    totals: u.totals.map((t) => ({ ...t, total: num(t.total) })),
+  };
+}
+
+// Mock: plantillas y pendientes en memoria con la misma forma que la API. La
+// generación automática es cosa del server: acá solo se simula el alta, el
+// ciclo de vida y la confirmación.
+let mockRecurring: Recurring[] = [
+  {
+    id: 'mock-rec-1',
+    type: 'income',
+    name: 'Sueldo',
+    description: null,
+    notes: null,
+    amount: 850000,
+    currency: 'ARS',
+    category_id: null,
+    bank_account_id: null,
+    account_type: 'cash',
+    payment_method: 'transfer',
+    merchant_name: '',
+    merchant_category: 'other',
+    frequency: 'monthly',
+    interval_count: 1,
+    weekday: null,
+    day_of_month: 5,
+    month_of_year: null,
+    start_date: '2026-01-01',
+    end_date: null,
+    anchor_date: '2026-01-05',
+    next_occurrence_date: nextRuleDates(
+      { frequency: 'monthly', interval_count: 1, weekday: null, day_of_month: 5, month_of_year: null },
+      '2026-01-01',
+      toLocalDateString(),
+      1,
+    )[0],
+    last_occurrence_date: null,
+    status: 'active',
+    requires_confirmation: false,
+    notify: true,
+    timezone_offset_minutes: -180,
+    state: 'active',
+    rule_label: 'Todos los meses el día 5',
+    pending_count: 0,
+    last_amount: 850000,
+  },
+  {
+    id: 'mock-rec-2',
+    type: 'expense',
+    name: 'Luz',
+    description: null,
+    notes: null,
+    amount: 25000,
+    currency: 'ARS',
+    category_id: null,
+    bank_account_id: null,
+    account_type: 'cash',
+    payment_method: 'cash',
+    merchant_name: '',
+    merchant_category: 'utilities',
+    frequency: 'monthly',
+    interval_count: 2,
+    weekday: null,
+    day_of_month: 15,
+    month_of_year: null,
+    start_date: '2026-01-01',
+    end_date: null,
+    anchor_date: '2026-01-15',
+    next_occurrence_date: nextRuleDates(
+      { frequency: 'monthly', interval_count: 2, weekday: null, day_of_month: 15, month_of_year: null },
+      '2026-01-01',
+      toLocalDateString(),
+      1,
+    )[0],
+    last_occurrence_date: null,
+    status: 'active',
+    requires_confirmation: true,
+    notify: true,
+    timezone_offset_minutes: -180,
+    state: 'active',
+    rule_label: 'Cada 2 meses el día 15',
+    pending_count: 1,
+    last_amount: null,
+  },
+];
+
+let mockOccurrences: Occurrence[] = [
+  {
+    id: 'mock-occ-1',
+    recurrence_id: 'mock-rec-2',
+    occurrence_date: isoDaysFromToday(-2),
+    status: 'pending',
+    suggested_amount: 25000,
+    transaction_id: null,
+    resolved_at: null,
+    name: 'Luz',
+    type: 'expense',
+    currency: 'ARS',
+  },
+];
+
+function mockRefreshRecurring(): Recurring[] {
+  return mockRecurring.map((r) => ({
+    ...r,
+    pending_count: mockOccurrences.filter((o) => o.recurrence_id === r.id && o.status === 'pending').length,
+    state: r.status === 'paused' ? 'paused' : r.next_occurrence_date === null ? 'finished' : 'active',
+  }));
+}
+
+export async function fetchRecurring(status: 'active' | 'paused' | 'all' = 'all'): Promise<Recurring[]> {
+  if (MOCK_ENABLED) {
+    return mockDelay(mockRefreshRecurring().filter((r) => status === 'all' || r.status === status));
+  }
+  const { data } = await apiClient.get<Recurring[]>('/api/v1/finance/recurring', {
+    params: { status, tz_offset_minutes: tzOffsetMinutes() },
+  });
+  return data.map(mapRecurring);
+}
+
+export async function fetchRecurringOne(id: string): Promise<RecurringDetail> {
+  if (MOCK_ENABLED) {
+    const found = mockRefreshRecurring().find((r) => r.id === id);
+    if (!found) throw new Error('Recurrencia no encontrada');
+    return mockDelay({
+      ...found,
+      recent_occurrences: mockOccurrences.filter((o) => o.recurrence_id === id),
+      next_dates: found.next_occurrence_date
+        ? nextRuleDates(found, found.start_date, found.next_occurrence_date, 3, found.end_date)
+        : [],
+    });
+  }
+  const { data } = await apiClient.get<RecurringDetail>(`/api/v1/finance/recurring/${id}`, {
+    params: { tz_offset_minutes: tzOffsetMinutes() },
+  });
+  return {
+    ...mapRecurring(data),
+    recent_occurrences: (data.recent_occurrences ?? []).map(mapOccurrence),
+  };
+}
+
+export async function createRecurring(input: RecurringInput): Promise<Recurring> {
+  if (MOCK_ENABLED) {
+    const today = toLocalDateString();
+    const next = nextRuleDates(input, input.start_date, today, 1, input.end_date)[0] ?? null;
+    const created: Recurring = {
+      ...input,
+      id: `mock-rec-${generateId()}`,
+      anchor_date: input.start_date,
+      next_occurrence_date: next,
+      last_occurrence_date: null,
+      status: 'active',
+      timezone_offset_minutes: tzOffsetMinutes(),
+      state: next === null ? 'finished' : 'active',
+      rule_label: ruleLabel(input),
+      pending_count: 0,
+      last_amount: null,
+    };
+    mockRecurring = [...mockRecurring, created];
+    return mockDelay(created);
+  }
+  const { data } = await apiClient.post<Recurring>('/api/v1/finance/recurring', {
+    ...input,
+    timezone_offset_minutes: tzOffsetMinutes(),
+  });
+  return mapRecurring(data);
+}
+
+export async function updateRecurring(id: string, input: Partial<RecurringInput>): Promise<Recurring> {
+  if (MOCK_ENABLED) {
+    const current = mockRecurring.find((r) => r.id === id);
+    if (!current) throw new Error('Recurrencia no encontrada');
+    const merged = { ...current, ...input } as Recurring;
+    const next =
+      nextRuleDates(merged, merged.start_date, toLocalDateString(), 1, merged.end_date)[0] ?? null;
+    const updated: Recurring = { ...merged, next_occurrence_date: next, rule_label: ruleLabel(merged) };
+    mockRecurring = mockRecurring.map((r) => (r.id === id ? updated : r));
+    return mockDelay(updated);
+  }
+  const { data } = await apiClient.put<Recurring>(`/api/v1/finance/recurring/${id}`, {
+    ...input,
+    timezone_offset_minutes: tzOffsetMinutes(),
+  });
+  return mapRecurring(data);
+}
+
+export async function deleteRecurring(id: string): Promise<void> {
+  if (MOCK_ENABLED) {
+    mockRecurring = mockRecurring.filter((r) => r.id !== id);
+    mockOccurrences = mockOccurrences.filter((o) => o.recurrence_id !== id);
+    return mockDelay(undefined);
+  }
+  await apiClient.delete(`/api/v1/finance/recurring/${id}`);
+}
+
+async function setRecurringPaused(id: string, paused: boolean): Promise<Recurring> {
+  if (MOCK_ENABLED) {
+    const current = mockRecurring.find((r) => r.id === id);
+    if (!current) throw new Error('Recurrencia no encontrada');
+    const updated: Recurring = { ...current, status: paused ? 'paused' : 'active' };
+    mockRecurring = mockRecurring.map((r) => (r.id === id ? updated : r));
+    return mockDelay(updated);
+  }
+  const { data } = await apiClient.post<Recurring>(
+    `/api/v1/finance/recurring/${id}/${paused ? 'pause' : 'resume'}`,
+    { timezone_offset_minutes: tzOffsetMinutes() },
+  );
+  return mapRecurring(data);
+}
+
+export const pauseRecurring = (id: string) => setRecurringPaused(id, true);
+export const resumeRecurring = (id: string) => setRecurringPaused(id, false);
+
+export async function previewRecurring(
+  rule: RecurringRule & { start_date: string; end_date?: string | null; generate_past?: boolean },
+): Promise<RecurringPreview> {
+  if (MOCK_ENABLED) {
+    // Aproximada: el server es quien manda (mismas reglas, ver utils/recurring.ts).
+    const from = rule.generate_past ? rule.start_date : toLocalDateString();
+    const dates = nextRuleDates(rule, rule.start_date, from, 5, rule.end_date);
+    return mockDelay({ anchor_date: dates[0] ?? rule.start_date, dates });
+  }
+  const { data } = await apiClient.post<RecurringPreview>('/api/v1/finance/recurring/preview', {
+    frequency: rule.frequency,
+    interval_count: rule.interval_count,
+    weekday: rule.weekday,
+    day_of_month: rule.day_of_month,
+    month_of_year: rule.month_of_year,
+    start_date: rule.start_date,
+    end_date: rule.end_date ?? null,
+    generate_past: rule.generate_past ?? false,
+    tz_offset_minutes: tzOffsetMinutes(),
+  });
+  return data;
+}
+
+export async function fetchUpcomingRecurring(days = 30): Promise<Upcoming> {
+  if (MOCK_ENABLED) {
+    const today = toLocalDateString();
+    const horizon = isoDaysFromToday(days);
+    const items = mockRecurring
+      .filter((r) => r.status === 'active')
+      .flatMap((r) =>
+        nextRuleDates(r, r.start_date, today, 40, r.end_date)
+          .filter((d) => d <= horizon)
+          .map((date) => ({
+            recurrence_id: r.id,
+            date,
+            name: r.name,
+            type: r.type,
+            amount: r.amount,
+            currency: r.currency,
+            requires_confirmation: r.requires_confirmation,
+          })),
+      )
+      .sort((a, b) => a.date.localeCompare(b.date) || a.name.localeCompare(b.name));
+    const totals = new Map<string, { type: 'income' | 'expense'; currency: string; total: number }>();
+    for (const i of items) {
+      if (i.amount === null) continue;
+      const key = `${i.type}-${i.currency}`;
+      const cur = totals.get(key) ?? { type: i.type, currency: i.currency, total: 0 };
+      cur.total += i.amount;
+      totals.set(key, cur);
+    }
+    return mockDelay({ days, items, totals: [...totals.values()] });
+  }
+  const { data } = await apiClient.get<Upcoming>('/api/v1/finance/recurring/upcoming', {
+    params: { days, tz_offset_minutes: tzOffsetMinutes() },
+  });
+  return mapUpcoming(data);
+}
+
+export async function fetchOccurrences(status: 'pending' | 'all' = 'pending'): Promise<Occurrence[]> {
+  if (MOCK_ENABLED) {
+    return mockDelay(mockOccurrences.filter((o) => status === 'all' || o.status === 'pending'));
+  }
+  const { data } = await apiClient.get<Occurrence[]>('/api/v1/finance/recurring/occurrences', {
+    params: { status },
+  });
+  return data.map(mapOccurrence);
+}
+
+export async function confirmOccurrence(id: string, input: ConfirmOccurrenceInput): Promise<Occurrence> {
+  if (MOCK_ENABLED) {
+    const current = mockOccurrences.find((o) => o.id === id);
+    if (!current) throw new Error('Movimiento pendiente no encontrado');
+    const updated: Occurrence = { ...current, status: 'confirmed', resolved_at: new Date().toISOString() };
+    mockOccurrences = mockOccurrences.map((o) => (o.id === id ? updated : o));
+    return mockDelay(updated);
+  }
+  const { data } = await apiClient.post<Occurrence>(`/api/v1/finance/recurring/occurrences/${id}/confirm`, {
+    ...input,
+    timezone_offset_minutes: tzOffsetMinutes(),
+  });
+  return mapOccurrence(data);
+}
+
+export async function skipOccurrence(id: string): Promise<Occurrence> {
+  if (MOCK_ENABLED) {
+    const current = mockOccurrences.find((o) => o.id === id);
+    if (!current) throw new Error('Movimiento pendiente no encontrado');
+    const updated: Occurrence = { ...current, status: 'skipped', resolved_at: new Date().toISOString() };
+    mockOccurrences = mockOccurrences.map((o) => (o.id === id ? updated : o));
+    return mockDelay(updated);
+  }
+  const { data } = await apiClient.post<Occurrence>(`/api/v1/finance/recurring/occurrences/${id}/skip`, {
+    timezone_offset_minutes: tzOffsetMinutes(),
+  });
+  return mapOccurrence(data);
+}
+
+// ── Renovación de plazo fijo ──
+
+function mapRenewalTerm(t: RenewalTerm): RenewalTerm {
+  return {
+    ...t,
+    invested_amount: num(t.invested_amount),
+    interest_rate_tna: numOrNull(t.interest_rate_tna),
+    amount_at_maturity: numOrNull(t.amount_at_maturity),
+    interest: numOrNull(t.interest),
+  };
+}
+
+export async function renewInvestment(id: string, input: RenewFixedTermInput): Promise<RenewResult> {
+  if (MOCK_ENABLED) {
+    const current = mockInvestmentBases.find((b) => b.id === id);
+    if (!current) throw new Error('Inversión no encontrada');
+    const enriched = enrichInvestment(current);
+    const collected = input.amount_collected ?? enriched.fixed_term?.amount_at_maturity ?? current.invested_amount;
+    const start = input.start_date ?? toLocalDateString();
+    const termDays = input.term_days ?? 30;
+    const maturity = input.maturity_date ?? toLocalDateString(addLocalDays(parseDateOnly(start), termDays));
+    const closedBase: MockInvestmentBase = { ...current, status: 'closed', current_value: collected };
+    const newBase: MockInvestmentBase = {
+      ...current,
+      id: `mock-inv-${generateId()}`,
+      status: 'active',
+      invested_amount: input.mode === 'principal_only' ? current.invested_amount : collected,
+      current_value: null,
+      interest_rate_tna: input.interest_rate_tna,
+      start_date: start,
+      maturity_date: maturity,
+    };
+    mockInvestmentBases = [...mockInvestmentBases.map((b) => (b.id === id ? closedBase : b)), newBase];
+    mockRenewals.set(id, newBase.id);
+    mockRenewedFrom.set(newBase.id, id);
+    const list = mockInvestmentList('all');
+    return mockDelay({
+      closed: list.find((i) => i.id === id)!,
+      renewed: list.find((i) => i.id === newBase.id)!,
+      interest_transaction_id: null,
+    });
+  }
+  const { data } = await apiClient.post<RenewResult>(`/api/v1/finance/investments/${id}/renew`, {
+    ...input,
+    timezone_offset_minutes: tzOffsetMinutes(),
+  });
+  return { ...data, closed: mapInvestment(data.closed), renewed: mapInvestment(data.renewed) };
+}
+
+export async function fetchRenewals(id: string): Promise<RenewalChain> {
+  if (MOCK_ENABLED) {
+    const chain: string[] = [id];
+    while (mockRenewedFrom.has(chain[0])) chain.unshift(mockRenewedFrom.get(chain[0])!);
+    while (mockRenewals.has(chain[chain.length - 1])) chain.push(mockRenewals.get(chain[chain.length - 1])!);
+    const list = mockInvestmentList('all');
+    const items: RenewalTerm[] = chain
+      .map((cid) => list.find((i) => i.id === cid))
+      .filter((i): i is Investment => !!i)
+      .map((i) => ({
+        id: i.id,
+        name: i.name,
+        status: i.status,
+        start_date: i.start_date,
+        maturity_date: i.maturity_date,
+        term_days: i.fixed_term?.term_days ?? null,
+        invested_amount: i.invested_amount,
+        interest_rate_tna: i.interest_rate_tna,
+        amount_at_maturity: i.status === 'closed' ? i.current_value : (i.fixed_term?.amount_at_maturity ?? null),
+        interest:
+          i.status === 'closed' && i.current_value !== null
+            ? Math.round((i.current_value - i.invested_amount) * 100) / 100
+            : (i.fixed_term?.interest_total ?? null),
+        renewed_from_id: mockRenewedFrom.get(i.id) ?? null,
+      }));
+    const accumulated = items
+      .filter((t) => t.status === 'closed' && t.interest !== null)
+      .reduce((a, t) => a + (t.interest ?? 0), 0);
+    return mockDelay({
+      items,
+      accumulated_interest: Math.round(accumulated * 100) / 100,
+      currency: list.find((i) => i.id === id)?.currency ?? 'ARS',
+    });
+  }
+  const { data } = await apiClient.get<RenewalChain>(`/api/v1/finance/investments/${id}/renewals`);
+  return {
+    ...data,
+    accumulated_interest: num(data.accumulated_interest),
+    items: data.items.map(mapRenewalTerm),
+  };
 }
 
 // ── Datos de mercado ──

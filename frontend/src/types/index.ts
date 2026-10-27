@@ -13,6 +13,10 @@ export interface Transaction {
   // useCategories() donde hacen falta.
   category_id?: string;
   notes?: string;
+  // Movimientos recurrentes: `is_recurring` queda en true aunque la plantilla se
+  // borre; `recurrence_id` es null en ese caso ("recurrencia eliminada").
+  is_recurring?: boolean;
+  recurrence_id?: string | null;
 }
 
 export interface Note {
@@ -593,6 +597,10 @@ export interface Investment {
   quote_stale?: boolean | null;
   real_return?: RealReturn | null;
   real_return_unavailable_reason?: RealReturnReason | null;
+  // Renovación de plazo fijo.
+  renewed_from_id?: string | null;
+  renewed_to_id?: string | null;
+  can_renew?: boolean;
 }
 
 // Lo que se manda al crear/editar. En PUT, `null` en un campo opcional lo borra.
@@ -706,4 +714,157 @@ export interface NetWorth {
   rates: NetWorthRates;
   missing_rates: string[];
   include_investments_in_balance: boolean;
+}
+
+// ── Movimientos recurrentes ──
+
+export type RecurringFrequency = 'daily' | 'weekly' | 'monthly' | 'yearly';
+export type RecurringState = 'active' | 'paused' | 'finished';
+export type OccurrenceStatus = 'generated' | 'pending' | 'confirmed' | 'skipped';
+
+// La regla de calendario. `weekday`: 0 = lunes ... 6 = domingo.
+export interface RecurringRule {
+  frequency: RecurringFrequency;
+  interval_count: number;
+  weekday: number | null;
+  day_of_month: number | null;
+  month_of_year: number | null;
+}
+
+export interface Recurring extends RecurringRule {
+  id: string;
+  type: 'income' | 'expense';
+  name: string;
+  description: string | null;
+  notes: string | null;
+  // null = monto variable sin estimado (solo con requires_confirmation).
+  amount: number | null;
+  currency: string;
+  category_id: string | null;
+  bank_account_id: string | null;
+  account_type: string;
+  payment_method: string;
+  merchant_name: string;
+  merchant_category: string;
+  start_date: string;
+  end_date: string | null;
+  anchor_date: string;
+  next_occurrence_date: string | null;
+  last_occurrence_date: string | null;
+  status: 'active' | 'paused';
+  requires_confirmation: boolean;
+  notify: boolean;
+  timezone_offset_minutes: number | null;
+  state: RecurringState;
+  rule_label: string;
+  pending_count: number;
+  last_amount: number | null;
+}
+
+export interface Occurrence {
+  id: string;
+  recurrence_id: string;
+  occurrence_date: string;
+  status: OccurrenceStatus;
+  suggested_amount: number | null;
+  transaction_id: string | null;
+  resolved_at: string | null;
+  name: string | null;
+  type: 'income' | 'expense' | null;
+  currency: string | null;
+  transaction?: Transaction | null;
+}
+
+export interface RecurringDetail extends Recurring {
+  recent_occurrences: Occurrence[];
+  next_dates: string[];
+}
+
+// Lo que se manda al crear (y, parcial, al editar).
+export interface RecurringInput extends RecurringRule {
+  type: 'income' | 'expense';
+  name: string;
+  description: string | null;
+  notes: string | null;
+  amount: number | null;
+  currency: string;
+  category_id: string | null;
+  bank_account_id: string | null;
+  account_type: string;
+  payment_method: string;
+  merchant_name: string;
+  merchant_category: string;
+  start_date: string;
+  end_date: string | null;
+  requires_confirmation: boolean;
+  notify: boolean;
+  generate_past?: boolean;
+}
+
+export interface UpcomingItem {
+  recurrence_id: string;
+  date: string;
+  name: string;
+  type: 'income' | 'expense';
+  amount: number | null;
+  currency: string;
+  requires_confirmation: boolean;
+}
+
+export interface Upcoming {
+  days: number;
+  items: UpcomingItem[];
+  totals: { type: 'income' | 'expense'; currency: string; total: number }[];
+}
+
+export interface RecurringPreview {
+  anchor_date: string;
+  dates: string[];
+}
+
+export interface ConfirmOccurrenceInput {
+  amount: number;
+  transaction_date?: string;
+  notes?: string;
+}
+
+// ── Renovación de plazo fijo ──
+
+export interface RenewFixedTermInput {
+  mode: 'principal_and_interest' | 'principal_only';
+  interest_rate_tna: number;
+  term_days?: number | null;
+  maturity_date?: string | null;
+  start_date?: string | null;
+  amount_collected?: number | null;
+  register_interest_income?: boolean;
+  income_category_id?: string | null;
+  income_bank_account_id?: string | null;
+  income_payment_method?: string;
+}
+
+export interface RenewResult {
+  closed: Investment;
+  renewed: Investment;
+  interest_transaction_id: string | null;
+}
+
+export interface RenewalTerm {
+  id: string;
+  name: string;
+  status: InvestmentStatus;
+  start_date: string | null;
+  maturity_date: string | null;
+  term_days: number | null;
+  invested_amount: number;
+  interest_rate_tna: number | null;
+  amount_at_maturity: number | null;
+  interest: number | null;
+  renewed_from_id: string | null;
+}
+
+export interface RenewalChain {
+  items: RenewalTerm[];
+  accumulated_interest: number;
+  currency: string;
 }
