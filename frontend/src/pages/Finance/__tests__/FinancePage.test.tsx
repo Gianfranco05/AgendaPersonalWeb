@@ -8,6 +8,10 @@ vi.mock('../../../hooks/useFinance', () => ({
   removeTransaction: vi.fn(),
 }))
 
+vi.mock('../../../hooks/useRecurring', () => ({
+  usePendingOccurrences: vi.fn(() => ({ data: [] })),
+}))
+vi.mock('../RecurringSection', () => ({ default: () => <div>RecurringSection</div> }))
 vi.mock('../TransactionTable', () => ({
   default: ({ onDelete }: { onDelete: (id: string) => void }) => (
     <button onClick={() => onDelete('tx1')}>borrar-tx</button>
@@ -17,6 +21,7 @@ vi.mock('../TransactionFilters', () => ({ default: () => <div>TransactionFilters
 vi.mock('../FinanceCharts', () => ({ default: () => <div>FinanceCharts</div> }))
 
 import { useFinanceSummary, useTransactions, removeTransaction } from '../../../hooks/useFinance'
+import { usePendingOccurrences } from '../../../hooks/useRecurring'
 import FinancePage from '../FinancePage'
 
 beforeEach(() => {
@@ -52,5 +57,35 @@ describe('FinancePage', () => {
     vi.mocked(useTransactions).mockReturnValue({ data: undefined, isLoading: true, error: undefined, isValidating: false, mutate: vi.fn() })
     renderWithProviders(<FinancePage />)
     expect(screen.getByText('-$1.000')).toBeInTheDocument()
+  })
+
+  describe('recurrentes', () => {
+    const loaded = () => {
+      vi.mocked(useFinanceSummary).mockReturnValue({ data: undefined, isLoading: false, error: undefined, isValidating: false, mutate: vi.fn() })
+      vi.mocked(useTransactions).mockReturnValue({ data: { items: [], total: 0, page: 1, page_size: 20 }, isLoading: false, error: undefined, isValidating: false, mutate: vi.fn() })
+    }
+
+    it('tiene la pestaña Recurrentes', () => {
+      loaded()
+      renderWithProviders(<FinancePage />)
+      fireEvent.click(screen.getByText('Recurrentes'))
+      expect(screen.getByText('RecurringSection')).toBeInTheDocument()
+    })
+
+    it('sin pendientes no hay banner', () => {
+      loaded()
+      renderWithProviders(<FinancePage />)
+      expect(screen.queryByTestId('pending-banner')).not.toBeInTheDocument()
+    })
+
+    it('con pendientes muestra el banner y lleva a Recurrentes', () => {
+      loaded()
+      vi.mocked(usePendingOccurrences).mockReturnValue({ data: [{ id: 'o1' }, { id: 'o2' }] } as never)
+      renderWithProviders(<FinancePage />)
+      const banner = screen.getByTestId('pending-banner')
+      expect(banner).toHaveTextContent('Tenés 2 movimientos recurrentes para confirmar')
+      fireEvent.click(banner)
+      expect(screen.getByText('RecurringSection')).toBeInTheDocument()
+    })
   })
 })

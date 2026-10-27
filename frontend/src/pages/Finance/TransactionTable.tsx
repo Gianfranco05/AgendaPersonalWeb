@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Pencil, Trash2 } from 'lucide-react';
+import { Pencil, Repeat, Trash2 } from 'lucide-react';
 import { useCategories } from '../../hooks/useFinance';
 import type { Category, Transaction } from '../../types';
 
@@ -7,11 +7,21 @@ interface TransactionTableProps {
   transactions: Transaction[];
   onEdit: (tx: Transaction) => void;
   onDelete: (id: string) => void;
+  /** Abre "Nueva recurrente" precargada con esta transacción. */
+  onMakeRecurring?: (tx: Transaction) => void;
+  /** Muestra los movimientos de la recurrencia que generó la transacción. */
+  onViewRecurrence?: (recurrenceId: string) => void;
 }
 
 type SortKey = 'transaction_date' | 'product_name' | 'category' | 'amount' | 'type';
 
-export default function TransactionTable({ transactions, onEdit, onDelete }: TransactionTableProps) {
+export default function TransactionTable({
+  transactions,
+  onEdit,
+  onDelete,
+  onMakeRecurring,
+  onViewRecurrence,
+}: TransactionTableProps) {
   const [sortKey, setSortKey] = useState<SortKey>('transaction_date');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const { data: categories } = useCategories();
@@ -95,8 +105,28 @@ export default function TransactionTable({ transactions, onEdit, onDelete }: Tra
                 className="border-b border-gray-50 transition-colors hover:bg-gray-50 dark:hover:bg-slate-700/50"
               >
                 <td className="px-4 py-3 text-gray-600 dark:text-slate-300">{tx.transaction_date}</td>
-                <td className="max-w-[200px] truncate px-4 py-3 font-medium text-gray-800 dark:text-slate-100">
-                  {tx.product_name}
+                <td className="max-w-[220px] px-4 py-3 font-medium text-gray-800 dark:text-slate-100">
+                  <span className="block truncate">{tx.product_name}</span>
+                  {tx.is_recurring &&
+                    (tx.recurrence_id ? (
+                      <button
+                        type="button"
+                        onClick={() => onViewRecurrence?.(tx.recurrence_id as string)}
+                        title="Ver los movimientos de esta recurrencia"
+                        className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-sky-50 dark:bg-sky-500/15 px-2 py-0.5 text-xs font-medium text-sky-700 dark:text-sky-300 hover:underline"
+                      >
+                        <Repeat size={11} />
+                        Recurrente
+                      </button>
+                    ) : (
+                      <span
+                        title="Generada por una recurrencia que ya se eliminó"
+                        className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-gray-100 dark:bg-slate-700 px-2 py-0.5 text-xs font-medium text-gray-500 dark:text-slate-300"
+                      >
+                        <Repeat size={11} />
+                        Recurrencia eliminada
+                      </span>
+                    ))}
                 </td>
                 <td className="px-4 py-3">
                   <span className="inline-flex items-center gap-1.5">
@@ -125,6 +155,16 @@ export default function TransactionTable({ transactions, onEdit, onDelete }: Tra
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex justify-end gap-1">
+                    {onMakeRecurring && !tx.is_recurring && (
+                      <button
+                        onClick={() => onMakeRecurring(tx)}
+                        className="rounded-lg p-1.5 text-gray-400 dark:text-slate-500 transition-colors hover:bg-gray-100 dark:hover:bg-slate-700 hover:text-brand-indigo"
+                        title="Hacer recurrente"
+                        aria-label={`Hacer recurrente ${tx.product_name}`}
+                      >
+                        <Repeat size={14} />
+                      </button>
+                    )}
                     <button
                       onClick={() => onEdit(tx)}
                       className="rounded-lg p-1.5 text-gray-400 dark:text-slate-500 transition-colors hover:bg-gray-100 dark:hover:bg-slate-700 hover:text-brand-indigo"

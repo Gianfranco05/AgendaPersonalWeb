@@ -1,8 +1,9 @@
 import { useState, lazy, Suspense } from 'react';
-import { TrendingUp, TrendingDown, Wallet, Plus } from 'lucide-react';
+import { TrendingUp, TrendingDown, Wallet, Plus, Repeat, X } from 'lucide-react';
 import { LoadingSkeleton } from '../../components/LoadingSkeleton';
 import { useFinanceSummary, useTransactions, removeTransaction } from '../../hooks/useFinance';
-import type { Transaction } from '../../types';
+import { usePendingOccurrences } from '../../hooks/useRecurring';
+import type { Recurring, Transaction } from '../../types';
 import TransactionTable from './TransactionTable';
 import TransactionModal from './TransactionModal';
 import TransactionFilters from './TransactionFilters';
@@ -12,6 +13,8 @@ import CategoriesSection from './CategoriesSection';
 import ReportsSection from './ReportsSection';
 import AccountsSection from './AccountsSection';
 import InvestmentsSection from './InvestmentsSection';
+import RecurringSection from './RecurringSection';
+import RecurringModal, { type RecurringPrefill } from './RecurringModal';
 
 const FinanceCharts = lazy(() => import('./FinanceCharts'));
 
@@ -31,7 +34,8 @@ type Tab =
   | 'categorias'
   | 'reportes'
   | 'cuentas'
-  | 'inversiones';
+  | 'inversiones'
+  | 'recurrentes';
 
 export default function FinancePage() {
   const [tab, setTab] = useState<Tab>('transacciones');
@@ -44,6 +48,9 @@ export default function FinancePage() {
   });
   const [showModal, setShowModal] = useState(false);
   const [editingTx, setEditingTx] = useState<Transaction | null>(null);
+  // Filtro "movimientos de esta recurrencia" y alta de una recurrente desde una transacción.
+  const [recurrenceFilter, setRecurrenceFilter] = useState<{ id: string; name: string } | null>(null);
+  const [recurringPrefill, setRecurringPrefill] = useState<RecurringPrefill | null>(null);
 
   const txParams = {
     page,
@@ -52,10 +59,13 @@ export default function FinancePage() {
     ...(filters.category && { category: filters.category }),
     ...(filters.date_from && { date_from: filters.date_from }),
     ...(filters.date_to && { date_to: filters.date_to }),
+    ...(recurrenceFilter && { recurrence_id: recurrenceFilter.id }),
   };
 
   const { data: summary, isLoading: summaryLoading } = useFinanceSummary();
   const { data: txData, isLoading: txLoading } = useTransactions(txParams);
+  const { data: pendingOccurrences } = usePendingOccurrences();
+  const pendingCount = pendingOccurrences?.length ?? 0;
 
   const transactions = txData?.items ?? [];
   const total = txData?.total ?? 0;
@@ -78,6 +88,29 @@ export default function FinancePage() {
 
   function handleSaved() {
     setShowModal(false);
+  }
+
+  function handleViewMovements(recurrence: Recurring) {
+    setRecurrenceFilter({ id: recurrence.id, name: recurrence.name });
+    setPage(1);
+    setTab('transacciones');
+  }
+
+  function handleViewRecurrence(id: string) {
+    setRecurrenceFilter({ id, name: 'esta recurrencia' });
+    setPage(1);
+  }
+
+  function handleMakeRecurring(tx: Transaction) {
+    setRecurringPrefill({
+      type: tx.type,
+      name: tx.product_name,
+      amount: tx.amount,
+      currency: tx.currency,
+      category_id: tx.category_id,
+      payment_method: tx.payment_method,
+      start_date: tx.transaction_date,
+    });
   }
 
   function handleFiltersChange(newFilters: Filters) {
@@ -109,6 +142,7 @@ export default function FinancePage() {
           ['reportes', 'Reportes'],
           ['cuentas', 'Cuentas'],
           ['inversiones', 'Inversiones'],
+          ['recurrentes', 'Recurrentes'],
         ] as const).map(([value, label]) => (
           <button
             key={value}
@@ -130,6 +164,7 @@ export default function FinancePage() {
       {tab === 'reportes' && <ReportsSection />}
       {tab === 'cuentas' && <AccountsSection />}
       {tab === 'inversiones' && <InvestmentsSection />}
+      {tab === 'recurrentes' && <RecurringSection onViewMovements={handleViewMovements} />}
 
       {tab === 'transacciones' && (
       <>
@@ -180,6 +215,37 @@ export default function FinancePage() {
         <FinanceCharts />
       </Suspense>
 
+      {pendingCount > 0 && (
+        <button
+          type="button"
+          data-testid="pending-banner"
+          onClick={() => setTab('recurrentes')}
+          className="flex w-full items-center gap-2 rounded-xl border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 px-4 py-3 text-left text-sm font-medium text-amber-800 dark:text-amber-200"
+        >
+          <Repeat size={16} />
+          Tenés {pendingCount} {pendingCount === 1 ? 'movimiento' : 'movimientos'} recurrentes para confirmar
+        </button>
+      )}
+
+      {recurrenceFilter && (
+        <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-slate-300">
+          <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 dark:bg-slate-700 px-3 py-1">
+            Movimientos de {recurrenceFilter.name}
+            <button
+              type="button"
+              aria-label="Quitar filtro de recurrencia"
+              onClick={() => {
+                setRecurrenceFilter(null);
+                setPage(1);
+              }}
+              className="rounded-full p-0.5 hover:bg-gray-200 dark:hover:bg-slate-600"
+            >
+              <X size={12} />
+            </button>
+          </span>
+        </div>
+      )}
+
       <TransactionFilters filters={filters} onChange={handleFiltersChange} />
 
       {txLoading ? (
@@ -190,6 +256,8 @@ export default function FinancePage() {
             transactions={transactions}
             onEdit={handleEdit}
             onDelete={handleDelete}
+            onMakeRecurring={handleMakeRecurring}
+            onViewRecurrence={handleViewRecurrence}
           />
 
           {total > PER_PAGE && (
@@ -218,6 +286,18 @@ export default function FinancePage() {
         </>
       )}
       </>
+      )}
+
+      {recurringPrefill && (
+        <RecurringModal
+          recurring={null}
+          prefill={recurringPrefill}
+          onClose={() => setRecurringPrefill(null)}
+          onSaved={() => {
+            setRecurringPrefill(null);
+            setTab('recurrentes');
+          }}
+        />
       )}
 
       {showModal && (
