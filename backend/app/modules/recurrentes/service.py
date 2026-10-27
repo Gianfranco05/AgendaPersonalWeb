@@ -405,14 +405,20 @@ class RecurringService:
             last = None
         if new_cursor == cursor:
             return result
+        # Fechas que ya tienen su ocurrencia (p. ej. el cursor quedo apuntando a
+        # un dia ya procesado): se avanza el cursor sin volver a generarlas. Evita
+        # que la restriccion unica trabe la plantilla en un ciclo de reintentos.
+        already = await self.repo.occurrence_dates(rec_id, user_id, dates)
+        to_create = [d for d in dates if d not in already]
 
         try:
             if not await self.repo.advance_cursor(rec_id, user_id, cursor, new_cursor, last):
                 # Otro worker (o una edicion) se adelanto: no hay nada que hacer.
                 await self.db.rollback()
+                await self.db.refresh(rec)
                 return MaterializeResult()
 
-            if dates:
+            if to_create:
                 await self.db.refresh(rec)
                 bank, category_ok = await self._refs_state(rec)
                 suggested = None
@@ -421,7 +427,7 @@ class RecurringService:
                     if suggested is None:
                         suggested = to_decimal(rec.amount)
                 bank_label = (bank.bank_name or bank.name) if bank is not None else ""
-                for d in dates:
+                for d in to_create:
                     occ = RecurringOccurrence(
                         id=str(uuid4()),
                         user_id=user_id,
@@ -460,6 +466,7 @@ class RecurringService:
             # La restriccion unica cortó un doble procesamiento: se revierte todo.
             await self.db.rollback()
             logger.warning("Recurrente %s: ocurrencia duplicada, se revierte el ciclo", rec_id)
+            await self.db.refresh(rec)
             return MaterializeResult()
         except Exception:
             await self.db.rollback()
@@ -628,9 +635,13 @@ class RecurringService:
             today = rules.local_today(rules.utc_now(), rec.timezone_offset_minutes)
             rec.status = "active"
             rec.paused_at = None
-            # Lo que cayo durante la pausa no se genera: el cursor salta a hoy.
+            # Lo que cayo durante la pausa no se genera: el cursor salta a hoy
+            # (o al dia siguiente de lo ultimo procesado, si hoy ya se registro).
+            floor = today
+            if rec.last_occurrence_date is not None:
+                floor = max(floor, rec.last_occurrence_date + timedelta(days=1))
             rec.next_occurrence_date = rules.cursor_from(
-                rule_of(rec), rec.anchor_date, today, rec.end_date
+                rule_of(rec), rec.anchor_date, floor, rec.end_date
             )
             await self.db.commit()
             await self.db.refresh(rec)

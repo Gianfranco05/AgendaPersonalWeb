@@ -129,6 +129,23 @@ class RecurringRepository:
         result = await self.db.execute(query)
         return result.scalars().all()
 
+    async def occurrence_dates(
+        self, recurrence_id: str, user_id: str, dates: Sequence[date]
+    ) -> set[date]:
+        """De `dates`, las que ya tienen una ocurrencia registrada."""
+        if not dates:
+            return set()
+        result = await self.db.execute(
+            select(O.occurrence_date).where(
+                and_(
+                    O.recurrence_id == recurrence_id,
+                    O.user_id == user_id,
+                    O.occurrence_date.in_(list(dates)),
+                )
+            )
+        )
+        return {row[0] for row in result.all()}
+
     async def recent_occurrences(self, recurrence_id: str, user_id: str, limit: int = 12):
         result = await self.db.execute(
             select(O)

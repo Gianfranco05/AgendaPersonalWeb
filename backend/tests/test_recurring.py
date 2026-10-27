@@ -681,3 +681,38 @@ async def test_detalle_muestra_las_ocurrencias_recientes(api_auth_client, clock)
     detail = (await api_auth_client.get(f"{BASE}/{rec['id']}")).json()
     assert [o["status"] for o in detail["recent_occurrences"]] == ["generated"]
     assert detail["recent_occurrences"][0]["occurrence_date"] == "2026-10-25"
+
+
+# ── Regresiones encontradas en la verificación contra Postgres ──────────────
+
+
+async def test_reanudar_el_mismo_dia_que_ya_se_registro_no_rompe_ni_duplica(api_auth_client, clock):
+    """Pausar y reanudar el mismo dia en que ya se genero la ocurrencia de hoy:
+    el cursor no puede volver a hoy (daba 500 por la restriccion unica)."""
+    rec = await create(api_auth_client, salary(start_date="2026-10-25", day_of_month=25))
+    assert len(await transactions(api_auth_client)) == 1
+    await api_auth_client.post(f"{BASE}/{rec['id']}/pause", json={})
+    resp = await api_auth_client.post(f"{BASE}/{rec['id']}/resume", json={})
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["next_occurrence_date"] == "2026-11-25"
+    assert len(await transactions(api_auth_client)) == 1
+
+
+async def test_cursor_apuntando_a_un_dia_ya_registrado_se_corrige_solo(api_auth_client, clock, db_session):
+    from datetime import date
+
+    from sqlalchemy import update
+
+    from app.modules.recurrentes.models import RecurringTransaction
+
+    rec = await create(api_auth_client, salary(start_date="2026-10-25", day_of_month=25))
+    await db_session.execute(
+        update(RecurringTransaction)
+        .where(RecurringTransaction.id == rec["id"])
+        .values(next_occurrence_date=date(2026, 10, 25))
+    )
+    await db_session.commit()
+    resp = await api_auth_client.put(f"{BASE}/{rec['id']}", json={"notes": "x"})
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["next_occurrence_date"] == "2026-11-25"
+    assert len(await transactions(api_auth_client)) == 1
