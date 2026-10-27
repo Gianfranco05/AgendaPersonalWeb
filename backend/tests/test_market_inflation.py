@@ -364,9 +364,12 @@ async def test_api_plazo_fijo_con_rendimiento_real_estimado(api_auth_client, db_
     assert rr["estimated"] is True and f"{today.year:04d}-{today.month:02d}" in rr["estimated_months"]
     assert resp.json()["real_return_unavailable_reason"] is None
 
-    summary = (await api_auth_client.get(f"{INVEST}/summary")).json()
+    # Como los clientes, con el offset local: sin el, despues de las 21 de
+    # Argentina "hoy" ya es otro dia en UTC y el rendimiento cambia.
+    tz = {"tz_offset_minutes": -180}
+    summary = (await api_auth_client.get(f"{INVEST}/summary", params=tz)).json()
     assert summary["real_return_ars"]["included_count"] == 1
-    listed = (await api_auth_client.get(INVEST)).json()[0]
+    listed = (await api_auth_client.get(INVEST, params=tz)).json()[0]
     assert listed["real_return"]["real_pct"] == rr["real_pct"]
 
 
