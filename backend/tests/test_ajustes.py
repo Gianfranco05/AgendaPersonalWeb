@@ -212,3 +212,81 @@ async def test_settings_toggle_de_inversiones(api_auth_client):
     assert kept.status_code == 200 and kept.json()["include_investments_in_balance"] is True
     off = (await api_auth_client.put("/api/v1/settings", json={"include_investments_in_balance": False})).json()
     assert off["include_investments_in_balance"] is False
+
+
+# ── Tutorial de bienvenida (onboarding_version_seen) ────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_settings_onboarding_default_es_cero(api_auth_client):
+    data = (await api_auth_client.get("/api/v1/settings")).json()
+    assert data["onboarding_version_seen"] == 0
+
+
+@pytest.mark.asyncio
+async def test_settings_onboarding_marcar_como_visto(api_auth_client):
+    resp = await api_auth_client.put("/api/v1/settings", json={"onboarding_version_seen": 1})
+    assert resp.status_code == 200 and resp.json()["onboarding_version_seen"] == 1
+    assert (await api_auth_client.get("/api/v1/settings")).json()["onboarding_version_seen"] == 1
+
+
+@pytest.mark.asyncio
+async def test_settings_onboarding_nunca_baja(api_auth_client):
+    await api_auth_client.put("/api/v1/settings", json={"onboarding_version_seen": 2})
+    resp = await api_auth_client.put("/api/v1/settings", json={"onboarding_version_seen": 1})
+    assert resp.status_code == 200 and resp.json()["onboarding_version_seen"] == 2
+    zero = await api_auth_client.put("/api/v1/settings", json={"onboarding_version_seen": 0})
+    assert zero.json()["onboarding_version_seen"] == 2
+
+
+@pytest.mark.asyncio
+async def test_settings_onboarding_null_se_ignora(api_auth_client):
+    await api_auth_client.put("/api/v1/settings", json={"onboarding_version_seen": 1})
+    resp = await api_auth_client.put("/api/v1/settings", json={"onboarding_version_seen": None})
+    assert resp.status_code == 200 and resp.json()["onboarding_version_seen"] == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("value", [-1, 1001, 5000, "x", 1.5])
+async def test_settings_onboarding_invalido_es_422(api_auth_client, value):
+    resp = await api_auth_client.put("/api/v1/settings", json={"onboarding_version_seen": value})
+    assert resp.status_code == 422
+    assert (await api_auth_client.get("/api/v1/settings")).json()["onboarding_version_seen"] == 0
+
+
+@pytest.mark.asyncio
+async def test_settings_onboarding_no_se_pisa_al_guardar_otros_ajustes(api_auth_client):
+    await api_auth_client.put("/api/v1/settings", json={"onboarding_version_seen": 1})
+    other = await api_auth_client.put("/api/v1/settings", json={"theme_color": "blue"})
+    assert other.json()["onboarding_version_seen"] == 1
+
+
+@pytest.mark.asyncio
+async def test_settings_onboarding_aislado_entre_usuarios(client, api_auth_client):
+    from httpx import ASGITransport, AsyncClient
+
+    from app.main import app
+
+    await api_auth_client.put("/api/v1/settings", json={"onboarding_version_seen": 1})
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as other:
+        reg = await other.post("/auth/api/register", json={
+            "email": "otro@test.com",
+            "full_name": "Otro",
+            "password": "testpass123",
+            "accept_terms": True,
+            "confirm_age": True,
+        })
+        assert reg.status_code == 201, reg.text
+        assert (await other.get("/api/v1/settings")).json()["onboarding_version_seen"] == 0
+        await other.put("/api/v1/settings", json={"onboarding_version_seen": 3})
+
+    assert (await api_auth_client.get("/api/v1/settings")).json()["onboarding_version_seen"] == 1
+
+
+@pytest.mark.asyncio
+async def test_export_de_cuenta_incluye_onboarding_version_seen(api_auth_client):
+    await api_auth_client.put("/api/v1/settings", json={"onboarding_version_seen": 1})
+    data = (await api_auth_client.get("/api/v1/me/export")).json()
+    assert data["user_preferences"][0]["onboarding_version_seen"] == 1

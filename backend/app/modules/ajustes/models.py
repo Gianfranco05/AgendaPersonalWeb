@@ -2,7 +2,7 @@ from uuid import uuid4
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Numeric, String, Text, false, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Numeric, String, Text, false, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.base import Base
@@ -39,6 +39,11 @@ class UserPreference(Base):
     # Solo cambia la presentacion en los clientes; `balance` sigue siendo efectivo.
     include_investments_in_balance: Mapped[bool] = mapped_column(
         Boolean, default=False, server_default=false()
+    )
+    # Version del tutorial de bienvenida que el usuario ya vio (0 = ninguno).
+    # El server solo la sube (max): ver PUT /settings.
+    onboarding_version_seen: Mapped[int] = mapped_column(
+        Integer, default=0, server_default="0"
     )
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

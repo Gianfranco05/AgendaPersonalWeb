@@ -42,6 +42,8 @@ class SettingsResponse(BaseModel):
     fx_usd_source: str = "mep"
     fx_eur_source: str = "oficial"
     include_investments_in_balance: bool = False
+    #: Version del tutorial de bienvenida que el usuario ya vio (0 = ninguna).
+    onboarding_version_seen: int = 0
 
     model_config = {"from_attributes": True}
 
@@ -59,6 +61,7 @@ def _to_response(prefs: UserPreference) -> "SettingsResponse":
         fx_usd_source=prefs.fx_usd_source or "mep",
         fx_eur_source=prefs.fx_eur_source or "oficial",
         include_investments_in_balance=bool(prefs.include_investments_in_balance),
+        onboarding_version_seen=prefs.onboarding_version_seen or 0,
     )
 
 
@@ -75,6 +78,8 @@ class SettingsUpdate(BaseModel):
     fx_usd_source: Optional[Literal["oficial", "mep", "blue", "manual"]] = None
     fx_eur_source: Optional[Literal["oficial", "blue", "manual"]] = None
     include_investments_in_balance: Optional[bool] = None
+    # Nunca baja (el server guarda el maximo); un null se ignora.
+    onboarding_version_seen: Optional[int] = Field(None, ge=0, le=1000)
 
 
 @router.get("", response_model=SettingsResponse)
@@ -113,9 +118,20 @@ async def update_settings(
 
     update_data = data.model_dump(exclude_unset=True)
     # La columna no admite null: un null explicito se ignora.
-    for column in ("include_investments_in_balance", "fx_usd_source", "fx_eur_source"):
+    for column in (
+        "include_investments_in_balance",
+        "fx_usd_source",
+        "fx_eur_source",
+        "onboarding_version_seen",
+    ):
         if update_data.get(column) is None:
             update_data.pop(column, None)
+    # Un cliente viejo o un PUT tardio de la cola offline no puede hacer
+    # que el tutorial vuelva a aparecer: el valor solo sube.
+    if "onboarding_version_seen" in update_data:
+        update_data["onboarding_version_seen"] = max(
+            prefs.onboarding_version_seen or 0, update_data["onboarding_version_seen"]
+        )
 
     rates_changed = any(
         key in update_data and _rate(update_data[key]) != _rate(getattr(prefs, key))
