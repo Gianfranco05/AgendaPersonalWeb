@@ -47,41 +47,41 @@
 - [x] 6.8 `backend/tests/test_fixed_term_renewal.py`: ambos modos con 1.000.000 / 30 % / 30 días (1.024.657,53), `amount_collected` editado, ingreso de 24.657,53 con y sin flag, no vencido → 422, no plazo fijo/cerrado → 422, ajeno → 404, doble renovación → 409, fechas y montos inválidos → 422, historial de 4 tramos, reabrir renovada → 422, borrar anterior/renovación, avisos de vencimiento solo para el nuevo
 - [x] 6.9 Aislamiento: sumar recurrentes, ocurrencias (confirmar/saltear) y renovación a `test_tenant_isolation.py` (→ 404) y verificar que listas, upcoming y pendientes no mezclan usuarios
 - [x] 6.10 `test_account.py`: el export incluye `recurring_transactions` y `recurring_occurrences` propios y no ajenos; el borrado no deja filas (incluida una cadena de inversiones renovadas); la guarda de `OWNED_TABLES` pasa
-- [ ] 6.11 Confirmar que `test_infra.py::test_no_api_route_is_public_by_accident` pasa sin rutas públicas nuevas y correr `python -m pytest -q` completo sin regresiones
+- [x] 6.11 Confirmar que `test_infra.py::test_no_api_route_is_public_by_accident` pasa sin rutas públicas nuevas y correr `python -m pytest -q` completo sin regresiones
 
 ## 7. Web — API, tipos y hooks (`frontend/`)
 
-- [ ] 7.1 Tipos en `src/types`: `Recurring`, `RecurringInput`, `RecurringRule`, `Occurrence`, `UpcomingItem`, `RenewFixedTermInput`, `RenewalChain`; `recurrence_id?` en `Transaction`; `renewed_from_id?`, `renewed_to_id?`, `can_renew?` en `Investment`
-- [ ] 7.2 `src/api/endpoints.ts`: endpoints de design D14 con `tz_offset_minutes` en lecturas y `timezone_offset_minutes` en escrituras, `recurrence_id` en `fetchTransactions`; mocks con las mismas formas cuando `MOCK_ENABLED` (preview aproximada)
-- [ ] 7.3 `src/hooks/useRecurring.ts` y extensión de `useInvestments.ts` con la invalidación de keys de la spec (incluye transacciones, summary, budgets y reports cuando corresponde)
-- [ ] 7.4 Tests en `src/api/__tests__` y `src/hooks/__tests__`: URLs, params de tz, filtro `recurrence_id`, invalidación tras confirmar y tras renovar
+- [x] 7.1 Tipos en `src/types`: `Recurring`, `RecurringInput`, `RecurringRule`, `Occurrence`, `UpcomingItem`, `RenewFixedTermInput`, `RenewalChain`; `recurrence_id?` en `Transaction`; `renewed_from_id?`, `renewed_to_id?`, `can_renew?` en `Investment`
+- [x] 7.2 `src/api/endpoints.ts`: endpoints de design D14 con `tz_offset_minutes` en lecturas y `timezone_offset_minutes` en escrituras, `recurrence_id` en `fetchTransactions`; mocks con las mismas formas cuando `MOCK_ENABLED` (preview aproximada)
+- [x] 7.3 `src/hooks/useRecurring.ts` y extensión de `useInvestments.ts` con la invalidación de keys de la spec (incluye transacciones, summary, budgets y reports cuando corresponde)
+- [x] 7.4 Tests en `src/api/__tests__` y `src/hooks/__tests__`: URLs, params de tz, filtro `recurrence_id`, invalidación tras confirmar y tras renovar
 
 ## 8. Web — UI (`frontend/`)
 
-- [ ] 8.1 `src/pages/Finance/RecurringSection.tsx`: "Para confirmar", "Próximos 30 días", lista con `rule_label`, próxima fecha, chip Activa/Pausada/Finalizada, acciones editar/pausar-reanudar/ver movimientos/borrar (confirmación "Las transacciones ya registradas se conservan"), estado vacío con ejemplos, dark mode
-- [ ] 8.2 `src/pages/Finance/RecurringModal.tsx` (RHF + Zod sin `z.coerce`, patrón `TransactionModal`): campos según frecuencia, coma decimal, switches confirmación/aviso/anteriores, vista previa de 5 fechas con debounce
-- [ ] 8.3 `src/pages/Finance/ConfirmOccurrenceModal.tsx`: monto sugerido editable, fecha, notas; botón Saltear
-- [ ] 8.4 `FinancePage.tsx`: pestaña `recurrentes` ("Recurrentes") y banner de pendientes en Transacciones; `TransactionTable.tsx`: badge "Recurrente" con link (o "recurrencia eliminada") y acción "Hacer recurrente" que abre `RecurringModal` precargado
-- [ ] 8.5 `InvestmentsSection.tsx` + `src/pages/Finance/RenewFixedTermModal.tsx`: botón "Renovar" si `can_renew`, modos con capital/interés/nuevo capital, monto cobrado editable, ingreso opcional con categoría/cuenta, TNA, plazo (chips 30/60/90/180/365 o fecha), inicio, vista previa; "Historial de renovaciones" en el detalle
-- [ ] 8.6 Tests de componentes: modal de recurrente (validación, campos por frecuencia, día 31 muestra la ayuda), confirmación de pendiente, modal de renovación (1.024.657,53 y 24.657,53 en la vista previa), badge en la tabla
-- [ ] 8.7 `npx vitest run --maxWorkers=2`, `npm run build` y lint sin errores
+- [x] 8.1 `src/pages/Finance/RecurringSection.tsx`: "Para confirmar", "Próximos 30 días", lista con `rule_label`, próxima fecha, chip Activa/Pausada/Finalizada, acciones editar/pausar-reanudar/ver movimientos/borrar (confirmación "Las transacciones ya registradas se conservan"), estado vacío con ejemplos, dark mode
+- [x] 8.2 `src/pages/Finance/RecurringModal.tsx` (RHF + Zod sin `z.coerce`, patrón `TransactionModal`): campos según frecuencia, coma decimal, switches confirmación/aviso/anteriores, vista previa de 5 fechas con debounce
+- [x] 8.3 `src/pages/Finance/ConfirmOccurrenceModal.tsx`: monto sugerido editable, fecha, notas; botón Saltear
+- [x] 8.4 `FinancePage.tsx`: pestaña `recurrentes` ("Recurrentes") y banner de pendientes en Transacciones; `TransactionTable.tsx`: badge "Recurrente" con link (o "recurrencia eliminada") y acción "Hacer recurrente" que abre `RecurringModal` precargado
+- [x] 8.5 `InvestmentsSection.tsx` + `src/pages/Finance/RenewFixedTermModal.tsx`: botón "Renovar" si `can_renew`, modos con capital/interés/nuevo capital, monto cobrado editable, ingreso opcional con categoría/cuenta, TNA, plazo (chips 30/60/90/180/365 o fecha), inicio, vista previa; "Historial de renovaciones" en el detalle
+- [x] 8.6 Tests de componentes: modal de recurrente (validación, campos por frecuencia, día 31 muestra la ayuda), confirmación de pendiente, modal de renovación (1.024.657,53 y 24.657,53 en la vista previa), badge en la tabla
+- [x] 8.7 `npx vitest run --maxWorkers=2`, `npm run build` y lint sin errores
 
 ## 9. Mobile — API, tipos y hooks (`C:\Proyectos\vida-personal-mobile`)
 
-- [ ] 9.1 [mobile] Tipos en `src/types` (recurrentes, ocurrencias, upcoming, renovación; `recurrence_id` en transacciones; `renewed_*`/`can_renew` en inversiones)
-- [ ] 9.2 [mobile] `src/api/endpoints.ts`: endpoints de recurrentes y renovación; escrituras con `queued('...')` y `timezone_offset_minutes`; `preview`/`upcoming` solo online
-- [ ] 9.3 [mobile] `src/hooks/useRecurring.ts` y extensión de `src/hooks/useInvestments.ts` con la misma invalidación que la web
+- [x] 9.1 [mobile] Tipos en `src/types` (recurrentes, ocurrencias, upcoming, renovación; `recurrence_id` en transacciones; `renewed_*`/`can_renew` en inversiones)
+- [x] 9.2 [mobile] `src/api/endpoints.ts`: endpoints de recurrentes y renovación; escrituras con `queued('...')` y `timezone_offset_minutes`; `preview`/`upcoming` solo online
+- [x] 9.3 [mobile] `src/hooks/useRecurring.ts` y extensión de `src/hooks/useInvestments.ts` con la misma invalidación que la web
 
 ## 10. Mobile — UI (`C:\Proyectos\vida-personal-mobile`)
 
-- [ ] 10.1 [mobile] `src/screens/RecurringScreen.tsx`: "Para confirmar", próximos 30 días, `SectionList` Activas/Pausadas/Finalizadas, estados vacío/cargando/error, pausar/reanudar/borrar con `Alert`
-- [ ] 10.2 [mobile] `src/components/RecurringFormSheet.tsx` (`BottomSheet`, `PickerField`, `NumberStepper`, `FilterChips` de días, `DateField`, `Switch`, `decimal-pad` + `parseDecimal`, vista previa con red) y `src/components/ConfirmOccurrenceSheet.tsx`
-- [ ] 10.3 [mobile] Registrar `Recurring` en `FinanceStack` (`src/navigation/TabNavigator.tsx`, `FinanceStackParamList`) con `create`/`occurrenceId` y `useCreateParam`
-- [ ] 10.4 [mobile] `src/screens/FinanceScreen.tsx`: tile "Recurrentes" (`repeat`) en `TOOLS` (5 tiles, último a lo ancho) y aviso de pendientes que abre Recurrentes
-- [ ] 10.5 [mobile] `src/components/QuickCreateSheet.tsx`: opción "Recurrente" → `FinanceTab` › `Recurring` con `create: true`
-- [ ] 10.6 [mobile] `src/lib/notifications.ts`: `recurring_generated`/`recurring_summary` → Recurrentes; `recurring_confirm` → Recurrentes con `occurrenceId` (sin error si ya se resolvió), en caliente y arranque en frío
-- [ ] 10.7 [mobile] Inversiones: "Renovar" en la tarjeta / `InvestmentFormSheet` si `can_renew` → `src/components/RenewFixedTermSheet.tsx`; historial de renovaciones; badge "Recurrente" en la lista de transacciones
-- [ ] 10.8 [mobile] Sin textos de compra/precios; `npx tsc --noEmit` y tests del repo mobile en verde
+- [x] 10.1 [mobile] `src/screens/RecurringScreen.tsx`: "Para confirmar", próximos 30 días, `SectionList` Activas/Pausadas/Finalizadas, estados vacío/cargando/error, pausar/reanudar/borrar con `Alert`
+- [x] 10.2 [mobile] `src/components/RecurringFormSheet.tsx` (`BottomSheet`, `PickerField`, `NumberStepper`, `FilterChips` de días, `DateField`, `Switch`, `decimal-pad` + `parseDecimal`, vista previa con red) y `src/components/ConfirmOccurrenceSheet.tsx`
+- [x] 10.3 [mobile] Registrar `Recurring` en `FinanceStack` (`src/navigation/TabNavigator.tsx`, `FinanceStackParamList`) con `create`/`occurrenceId` y `useCreateParam`
+- [x] 10.4 [mobile] `src/screens/FinanceScreen.tsx`: tile "Recurrentes" (`repeat`) en `TOOLS` (5 tiles, último a lo ancho) y aviso de pendientes que abre Recurrentes
+- [x] 10.5 [mobile] `src/components/QuickCreateSheet.tsx`: opción "Recurrente" → `FinanceTab` › `Recurring` con `create: true`
+- [x] 10.6 [mobile] `src/lib/notifications.ts`: `recurring_generated`/`recurring_summary` → Recurrentes; `recurring_confirm` → Recurrentes con `occurrenceId` (sin error si ya se resolvió), en caliente y arranque en frío
+- [x] 10.7 [mobile] Inversiones: "Renovar" en la tarjeta / `InvestmentFormSheet` si `can_renew` → `src/components/RenewFixedTermSheet.tsx`; historial de renovaciones; badge "Recurrente" en la lista de transacciones
+- [x] 10.8 [mobile] Sin textos de compra/precios; `npx tsc --noEmit` y tests del repo mobile en verde
 
 ## 11. Verificación contra el backend real (no mock)
 
