@@ -1,4 +1,5 @@
 import apiClient from './client';
+import { CURRENT_ONBOARDING_VERSION } from '../components/Onboarding/steps';
 import type {
   Transaction,
   Note,
@@ -1050,6 +1051,8 @@ let mockSettingsState: Settings = {
   fx_usd_source: 'mep',
   fx_eur_source: 'oficial',
   include_investments_in_balance: false,
+  // Visto: el modo mock no muestra el tutorial (tests y demos no lo esperan).
+  onboarding_version_seen: CURRENT_ONBOARDING_VERSION,
 };
 
 export async function fetchSettings(): Promise<Settings> {
@@ -1065,9 +1068,15 @@ export async function updateSettings(settings: Partial<Settings>): Promise<Setti
     const ratesChanged =
       ('fx_usd_ars' in settings && settings.fx_usd_ars !== mockSettingsState.fx_usd_ars) ||
       ('fx_eur_ars' in settings && settings.fx_eur_ars !== mockSettingsState.fx_eur_ars);
+    // Como el server: el tutorial visto nunca baja.
+    const onboardingSeen = Math.max(
+      mockSettingsState.onboarding_version_seen ?? 0,
+      settings.onboarding_version_seen ?? 0,
+    );
     mockSettingsState = {
       ...mockSettingsState,
       ...settings,
+      onboarding_version_seen: onboardingSeen,
       ...(ratesChanged && { fx_rates_updated_at: new Date().toISOString() }),
     };
     return mockDelay({ ...mockSettingsState });

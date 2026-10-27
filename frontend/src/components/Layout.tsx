@@ -4,6 +4,7 @@ import { LayoutDashboard, PiggyBank, StickyNote, ListTodo, Calendar, Target, Set
 import { useAuthStore } from '../store/authStore';
 import { useTheme } from '../context/ThemeContext';
 import PublicFooter from './PublicFooter';
+import OnboardingModal from './Onboarding/OnboardingModal';
 
 const navItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -153,6 +154,7 @@ export default function Layout() {
           <PublicFooter className="mt-10 pb-2" />
         </main>
       </div>
+      <OnboardingModal />
     </div>
   );
 }

@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Sun, Moon, Save, Check, Loader2, Calendar, RefreshCw, Unlink, Download, Trash2, AlertTriangle } from 'lucide-react';
+import { Sun, Moon, Save, Check, Loader2, Calendar, RefreshCw, Unlink, Download, Trash2, AlertTriangle, HelpCircle } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { useTheme } from '../../context/ThemeContext';
 import { useSettings, syncGoogle, disconnectGoogle } from '../../hooks/useSettings';
 import { exportMyData, deleteMyAccount } from '../../api/endpoints';
 import SessionsSection from './SessionsSection';
 import ReminderSection from './ReminderSection';
+import { useOnboardingStore } from '../../store/onboardingStore';
 import { toLocalDateString } from '../../utils/date';
 
 const inputCls =
@@ -23,6 +24,7 @@ const GOOGLE_ERROR_MESSAGES: Record<string, string> = {
 export default function SettingsPage() {
   const { user, updateProfile } = useAuthStore();
   const { theme, toggle } = useTheme();
+  const openTutorial = useOnboardingStore((s) => s.openReplay);
   const [displayName, setDisplayName] = useState(user?.full_name ?? '');
   const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState('');
@@ -200,6 +202,23 @@ export default function SettingsPage() {
           )}
         </div>
       </form>
+
+      <div className="space-y-3 rounded-xl bg-white dark:bg-slate-800 p-6 shadow-sm">
+        <div className="flex items-center gap-2">
+          <HelpCircle size={18} className="text-brand-indigo" />
+          <h3 className="text-sm font-semibold text-gray-700 dark:text-slate-200">Ayuda</h3>
+        </div>
+        <p className="text-sm text-gray-500 dark:text-slate-400">
+          Repasá cómo está organizada la app en cuatro pasos.
+        </p>
+        <button
+          type="button"
+          onClick={openTutorial}
+          className="flex items-center gap-2 rounded-lg border border-gray-200 dark:border-slate-700 px-4 py-2 text-sm text-gray-700 dark:text-slate-200 transition-colors hover:bg-gray-50 dark:hover:bg-slate-700/50"
+        >
+          Ver tutorial
+        </button>
+      </div>
 
       <div className="space-y-4 rounded-xl bg-white dark:bg-slate-800 p-6 shadow-sm">
         <div className="flex items-center gap-2">

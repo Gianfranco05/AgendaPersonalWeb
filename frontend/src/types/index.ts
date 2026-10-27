@@ -151,6 +151,9 @@ export interface Settings {
   fx_usd_source?: FxUsdSource;
   fx_eur_source?: FxEurSource;
   include_investments_in_balance?: boolean;
+  // Versión del tutorial de bienvenida que el usuario ya vio (0 = ninguna).
+  // El server solo la sube. Ausente = backend viejo: no se muestra el tutorial.
+  onboarding_version_seen?: number;
 }
 
 export type FxUsdSource = 'oficial' | 'mep' | 'blue' | 'manual';
