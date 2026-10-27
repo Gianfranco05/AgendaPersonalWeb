@@ -5,6 +5,7 @@ from typing import Annotated, Literal, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -82,22 +83,29 @@ class SettingsUpdate(BaseModel):
     onboarding_version_seen: Optional[int] = Field(None, ge=0, le=1000)
 
 
+async def _get_or_create_prefs(db: AsyncSession, user_id: str) -> UserPreference:
+    """Las preferencias se crean en el primer pedido. Con varios pedidos
+    simultaneos del mismo usuario nuevo (la web consulta /settings al cargar
+    cualquier pagina) todos ven "sin fila" y todos insertan: el que pierde la
+    carrera choca con el UNIQUE de user_id y se queda con la fila del ganador."""
+    query = select(UserPreference).where(UserPreference.user_id == user_id)
+    prefs = (await db.execute(query)).scalar_one_or_none()
+    if prefs is not None:
+        return prefs
+    db.add(UserPreference(user_id=user_id))
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+    return (await db.execute(query)).scalar_one()
+
+
 @router.get("", response_model=SettingsResponse)
 async def get_settings(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(
-        select(UserPreference).where(UserPreference.user_id == current_user.id)
-    )
-    prefs = result.scalar_one_or_none()
-
-    if not prefs:
-        prefs = UserPreference(user_id=current_user.id)
-        db.add(prefs)
-        await db.commit()
-        await db.refresh(prefs)
-
+    prefs = await _get_or_create_prefs(db, current_user.id)
     return _to_response(prefs)
 
 
@@ -107,14 +115,7 @@ async def update_settings(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(
-        select(UserPreference).where(UserPreference.user_id == current_user.id)
-    )
-    prefs = result.scalar_one_or_none()
-
-    if not prefs:
-        prefs = UserPreference(user_id=current_user.id)
-        db.add(prefs)
+    prefs = await _get_or_create_prefs(db, current_user.id)
 
     update_data = data.model_dump(exclude_unset=True)
     # La columna no admite null: un null explicito se ignora.

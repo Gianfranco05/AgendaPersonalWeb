@@ -290,3 +290,53 @@ async def test_export_de_cuenta_incluye_onboarding_version_seen(api_auth_client)
     await api_auth_client.put("/api/v1/settings", json={"onboarding_version_seen": 1})
     data = (await api_auth_client.get("/api/v1/me/export")).json()
     assert data["user_preferences"][0]["onboarding_version_seen"] == 1
+
+
+@pytest.mark.asyncio
+async def test_settings_la_carrera_del_primer_insert_se_queda_con_la_fila_del_ganador():
+    """La web consulta /settings al cargar cualquier pagina: con varios pedidos
+    simultaneos de un usuario nuevo todos intentan insertar y el que pierde choca
+    con el UNIQUE de user_id. En vez de 500 tiene que devolver la fila ganadora.
+    (Los tests comparten una sola sesion, asi que la carrera real no se puede
+    armar con pedidos paralelos: se simula el choque en el commit.)"""
+    from sqlalchemy.exc import IntegrityError
+
+    from app.api.v1.settings import _get_or_create_prefs
+
+    ganadora = UserPreference(user_id="u-carrera")
+
+    class Result:
+        def __init__(self, row):
+            self.row = row
+
+        def scalar_one_or_none(self):
+            return self.row
+
+        def scalar_one(self):
+            assert self.row is not None
+            return self.row
+
+    class FakeDb:
+        def __init__(self):
+            self.selects = 0
+            self.rolled_back = False
+            self.added = []
+
+        async def execute(self, _query):
+            self.selects += 1
+            # 1.ª lectura: todavia no hay fila. Despues del choque, ya esta la del ganador.
+            return Result(None if self.selects == 1 else ganadora)
+
+        def add(self, obj):
+            self.added.append(obj)
+
+        async def commit(self):
+            raise IntegrityError("INSERT", {}, Exception("UNIQUE constraint failed"))
+
+        async def rollback(self):
+            self.rolled_back = True
+
+    db = FakeDb()
+    prefs = await _get_or_create_prefs(db, "u-carrera")
+    assert prefs is ganadora
+    assert db.rolled_back is True
