@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Pencil, Trash2, Archive, ArchiveRestore, LineChart } from 'lucide-react';
+import { Plus, Pencil, Trash2, Archive, ArchiveRestore, LineChart, RefreshCw, History } from 'lucide-react';
 import { LoadingSkeleton } from '../../components/LoadingSkeleton';
 import { useMarketFx } from '../../hooks/useMarket';
 import {
@@ -8,6 +8,7 @@ import {
   removeInvestment,
   setInvestmentStatus,
   saveInvestmentSettings,
+  useRenewals,
   type InvestmentStatusFilter,
 } from '../../hooks/useInvestments';
 import type { Investment, InvestmentCurrency, PortfolioRealReturn } from '../../types';
@@ -23,7 +24,9 @@ import {
   realReturnReasonText,
   relativeTime,
 } from '../../utils/investments';
+import { formatShortDate } from '../../utils/recurring';
 import InvestmentModal from './InvestmentModal';
+import RenewFixedTermModal from './RenewFixedTermModal';
 import NetWorthCard from './NetWorthCard';
 import FxRatesEditor from './FxRatesEditor';
 
@@ -138,17 +141,61 @@ function RealReturnSummary({ data }: { data: PortfolioRealReturn }) {
   );
 }
 
+/** Cadena de renovaciones de un plazo fijo, de la más vieja a la más nueva. */
+function RenewalHistory({ investment: i }: { investment: Investment }) {
+  const { data, isLoading, error } = useRenewals(i.id);
+  if (isLoading && !data) return <p className="mt-3 text-xs text-gray-400 dark:text-slate-500">Cargando…</p>;
+  if (error && !data) {
+    return (
+      <p role="alert" className="mt-3 text-xs text-red-500">
+        No se pudo cargar el historial.
+      </p>
+    );
+  }
+  if (!data) return null;
+  const currency = data.currency as InvestmentCurrency;
+  return (
+    <div className="mt-3 rounded-lg bg-gray-50 dark:bg-slate-900/40 p-3 text-xs" data-testid="renewal-history">
+      <ol className="space-y-2">
+        {data.items.map((t, index) => (
+          <li key={t.id} className={t.id === i.id ? 'font-medium text-gray-800 dark:text-slate-100' : 'text-gray-600 dark:text-slate-300'}>
+            <span className="mr-1 text-gray-400 dark:text-slate-500">{index + 1}.</span>
+            {t.start_date ? formatShortDate(t.start_date) : '—'} → {t.maturity_date ? formatShortDate(t.maturity_date) : '—'}
+            {' · '}
+            {formatMoney(t.invested_amount, currency)}
+            {t.interest_rate_tna !== null && ` · TNA ${t.interest_rate_tna.toLocaleString('es-AR', { maximumFractionDigits: 4 })}%`}
+            {t.interest !== null && (
+              <span className="text-emerald-600 dark:text-emerald-400">
+                {' '}
+                · interés {t.status === 'closed' ? '' : 'previsto '}
+                {formatMoney(t.interest, currency)}
+              </span>
+            )}
+          </li>
+        ))}
+      </ol>
+      <p className="mt-2 text-gray-500 dark:text-slate-400">
+        Interés acumulado cobrado: <span className="font-medium">{formatMoney(data.accumulated_interest, currency)}</span>
+      </p>
+    </div>
+  );
+}
+
 function InvestmentCard({
   investment: i,
   onEdit,
   onToggleStatus,
   onDelete,
+  onRenew,
 }: {
   investment: Investment;
   onEdit: () => void;
   onToggleStatus: () => void;
   onDelete: () => void;
+  onRenew: () => void;
 }) {
+  const [showHistory, setShowHistory] = useState(false);
+  const hasRenewals = !!(i.renewed_from_id || i.renewed_to_id);
   const chip = maturityLabel(i.days_to_maturity);
   const closed = i.status === 'closed';
   const gainPositive = i.gain >= 0;
@@ -250,6 +297,30 @@ function InvestmentCard({
       </div>
       <QuoteInfo investment={i} />
       <RealReturnInfo investment={i} />
+      {(i.can_renew || hasRenewals) && (
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          {i.can_renew && (
+            <button
+              onClick={onRenew}
+              className="flex items-center gap-1.5 rounded-lg bg-brand-charcoal px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-brand-charcoal-hover"
+            >
+              <RefreshCw size={12} />
+              Renovar
+            </button>
+          )}
+          {hasRenewals && (
+            <button
+              onClick={() => setShowHistory((s) => !s)}
+              aria-expanded={showHistory}
+              className="flex items-center gap-1.5 rounded-lg border border-gray-200 dark:border-slate-700 px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-700/50"
+            >
+              <History size={12} />
+              Historial de renovaciones
+            </button>
+          )}
+        </div>
+      )}
+      {showHistory && hasRenewals && <RenewalHistory investment={i} />}
     </div>
   );
 }
@@ -258,6 +329,7 @@ export default function InvestmentsSection() {
   const [filter, setFilter] = useState<InvestmentStatusFilter>('active');
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<Investment | null>(null);
+  const [renewing, setRenewing] = useState<Investment | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
   const { data: investments, isLoading, error } = useInvestments(filter);
@@ -423,11 +495,20 @@ export default function InvestmentsSection() {
                     run(() => setInvestmentStatus(i.id, i.status === 'active' ? 'closed' : 'active'))
                   }
                   onDelete={() => handleDelete(i)}
+                  onRenew={() => setRenewing(i)}
                 />
               ))}
             </div>
           </section>
         ))
+      )}
+
+      {renewing && (
+        <RenewFixedTermModal
+          investment={renewing}
+          onClose={() => setRenewing(null)}
+          onDone={() => setRenewing(null)}
+        />
       )}
 
       {showModal && (

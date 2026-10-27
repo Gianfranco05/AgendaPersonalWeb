@@ -10,6 +10,8 @@ vi.mock('../../../hooks/useInvestments', () => ({
   setInvestmentStatus: vi.fn(),
   saveInvestmentSettings: vi.fn(),
   saveInvestment: vi.fn(),
+  useRenewals: vi.fn(),
+  renewFixedTerm: vi.fn(),
 }))
 
 vi.mock('../../../hooks/useMarket', () => ({
@@ -25,6 +27,7 @@ import {
   removeInvestment,
   setInvestmentStatus,
   saveInvestmentSettings,
+  useRenewals,
 } from '../../../hooks/useInvestments'
 import InvestmentsSection from '../InvestmentsSection'
 
@@ -179,6 +182,67 @@ describe('InvestmentsSection', () => {
     expect(within(stock).getByText(/\+\$ 22\.500,00/).className).toContain('text-emerald-500')
     const bond = screen.getByRole('region', { name: 'Bonos' })
     expect(within(bond).getByText(/-\$ 200,00/).className).toContain('text-rose-500')
+  })
+
+  describe('renovar plazo fijo', () => {
+    const matured = inv({
+      id: 'i9',
+      asset_type: 'fixed_term',
+      name: 'PF vencido',
+      ticker: null,
+      quantity: null,
+      invested_amount: 1000000,
+      current_value: null,
+      interest_rate_tna: 30,
+      start_date: '2026-09-26',
+      maturity_date: '2026-10-26',
+      effective_value: 1024657.53,
+      days_to_maturity: 0,
+      fixed_term: {
+        term_days: 30,
+        interest_total: 24657.53,
+        amount_at_maturity: 1024657.53,
+        accrued_interest: 24657.53,
+        tea_pct: 34.5,
+      },
+      can_renew: true,
+    })
+
+    it('el botón Renovar solo aparece si can_renew y abre el modal', () => {
+      vi.mocked(useInvestments).mockReturnValue(swr([matured, fixedTerm]))
+      renderWithProviders(<InvestmentsSection />)
+      expect(screen.getAllByRole('button', { name: 'Renovar' })).toHaveLength(1)
+      fireEvent.click(screen.getByRole('button', { name: 'Renovar' }))
+      expect(screen.getByRole('dialog', { name: 'Renovar plazo fijo' })).toBeInTheDocument()
+    })
+
+    it('sin can_renew no hay botón', () => {
+      renderWithProviders(<InvestmentsSection />)
+      expect(screen.queryByRole('button', { name: 'Renovar' })).not.toBeInTheDocument()
+      expect(screen.queryByText('Historial de renovaciones')).not.toBeInTheDocument()
+    })
+
+    it('el historial de renovaciones se pide al abrirlo y lista los tramos', () => {
+      const renewed = inv({ ...matured, id: 'i10', can_renew: false, renewed_from_id: 'i9' })
+      vi.mocked(useInvestments).mockReturnValue(swr([renewed]))
+      vi.mocked(useRenewals).mockReturnValue(
+        swr({
+          currency: 'ARS',
+          accumulated_interest: 24657.53,
+          items: [
+            { id: 'i9', name: 'PF', status: 'closed', start_date: '2026-09-26', maturity_date: '2026-10-26', term_days: 30, invested_amount: 1000000, interest_rate_tna: 30, amount_at_maturity: 1024657.53, interest: 24657.53, renewed_from_id: null },
+            { id: 'i10', name: 'PF', status: 'active', start_date: '2026-10-26', maturity_date: '2026-11-25', term_days: 30, invested_amount: 1024657.53, interest_rate_tna: 28, amount_at_maturity: 1048238.69, interest: 23581.16, renewed_from_id: 'i9' },
+          ],
+        }),
+      )
+      renderWithProviders(<InvestmentsSection />)
+      expect(useRenewals).not.toHaveBeenCalled()
+      fireEvent.click(screen.getByRole('button', { name: /Historial de renovaciones/ }))
+      expect(useRenewals).toHaveBeenCalledWith('i10')
+      const history = screen.getByTestId('renewal-history')
+      expect(within(history).getAllByRole('listitem')).toHaveLength(2)
+      expect(history).toHaveTextContent('Interés acumulado cobrado: $ 24.657,53')
+    })
   })
 
   it('estado vacío', () => {
