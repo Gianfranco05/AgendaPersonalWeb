@@ -199,13 +199,25 @@ Controles: "Saltar" (pasos 1–3), "Anterior" (pasos 2–4), "Siguiente" / "Empe
 2. Web: deploy junto con el backend.
 3. Mobile: build nuevo de EAS (perfil `lan` para probar, luego `preview`/`production`) por las dependencias nativas. Un backend nuevo con mobile viejo no cambia nada (campo aditivo).
 
-## Open Questions
+## Decisiones tomadas (antes "Preguntas abiertas")
 
-1. **Preguntas de bienvenida** (moneda principal ARS/USD, qué querés organizar). *Recomendación*: no incluirlas ahora. `user_preferences.currency` existe pero **ninguna pantalla lo usa** (los montos van en la moneda de cada movimiento/activo), así que preguntarlo no cambiaría nada visible; y las plantillas base están siempre activas y no se pueden desactivar, así que "qué querés organizar → activar módulos base" no tiene efecto. Si se quiere, un change posterior podría usar la respuesta para ordenar los widgets de Inicio y, cuando `currency` se use de verdad (p. ej. con `finanzas-datos-mercado`), sumar la pregunta de moneda como paso 5 opcional.
-2. **Tiempo de re-bloqueo por defecto**. *Recomendación*: 1 minuto (equilibrio entre seguridad y no pedir huella por cada ida y vuelta corta); opciones Inmediato/1/5/15.
-3. **Detectar huellas nuevas** con el centinela de SecureStore `requireAuthentication`. *Recomendación*: no en esta etapa; reevaluar tras probar en 2–3 fabricantes.
-4. **Ocultar recientes sin bloquear capturas** (config plugin propio con `setRecentsScreenshotEnabled(false)`, Android 13+). *Recomendación*: no por ahora; `FLAG_SECURE` con sub-ajuste alcanza.
-5. **Montos en el texto de las push** (vencimientos de inversiones) visibles en la pantalla de bloqueo del sistema. *Recomendación*: change aparte con preferencia "Ocultar montos en notificaciones" del lado del server.
-6. **Usuarios existentes**: ¿ven el tutorial una vez? *Recomendación*: sí (son pocos, antes del lanzamiento, y explica Inversiones, que es nuevo). Alternativa: backfill en la migración marcando `onboarding_version_seen = 1` a las filas existentes.
-7. **Cierre de sesión al 10.º fallo**. *Recomendación*: sí; alternativa más blanda: espera de 1 h por cada fallo extra sin cerrar sesión.
-8. **Biometría solo "fuerte" (Clase 3) en Android**. *Recomendación*: sí; deja afuera el desbloqueo facial 2D de gama baja, que se engaña con una foto.
+Resueltas por el usuario al aplicar el change; todas coinciden con la recomendación original.
+
+1. **Preguntas de bienvenida**: no se incluyen. Queda para un change posterior (ver la recomendación original: la moneda principal no cambia nada visible hoy).
+2. **Tiempo de re-bloqueo por defecto**: 1 minuto (opciones Inmediato / 1 / 5 / 15 min).
+3. **Detectar huellas nuevas** con el centinela de SecureStore: no en esta etapa.
+4. **Ocultar recientes sin bloquear capturas** (config plugin propio): no por ahora; `FLAG_SECURE` con el sub-ajuste alcanza.
+5. **Montos en el texto de las push**: change aparte.
+6. **Usuarios existentes**: ven el tutorial una vez; sin backfill en la migración (`022_onboarding_seen` agrega la columna con `server_default 0`).
+7. **Cierre de sesión al 10.º fallo**: sí (cierre local; los datos del servidor no se tocan).
+8. **Biometría solo fuerte (Clase 3) en Android**: sí, con el PIN como alternativa.
+9. **Mobile sin textos de compra**: ni CTAs, precios ni "comprar en la web" en ningún lado, tutorial incluido. Las plantillas pueden mencionarse como funciones, nunca como algo para comprar.
+
+## Desvíos respecto del diseño original (al implementar)
+
+- **Migración**: `022_onboarding_seen` sobre `021_recurring_transactions` (el head ya no era `018_investments`).
+- **Carga de los módulos nativos**: `require()` dentro de `try/catch` en vez de `import()` dinámico (`src/lib/appLock/biometrics.ts`, `screenGuard.ts`). El comportamiento es el mismo (módulo ausente → "no disponible") y es testeable en Jest, donde `import()` dinámico no se transforma.
+- **Viaje esperado** (`allowExternalTrip`): la marca vence a los 15 segundos si el viaje a segundo plano no empieza (p. ej. `Linking.openURL` falla), para que no cubra un viaje posterior sin relación. Además, los cambios de `AppState` se ignoran 1 segundo después de terminar un prompt biométrico (en algunos equipos llegan tarde).
+- **Secuencias del PIN**: se rechazan las que avanzan o retroceden de a 1 (`1234`, `4321`, `012345`, `987654`); `1357` se acepta.
+- **Jest en mobile**: `tsconfig.json` declara `"types": ["jest", "node"]` (con TypeScript 6 los tipos globales ya no se incluyen solos) y `jest.setup.ts` se carga con `setupFilesAfterEnv`.
+- **Condición de carrera en `GET /api/v1/settings`** (bug encontrado en la verificación en vivo): la web ahora consulta `/settings` al cargar cualquier página (Layout), y varios pedidos simultáneos de un usuario nuevo intentaban insertar `user_preferences` a la vez; los perdedores chocaban con el UNIQUE y devolvían 500 (el tutorial no aparecía). `_get_or_create_prefs` captura el `IntegrityError` y se queda con la fila ganadora. Verificado en SQLite y en Postgres (PGlite).
