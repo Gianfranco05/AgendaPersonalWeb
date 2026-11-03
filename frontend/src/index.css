@@ -130,6 +130,16 @@
   }
 }
 
+/* Resaltado del elemento al que llegó el buscador (utils/reveal.ts) */
+.search-reveal {
+  animation: search-reveal 2.5s ease-out;
+  border-radius: 0.5rem;
+}
+@keyframes search-reveal {
+  0%, 60% { box-shadow: 0 0 0 3px var(--c-brand-indigo); background-color: color-mix(in srgb, var(--c-brand-indigo) 14%, transparent); }
+  100% { box-shadow: 0 0 0 3px transparent; background-color: transparent; }
+}
+
 /* Accesibilidad: sin movimiento para quien lo pide */
 @media (prefers-reduced-motion: reduce) {
   *,

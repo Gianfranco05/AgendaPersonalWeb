@@ -75,9 +75,14 @@ import type {
   RenewResult,
   RenewalChain,
   RenewalTerm,
+  SearchType,
+  SearchItem,
+  SearchGroup,
+  SearchResponse,
 } from '../types';
 import { parseDateOnly, toLocalDateString } from '../utils/date';
 import { nextRuleDates, ruleLabel } from '../utils/recurring';
+import { foldText, highlightRanges, matchRank, tokenize } from '../utils/search';
 import { enrichInvestment, MOCK_CRYPTO_PRICES, MOCK_MONTHLY_INFLATION } from '../utils/investments';
 
 const MOCK_ENABLED = import.meta.env.VITE_MOCK_ENABLED === 'true';
@@ -2911,5 +2916,144 @@ export async function fetchProjectsSummary(): Promise<ProjectsSummary> {
     });
   }
   const { data } = await apiClient.get<ProjectsSummary>('/api/v1/projects/summary');
+  return data;
+}
+
+// ── Buscador global ──
+
+const SEARCH_LABELS: Record<SearchType, string> = {
+  notes: 'Notas',
+  tasks: 'Tareas',
+  events: 'Eventos',
+  transactions: 'Movimientos',
+  habits: 'Hábitos',
+  goals: 'Metas',
+  investments: 'Inversiones',
+  study: 'Estudio',
+  library: 'Biblioteca',
+  media: 'Películas y series',
+  work: 'Trabajo',
+  travel: 'Viajes',
+  vehicle: 'Vehículo',
+  projects: 'Proyectos',
+};
+
+const SEARCH_TYPE_ORDER = Object.keys(SEARCH_LABELS) as SearchType[];
+const PAID_SEARCH_TYPES: SearchType[] = ['study', 'library', 'media', 'work', 'travel', 'vehicle', 'projects'];
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+type MockRow = Record<string, any>;
+
+interface MockSearchSource {
+  type: SearchType;
+  entity: string;
+  load: () => Promise<MockRow[]>;
+  title: (r: MockRow) => string;
+  content: (r: MockRow) => (string | null | undefined)[];
+  path: (id: string) => string;
+  date?: (r: MockRow) => string | null | undefined;
+  filter?: (r: MockRow) => boolean;
+}
+
+const MOCK_SEARCH_SOURCES: MockSearchSource[] = [
+  { type: 'notes', entity: 'note', load: fetchNotes, title: (r) => r.title, content: (r) => [r.content, ...(r.tags ?? []).map((t: { name: string }) => t.name)], path: (id) => `/notes?open=${id}`, date: (r) => r.updated_at },
+  { type: 'tasks', entity: 'task', load: () => fetchTasks(), title: (r) => r.title, content: (r) => [r.description, r.area], path: (id) => `/tasks?open=${id}`, date: (r) => r.due_date },
+  { type: 'events', entity: 'event', load: fetchEvents, title: (r) => r.title, content: (r) => [r.description, r.location], path: (id) => `/events?open=${id}`, date: (r) => r.start_datetime },
+  { type: 'transactions', entity: 'transaction', load: async () => (await fetchTransactions({ per_page: 100 })).items, title: (r) => r.product_name, content: (r) => [r.merchant_name, r.product_description, r.notes], path: (id) => `/finances?tab=transacciones&open=${id}`, date: (r) => r.transaction_date },
+  { type: 'habits', entity: 'habit', load: fetchGoals, title: (r) => r.title, content: (r) => [r.description], path: (id) => `/habits?open=${id}`, filter: (r) => r.goal_type === 'binary' || r.goal_type === 'metric' },
+  { type: 'goals', entity: 'goal', load: fetchGoals, title: (r) => r.title, content: (r) => [r.description], path: (id) => `/goals?open=${id}`, date: (r) => r.end_date, filter: (r) => r.goal_type === 'progress' || r.goal_type === 'savings' },
+  { type: 'investments', entity: 'investment', load: () => fetchInvestments(), title: (r) => r.name, content: (r) => [r.ticker, r.institution, r.notes], path: (id) => `/finances?tab=inversiones&open=${id}`, date: (r) => r.maturity_date },
+  { type: 'study', entity: 'subject', load: fetchSubjects, title: (r) => r.name, content: (r) => [r.professor], path: (id) => `/study?open=${id}&entity=subject` },
+  { type: 'library', entity: 'book', load: () => fetchBooks(), title: (r) => r.title, content: (r) => [r.author, r.notes], path: (id) => `/library?open=${id}&entity=book`, date: (r) => r.finished_date ?? r.started_date },
+  { type: 'media', entity: 'media_item', load: () => fetchMediaItems(), title: (r) => r.title, content: (r) => [r.notes], path: (id) => `/media?open=${id}&entity=media_item` },
+  { type: 'work', entity: 'opportunity', load: () => fetchOpportunities(), title: (r) => `${r.role} · ${r.company}`, content: (r) => [r.company, r.notes], path: (id) => `/work?open=${id}&entity=opportunity`, date: (r) => r.applied_date },
+  { type: 'travel', entity: 'trip', load: fetchTrips, title: (r) => r.destination, content: (r) => [r.notes], path: (id) => `/travel?open=${id}&entity=trip`, date: (r) => r.start_date },
+  { type: 'vehicle', entity: 'vehicle', load: fetchVehicles, title: (r) => r.name, content: (r) => [r.brand, r.model, r.plate], path: (id) => `/vehicle?open=${id}&entity=vehicle` },
+  { type: 'projects', entity: 'project', load: fetchProjects, title: (r) => r.name, content: (r) => [r.description], path: (id) => `/projects?open=${id}&entity=project` },
+];
+/* eslint-enable @typescript-eslint/no-explicit-any */
+
+function mockSnippet(fields: (string | null | undefined)[], tokens: string[]): string | null {
+  const texts = fields.filter((f): f is string => !!f).map((f) => f.replace(/\s+/g, ' ').trim());
+  const hit = texts.find((t) => highlightRanges(t, tokens).length > 0) ?? texts[0];
+  return hit ? hit.slice(0, 140) : null;
+}
+
+/** Misma lógica que el server (plegado, AND de tokens, ranking, límite por
+ *  grupo) sobre los datos mock, respetando las plantillas que el mock da por
+ *  compradas y activas. */
+async function searchMock(q: string, types: SearchType[] | undefined, limit: number): Promise<SearchResponse> {
+  const { query, tokens } = tokenize(q);
+  const phrase = foldText(query);
+  const modules = await fetchModules();
+  const allowed = new Set<SearchType>(
+    SEARCH_TYPE_ORDER.filter(
+      (t) => !PAID_SEARCH_TYPES.includes(t) || modules.some((m) => m.key === t && m.owned && m.enabled),
+    ),
+  );
+  const wanted = SEARCH_TYPE_ORDER.filter(
+    (t) => (!types || types.length === 0 || types.includes(t)) && allowed.has(t),
+  );
+  const groups: SearchGroup[] = [];
+  for (const type of wanted) {
+    const ranked: { rank: number; date: string; item: SearchItem }[] = [];
+    for (const source of MOCK_SEARCH_SOURCES.filter((s) => s.type === type)) {
+      for (const row of await source.load()) {
+        if (source.filter && !source.filter(row)) continue;
+        const title = source.title(row);
+        const content = source.content(row);
+        const haystacks = [title, ...content].map((f) => foldText(f ?? ''));
+        if (!tokens.every((tok) => haystacks.some((h) => h.includes(tok)))) continue;
+        const snippet = mockSnippet(content, tokens);
+        const date = source.date?.(row) ?? null;
+        ranked.push({
+          rank: matchRank(title, phrase, tokens),
+          date: date ?? '',
+          item: {
+            id: String(row.id),
+            type,
+            entity: source.entity,
+            title,
+            title_highlights: highlightRanges(title, tokens),
+            snippet,
+            snippet_highlights: highlightRanges(snippet, tokens),
+            date,
+            parent_id: null,
+            path: source.path(String(row.id)),
+            meta:
+              type === 'notes'
+                ? { tags: (row.tags ?? []).map((t: { name: string }) => t.name), archived: !!row.is_archived }
+                : null,
+          },
+        });
+      }
+    }
+    if (ranked.length === 0) continue;
+    ranked.sort((a, b) => a.rank - b.rank || b.date.localeCompare(a.date) || a.item.id.localeCompare(b.item.id));
+    groups.push({
+      type,
+      label: SEARCH_LABELS[type],
+      has_more: ranked.length > limit,
+      items: ranked.slice(0, limit).map((r) => r.item),
+    });
+  }
+  return mockDelay({ query, groups });
+}
+
+export async function searchAll(
+  q: string,
+  options: { types?: SearchType[]; limit?: number } = {},
+): Promise<SearchResponse> {
+  const limit = options.limit ?? 5;
+  if (MOCK_ENABLED) {
+    return searchMock(q, options.types, limit);
+  }
+  const { data } = await apiClient.get<SearchResponse>('/api/v1/search', {
+    params: {
+      q,
+      limit,
+      ...(options.types && options.types.length > 0 && { types: options.types.join(',') }),
+    },
+  });
   return data;
 }

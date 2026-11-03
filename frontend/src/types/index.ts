@@ -906,3 +906,51 @@ export interface RenewalChain {
   accumulated_interest: number;
   currency: string;
 }
+
+// ── Buscador global ──
+
+export type SearchType =
+  | 'notes'
+  | 'tasks'
+  | 'events'
+  | 'transactions'
+  | 'habits'
+  | 'goals'
+  | 'investments'
+  | 'study'
+  | 'library'
+  | 'media'
+  | 'work'
+  | 'travel'
+  | 'vehicle'
+  | 'projects';
+
+export interface SearchItem {
+  id: string;
+  type: SearchType;
+  /** note, task, exam, packing_item, maintenance, project_task... */
+  entity: string;
+  title: string;
+  /** Rangos [inicio, fin) sobre `title`. Nunca HTML. */
+  title_highlights: [number, number][];
+  snippet: string | null;
+  snippet_highlights: [number, number][];
+  /** YYYY-MM-DD, UTC con Z, o (eventos) hora de pared sin zona. */
+  date: string | null;
+  parent_id: string | null;
+  /** Ruta web de destino, p. ej. /notes?open=<id>. */
+  path: string;
+  meta: Record<string, unknown> | null;
+}
+
+export interface SearchGroup {
+  type: SearchType;
+  label: string;
+  has_more: boolean;
+  items: SearchItem[];
+}
+
+export interface SearchResponse {
+  query: string;
+  groups: SearchGroup[];
+}
