@@ -2,10 +2,12 @@ import { useState } from 'react';
 import { Car, Plus, Pencil, Trash2, ChevronDown } from 'lucide-react';
 import { LoadingSkeleton } from '../../components/LoadingSkeleton';
 import ModuleLockedNotice, { isPaymentRequiredError } from '../../components/ModuleLockedNotice';
-import { useVehicles, useVehicleSummary, removeVehicle } from '../../hooks/useVehicle';
+import { useVehicles, useVehicleSummary, useVehicleRecords, removeVehicle } from '../../hooks/useVehicle';
 import type { Vehicle } from '../../types';
 import VehicleForm from './VehicleForm';
 import MaintenanceRecords from './MaintenanceRecords';
+import { useOpenParam } from '../../hooks/useOpenParam';
+import { revealItem } from '../../utils/reveal';
 
 export default function VehiclePage() {
   const { data: vehicles, isLoading, error: vehiclesError } = useVehicles();
@@ -13,6 +15,33 @@ export default function VehiclePage() {
   const [formOpen, setFormOpen] = useState(false);
   const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  // Desde el buscador: un registro de mantenimiento se muestra expandiendo su
+  // vehículo. Se pide también su lista (misma clave SWR que el historial, sin
+  // request extra) para saber si el registro existe antes de buscarlo en el DOM.
+  const [openVehicleId, setOpenVehicleId] = useState<string | null>(null);
+  const { data: openVehicleRecords } = useVehicleRecords(openVehicleId);
+
+  useOpenParam({
+    ready: !isLoading && !vehiclesError,
+    onOpen: ({ id, entity, parent }) => {
+      if (entity !== 'maintenance') {
+        const target = vehicles?.find((v) => v.id === id);
+        if (!target) return false;
+        handleEdit(target);
+        return true;
+      }
+      if (!parent || !vehicles?.some((v) => v.id === parent)) return false;
+      if (openVehicleId !== parent || expandedId !== parent) {
+        setOpenVehicleId(parent);
+        setExpandedId(parent);
+        return 'wait';
+      }
+      if (!openVehicleRecords) return 'wait';
+      if (!openVehicleRecords.some((r) => r.id === id)) return false;
+      return revealItem(id) || 'wait';
+    },
+  });
 
   const error = vehiclesError ?? summaryError;
   if (isPaymentRequiredError(error)) {

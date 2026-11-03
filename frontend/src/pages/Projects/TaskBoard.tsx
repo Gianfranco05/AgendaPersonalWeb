@@ -72,6 +72,7 @@ export default function TaskBoard({ projectId }: Props) {
                       return (
                         <li
                           key={task.id}
+                          id={`item-${task.id}`}
                           className="flex items-center justify-between gap-2 rounded-lg bg-white dark:bg-slate-800 px-3 py-2 shadow-sm"
                         >
                           <span className="min-w-0 flex-1 truncate text-sm text-gray-700 dark:text-slate-200">

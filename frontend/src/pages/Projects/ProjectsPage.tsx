@@ -2,10 +2,12 @@ import { useState } from 'react';
 import { FolderKanban, Plus, Pencil, Trash2, ChevronDown } from 'lucide-react';
 import { LoadingSkeleton } from '../../components/LoadingSkeleton';
 import ModuleLockedNotice, { isPaymentRequiredError } from '../../components/ModuleLockedNotice';
-import { useProjects, useProjectsSummary, removeProject } from '../../hooks/useProjects';
+import { useProjects, useProjectsSummary, useProjectTasks, removeProject } from '../../hooks/useProjects';
 import type { Project, ProjectStatus } from '../../types';
 import ProjectForm from './ProjectForm';
 import TaskBoard from './TaskBoard';
+import { useOpenParam } from '../../hooks/useOpenParam';
+import { revealItem } from '../../utils/reveal';
 
 const STATUS_LABELS: Record<ProjectStatus, string> = {
   activo: 'Activo',
@@ -25,6 +27,33 @@ export default function ProjectsPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  // Desde el buscador: una tarea de proyecto se muestra expandiendo su proyecto.
+  // Se pide también su lista (misma clave SWR que el tablero, sin request extra)
+  // para saber si la tarea existe antes de buscarla en el DOM.
+  const [openProjectId, setOpenProjectId] = useState<string | null>(null);
+  const { data: openProjectTasks } = useProjectTasks(openProjectId);
+
+  useOpenParam({
+    ready: !isLoading && !projectsError,
+    onOpen: ({ id, entity, parent }) => {
+      if (entity !== 'project_task') {
+        const target = projects?.find((p) => p.id === id);
+        if (!target) return false;
+        handleEdit(target);
+        return true;
+      }
+      if (!parent || !projects?.some((p) => p.id === parent)) return false;
+      if (openProjectId !== parent || expandedId !== parent) {
+        setOpenProjectId(parent);
+        setExpandedId(parent);
+        return 'wait';
+      }
+      if (!openProjectTasks) return 'wait';
+      if (!openProjectTasks.some((t) => t.id === id)) return false;
+      return revealItem(id) || 'wait';
+    },
+  });
 
   const error = projectsError ?? summaryError;
   if (isPaymentRequiredError(error)) {

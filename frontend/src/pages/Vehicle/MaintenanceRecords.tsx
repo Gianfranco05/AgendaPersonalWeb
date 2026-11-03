@@ -73,7 +73,7 @@ export default function MaintenanceRecords({ vehicleId }: Props) {
       ) : (
         <ul className="mb-3 space-y-1.5">
           {(records ?? []).map((r) => (
-            <li key={r.id} className="flex items-center justify-between gap-2 py-0.5">
+            <li key={r.id} id={`item-${r.id}`} className="flex items-center justify-between gap-2 rounded py-0.5">
               <div className="flex min-w-0 flex-1 items-center gap-2">
                 <span className="text-base">{TYPE_ICONS[r.record_type]}</span>
                 <div className="min-w-0">
