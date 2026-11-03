@@ -408,3 +408,22 @@ async def test_user_b_does_not_see_user_a_habit_reminders(user_a, user_b):
     assert resp.status_code == 404
     mine = [g for g in (await user_a.get("/api/v1/goals")).json() if g["id"] == goal_id][0]
     assert mine["reminder_enabled"] is True and mine["reminder_time"] == "07:30"
+
+
+async def test_user_b_search_never_returns_user_a_data(user_a, user_b):
+    """Buscador: ninguna entidad de A aparece en la busqueda de B (flujo por API)."""
+    await user_a.post("/api/v1/notes", json={"title": "Nota ultrasecreta A", "content": "ultrasecreto"})
+    await user_a.post("/api/v1/tasks", json={"title": "Tarea ultrasecreta A"})
+    await user_a.post("/api/v1/goals", json={"title": "Habito ultrasecreto A", "goal_type": "binary"})
+    await user_a.post("/api/v1/finance/transactions", json={
+        "amount": "10.00", "type": "expense", "transaction_date": "2026-01-01",
+        "account_type": "cash", "payment_method": "cash", "product_name": "Gasto ultrasecreto A",
+    })
+    await user_a.post("/api/v1/library/books", json={"title": "Libro ultrasecreto A"})
+
+    mine = (await user_a.get("/api/v1/search", params={"q": "ultrasecret"})).json()
+    assert {g["type"] for g in mine["groups"]} >= {"notes", "tasks", "habits", "transactions", "library"}
+
+    theirs = await user_b.get("/api/v1/search", params={"q": "ultrasecret"})
+    assert theirs.status_code == 200
+    assert theirs.json()["groups"] == []

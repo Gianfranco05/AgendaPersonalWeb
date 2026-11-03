@@ -26,6 +26,7 @@ ENDPOINTS = [
     ("GET", "/api/v1/goals"),
     ("POST", "/api/v1/goals"),
     ("PUT", "/api/v1/goals/nonexistent-id/checkin"),
+    ("GET", "/api/v1/search?q=ab"),
     ("GET", "/api/v1/settings"),
     ("PUT", "/api/v1/settings"),
 ]

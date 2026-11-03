@@ -181,6 +181,11 @@ billing_rate_limiter = _build_rate_limiter(max_attempts=10, window_seconds=300)
 # Mas estricto que el de auth: cada pedido dispara un mail y un aviso al
 # operador, y una persona real manda uno, quizas un par si se equivoco.
 withdrawal_rate_limiter = _build_rate_limiter(max_attempts=5, window_seconds=3600)
+# Buscador global: la key es el user_id (accion autenticada; por IP castigaria
+# a quienes comparten NAT). Con debounce de 250-300 ms una persona tipeando
+# rapido genera ~3 requests/s en rafagas cortas: 120/min no se alcanza en uso
+# real y corta un script que barra el endpoint. Bucket aparte del de auth.
+search_rate_limiter = _build_rate_limiter(max_attempts=120, window_seconds=60)
 
 
 async def rate_limit_auth(request: Request) -> None:
@@ -206,6 +211,20 @@ async def rate_limit_billing(
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Demasiados intentos. Probá de nuevo en unos minutos.",
+            headers={"Retry-After": str(retry_after)},
+        )
+
+
+async def rate_limit_search(
+    current_user=Depends(get_current_user),
+) -> None:
+    if not settings.RATE_LIMIT_ENABLED:
+        return
+    retry_after = await search_rate_limiter.hit(str(current_user.id))
+    if retry_after:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Estás buscando muy rápido. Esperá un momento y probá de nuevo.",
             headers={"Retry-After": str(retry_after)},
         )
 

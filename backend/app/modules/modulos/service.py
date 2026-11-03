@@ -71,6 +71,31 @@ class ModulesService:
             )
         return modules
 
+    async def searchable_module_keys(self, user_id: str) -> set[str]:
+        """Plantillas en las que el buscador puede mirar.
+
+        Las base siempre. Una paga si `require_module` la dejaria pasar
+        (comprada, o el bypass de dev sin cobro) Y el usuario no la apagó: una
+        plantilla desactivada no se ve en la app, asi que tampoco tiene que
+        aparecer en el buscador (el resultado llevaria a una pantalla apagada).
+        Esto es mas estricto que `require_module`, que no mira `enabled`.
+        """
+        from app.core.entitlements import module_access_bypassed
+
+        owned = await self.owned_keys(user_id)
+        result = await self.db.execute(
+            select(EnabledModule).where(EnabledModule.user_id == user_id)
+        )
+        overrides = {row.module_key: row.enabled for row in result.scalars().all()}
+        bypass = module_access_bypassed()
+        keys: set[str] = set()
+        for m in MODULE_REGISTRY:
+            if m.is_base:
+                keys.add(m.key)
+            elif (bypass or m.key in owned) and overrides.get(m.key, True):
+                keys.add(m.key)
+        return keys
+
     async def set_enabled(self, user_id: str, module_key: str, enabled: bool) -> dict:
         module = MODULE_BY_KEY.get(module_key)
         if module is None:

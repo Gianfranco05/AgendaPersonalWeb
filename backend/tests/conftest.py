@@ -16,6 +16,7 @@ from app.database import get_db
 from app.core.http_security import (
     auth_rate_limiter,
     billing_rate_limiter,
+    search_rate_limiter,
     withdrawal_rate_limiter,
 )
 from app.core.base import Base
@@ -61,6 +62,7 @@ async def _reset_rate_limiter():
     # The limiter is process-global; without this, logins accumulate across tests
     auth_rate_limiter.reset()
     billing_rate_limiter.reset()
+    search_rate_limiter.reset()
     withdrawal_rate_limiter.reset()
     yield
 

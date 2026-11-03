@@ -189,9 +189,21 @@ Los términos pueden ser sensibles (salud, plata). La app ya no loguea query str
 
 ## Open Questions
 
-1. **¿Plantilla comprada pero desactivada aparece en el buscador?** Recomendación: no (D4), coherente con que la pantalla no se ve.
-2. **¿Incluir notas archivadas?** Recomendación: sí, con `meta.archived = true` y una etiqueta "Archivada" en el resultado (buscar algo viejo es justamente el caso de uso).
-3. **¿`ñ` se pliega a `n`?** Recomendación: sí ("nino" encuentra "niño"); el costo es que "año" y "ano" coinciden, aceptable en un buscador personal.
-4. **¿Sumar fitness/nutrición, recordatorios y categorías/cuentas como tipos?** Recomendación: no en esta etapa; el registro de fuentes lo deja a una línea.
-5. **¿Historial de búsquedas recientes?** Recomendación: no por ahora (los términos pueden ser sensibles y guardar historial agrega una superficie de privacidad); evaluarlo después, en el dispositivo y no en el servidor.
-6. **Atajo adicional `/` para abrir la paleta en web.** Recomendación: solo `Ctrl+K`/`⌘K` (el `/` choca con tipeo en campos de texto y lectores de pantalla).
+Decididas por el usuario (2026-11-03): se aplicaron las recomendaciones.
+
+1. **¿Plantilla comprada pero desactivada aparece en el buscador?** Decidido: no (D4), coherente con que la pantalla no se ve. Las plantillas no compradas tampoco aparecen.
+2. **¿Incluir notas archivadas?** Decidido: sí, con `meta.archived = true` y una etiqueta "Archivada" en el resultado (buscar algo viejo es justamente el caso de uso).
+3. **¿`ñ` se pliega a `n`?** Decidido: sí ("nino" encuentra "niño"); el costo es que "año" y "ano" coinciden, aceptable en un buscador personal.
+4. **¿Sumar fitness/nutrición, recordatorios y categorías/cuentas como tipos?** Decidido: no en esta etapa; el registro de fuentes lo deja a una línea.
+5. **¿Historial de búsquedas recientes?** Decidido: no por ahora (los términos pueden ser sensibles y guardar historial agrega una superficie de privacidad); evaluarlo después, en el dispositivo y no en el servidor.
+6. **Atajo adicional `/` para abrir la paleta en web.** Decidido: solo `Ctrl+K`/`⌘K` (el `/` choca con tipeo en campos de texto y lectores de pantalla).
+7. **Plantillas en mobile.** Decidido: mobile no muestra CTAs de compra, precios ni "comprar en la web"; los resultados de plantillas que el usuario no tiene simplemente no vienen del backend.
+
+## Notas de implementación
+
+Desviaciones y hallazgos de la implementación respecto del diseño original:
+
+- **Fecha de los eventos**: se devuelve como hora de pared sin zona (`2026-10-20T10:00:00`), igual que la API de eventos (`to_wall_clock`); con `Z` el cliente la correría 3 horas. Los demás timestamps siguen en UTC con `Z`.
+- **Cobertura de changes hermanos**: se revisaron `modules/inversiones` (ya es fuente `investments`), `modules/recurrentes` (reglas recurrentes), `modules/habitos_recordatorios` y bloqueo/bienvenida. Las reglas recurrentes y los ajustes de recordatorios **no** se agregan como tipos: el alcance del diseño son los 14 tipos y ninguna de esas entidades tiene una pantalla propia a la que abrir un resultado; sumar una fuente más es una entrada en `SEARCH_SOURCES`.
+- **Logs**: `sentry.py::scrub_search_query` (nuevo) saca el query string de los eventos y transacciones de `/api/v1/search` (`before_send` y `before_send_transaction`); Sentry adjunta `request.query_string` aunque `send_default_pii` sea `False`. En dev, `DEBUG=True` activa el echo de SQLAlchemy, que sí vuelca los parámetros de las consultas (incluido el término); producción fuerza `DEBUG=false`.
+- **Etiqueta de mantenimiento**: el título mostrado es "Tipo · Vehículo" con el tipo capitalizado (`Revision · Gol Trend`); la coincidencia se busca solo en `notes` (el tipo no es buscable por texto).
