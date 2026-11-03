@@ -97,6 +97,43 @@ describe('HabitReminderSection', () => {
     expect(screen.getByText(/a las 20:00/)).toBeInTheDocument()
   })
 
+  it('no promete una franja cuya ventana ya pasó sin avisar', () => {
+    const missed = today({
+      slots: [{ time: '07:05', status: 'missed', habits: [{ id: 'a', title: 'Agua', icon: null, streak: 0 }] }],
+    })
+    setup(settings(), missed)
+    expect(screen.queryByText(/a las 07:05/)).not.toBeInTheDocument()
+  })
+
+  it('una franja ya enviada se dice como enviada y la que viene se promete', () => {
+    const mixed = today({
+      slots: [
+        { time: '20:00', status: 'sent', habits: [{ id: 'a', title: 'Agua', icon: null, streak: 0 }] },
+        { time: '22:30', status: 'upcoming', habits: [{ id: 'b', title: 'Leer', icon: null, streak: 0 }] },
+      ],
+    })
+    setup(settings(), mixed)
+    expect(screen.getByText('A las 20:00 ya te avisamos: Agua')).toBeInTheDocument()
+    expect(screen.getByText('Hoy a las 22:30 te avisamos de: Leer')).toBeInTheDocument()
+  })
+
+  it('fusionada, tope alcanzado o sin dispositivos no se prometen; due sí', () => {
+    const h = [{ id: 'a', title: 'Agua', icon: null, streak: 0 }]
+    setup(
+      settings(),
+      today({
+        slots: [
+          { time: '08:00', status: 'merged', habits: h },
+          { time: '09:00', status: 'capped', habits: h },
+          { time: '10:00', status: 'no_devices', habits: h },
+          { time: '11:00', status: 'due', habits: h },
+        ],
+      }),
+    )
+    expect(screen.queryByText(/a las 08:00|a las 09:00|a las 10:00/)).not.toBeInTheDocument()
+    expect(screen.getByText('Hoy a las 11:00 te avisamos de: Agua')).toBeInTheDocument()
+  })
+
   it('si ya marcó todo lo dice', () => {
     setup(settings(), today({ pending_count: 0, slots: [] }))
     expect(screen.getByText(/ya marcaste todo hoy/i)).toBeInTheDocument()

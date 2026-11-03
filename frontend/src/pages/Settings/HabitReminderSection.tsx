@@ -32,9 +32,16 @@ export default function HabitReminderSection() {
     summary =
       today.pending_count === 0
         ? ['Ya marcaste todo hoy: no te vamos a avisar.']
-        : today.slots
-            .filter((slot) => slot.habits.length > 0)
-            .map((slot) => `Hoy a las ${slot.time} te avisamos de: ${slot.habits.map((h) => h.title).join(', ')}`);
+        : today.slots.flatMap((slot) => {
+            if (slot.habits.length === 0) return [];
+            const names = slot.habits.map((h) => h.title).join(', ');
+            // Solo se promete lo que todavía va a llegar; lo perdido, fusionado o sin envío no se menciona.
+            if (slot.status === 'sent') return [`A las ${slot.time} ya te avisamos: ${names}`];
+            if (slot.status === 'upcoming' || slot.status === 'due') {
+              return [`Hoy a las ${slot.time} te avisamos de: ${names}`];
+            }
+            return [];
+          });
   }
 
   return (
