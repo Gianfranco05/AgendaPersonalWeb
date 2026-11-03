@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Plus, Pencil, Trash2, Archive, ArchiveRestore, LineChart, RefreshCw, History } from 'lucide-react';
 import { LoadingSkeleton } from '../../components/LoadingSkeleton';
 import { useMarketFx } from '../../hooks/useMarket';
@@ -29,6 +29,7 @@ import InvestmentModal from './InvestmentModal';
 import RenewFixedTermModal from './RenewFixedTermModal';
 import NetWorthCard from './NetWorthCard';
 import FxRatesEditor from './FxRatesEditor';
+import { useOpenParam } from '../../hooks/useOpenParam';
 
 const TONE_CLASSES = {
   urgent: 'bg-rose-50 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300',
@@ -335,6 +336,30 @@ export default function InvestmentsSection() {
   const { data: investments, isLoading, error } = useInvestments(filter);
   const { data: netWorth } = useNetWorth();
   const { data: market } = useMarketFx();
+
+  // Desde el buscador: la inversión puede estar entre las activas o entre las
+  // cerradas. Si no está en el filtro actual se prueba el otro antes de rendirse.
+  const openTried = useRef<{ id: string; filters: Set<InvestmentStatusFilter> } | null>(null);
+  useOpenParam({
+    ready: !isLoading,
+    onOpen: ({ id }) => {
+      const found = investments?.find((i) => i.id === id);
+      if (found) {
+        openTried.current = null;
+        handleEdit(found);
+        return true;
+      }
+      if (openTried.current?.id !== id) openTried.current = { id, filters: new Set() };
+      openTried.current.filters.add(filter);
+      const other: InvestmentStatusFilter = filter === 'active' ? 'closed' : 'active';
+      if (!openTried.current.filters.has(other)) {
+        setFilter(other);
+        return 'wait';
+      }
+      openTried.current = null;
+      return false;
+    },
+  });
 
   function handleNew() {
     setEditing(null);

@@ -1,4 +1,5 @@
-import { useState, lazy, Suspense } from 'react';
+import { useState, useEffect, useRef, lazy, Suspense } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { TrendingUp, TrendingDown, Wallet, Plus, Repeat, X } from 'lucide-react';
 import { LoadingSkeleton } from '../../components/LoadingSkeleton';
 import { useFinanceSummary, useTransactions, removeTransaction } from '../../hooks/useFinance';
@@ -15,6 +16,8 @@ import AccountsSection from './AccountsSection';
 import InvestmentsSection from './InvestmentsSection';
 import RecurringSection from './RecurringSection';
 import RecurringModal, { type RecurringPrefill } from './RecurringModal';
+import { findTransactionById } from './findTransaction';
+import { useOpenParam } from '../../hooks/useOpenParam';
 
 const FinanceCharts = lazy(() => import('./FinanceCharts'));
 
@@ -37,8 +40,31 @@ type Tab =
   | 'inversiones'
   | 'recurrentes';
 
+const TABS: readonly Tab[] = [
+  'transacciones',
+  'presupuestos',
+  'ahorro',
+  'categorias',
+  'reportes',
+  'cuentas',
+  'inversiones',
+  'recurrentes',
+];
+
+function parseTab(value: string | null): Tab | null {
+  return TABS.find((t) => t === value) ?? null;
+}
+
 export default function FinancePage() {
-  const [tab, setTab] = useState<Tab>('transacciones');
+  // El buscador manda `?tab=`: elige la pestaña al entrar y también con la
+  // página ya montada (la URL cambia sin desmontar). Quien abre el elemento
+  // limpia luego el parámetro.
+  const [searchParams] = useSearchParams();
+  const tabParam = parseTab(searchParams.get('tab'));
+  const [tab, setTab] = useState<Tab>(tabParam ?? 'transacciones');
+  useEffect(() => {
+    if (tabParam) setTab(tabParam);
+  }, [tabParam]);
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState<Filters>({
     date_from: '',
@@ -80,6 +106,39 @@ export default function FinancePage() {
     setEditingTx(tx);
     setShowModal(true);
   }
+
+  // Movimientos: la lista está paginada, así que si el buscador apunta a uno que
+  // no está en la página visible se lo busca en el historial (async: 'wait').
+  const txLookup = useRef<{ id: string; done: boolean; tx: Transaction | null } | null>(null);
+  const [, setLookupTick] = useState(0);
+
+  useOpenParam({
+    // Las inversiones las abre su propia sección (tiene sus datos y su modal).
+    ready: !txLoading && tabParam !== 'inversiones',
+    onOpen: ({ id }) => {
+      const local = transactions.find((t) => t.id === id);
+      if (local) {
+        txLookup.current = null;
+        handleEdit(local);
+        return true;
+      }
+      const lookup = txLookup.current;
+      if (!lookup || lookup.id !== id) {
+        txLookup.current = { id, done: false, tx: null };
+        void findTransactionById(id).then((tx) => {
+          if (txLookup.current?.id !== id) return;
+          txLookup.current = { id, done: true, tx };
+          setLookupTick((n) => n + 1);
+        });
+        return 'wait';
+      }
+      if (!lookup.done) return 'wait';
+      txLookup.current = null;
+      if (!lookup.tx) return false;
+      handleEdit(lookup.tx);
+      return true;
+    },
+  });
 
   async function handleDelete(id: string) {
     if (!window.confirm('¿Eliminar esta transacción?')) return;
