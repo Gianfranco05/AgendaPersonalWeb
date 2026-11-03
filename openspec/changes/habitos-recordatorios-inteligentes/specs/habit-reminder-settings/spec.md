@@ -54,7 +54,7 @@ Goal create, update and responses under `/api/v1/goals` SHALL include `reminder_
 - **THEN** the goal SHALL be created with `reminder_enabled: true` and `reminder_time: null`
 
 ### Requirement: Today's reminder overview
-The system SHALL expose `GET /api/v1/habit-reminders/today` with optional `tz_offset_minutes` (−840..840) returning the local date, whether reminders are enabled, `pending_count`, and the list of slots for that day, each with its `time`, `status` (`upcoming`, `due`, or the recorded `sent`, `merged`, `nothing`, `capped`, `no_devices`) and the pending habits assigned to it (`id`, `title`, `icon`, `streak`). It SHALL use the same pending logic as the scheduler. When `tz_offset_minutes` is missing the stored offset SHALL be used, falling back to −180.
+The system SHALL expose `GET /api/v1/habit-reminders/today` with optional `tz_offset_minutes` (−840..840) returning the local date, whether reminders are enabled, `pending_count`, and the list of slots for that day, each with its `time`, `status` (`upcoming`, `due`, `missed` when the slot's window already passed without an evaluation, or the recorded `sent`, `merged`, `nothing`, `capped`, `no_devices`) and the pending habits assigned to it (`id`, `title`, `icon`, `streak`). It SHALL use the same pending logic as the scheduler. When `tz_offset_minutes` is missing the stored offset SHALL be used, falling back to −180.
 
 #### Scenario: Pending habits before the time
 - **WHEN** at 18:00 local "Agua" and "Leer" are pending for the 20:00 slot
