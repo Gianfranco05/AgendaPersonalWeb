@@ -36,7 +36,7 @@ export default function PackingChecklist({ tripId }: Props) {
       ) : (
         <ul className="mb-3 space-y-1">
           {(items ?? []).map((item) => (
-            <li key={item.id} className="flex items-center justify-between gap-2 py-0.5">
+            <li key={item.id} id={`item-${item.id}`} className="flex items-center justify-between gap-2 rounded py-0.5">
               <label className="flex flex-1 cursor-pointer items-center gap-2">
                 <input
                   type="checkbox"

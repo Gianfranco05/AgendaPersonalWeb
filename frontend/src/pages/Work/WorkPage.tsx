@@ -6,6 +6,7 @@ import { useOpportunities, useWorkSummary, removeOpportunity } from '../../hooks
 import type { OpportunityStatus, WorkOpportunity } from '../../types';
 import OpportunityForm from './OpportunityForm';
 import OpportunityCard from './OpportunityCard';
+import { useOpenParam } from '../../hooks/useOpenParam';
 
 const COLUMNS: { key: OpportunityStatus; label: string }[] = [
   { key: 'aplicado', label: 'Aplicado' },
@@ -23,6 +24,16 @@ export default function WorkPage() {
 
   const { data: opportunities, isLoading: oppsLoading, error: oppsError } = useOpportunities();
   const { data: summary, isLoading: summaryLoading } = useWorkSummary();
+
+  useOpenParam({
+    ready: !oppsLoading && !oppsError,
+    onOpen: ({ id }) => {
+      const opportunity = opportunities?.find((o) => o.id === id);
+      if (!opportunity) return false;
+      setModal({ open: true, opportunity });
+      return true;
+    },
+  });
 
   if (isPaymentRequiredError(oppsError)) {
     return <ModuleLockedNotice moduleName="Trabajo y Carrera" />;

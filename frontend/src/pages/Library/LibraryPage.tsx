@@ -6,6 +6,7 @@ import { useBooks, useLibrarySummary, removeBook } from '../../hooks/useLibrary'
 import type { Book, BookStatus } from '../../types';
 import BookForm from './BookForm';
 import BookCard from './BookCard';
+import { useOpenParam } from '../../hooks/useOpenParam';
 
 const FILTERS: { key: BookStatus | 'all'; label: string }[] = [
   { key: 'all', label: 'Todos' },
@@ -20,6 +21,16 @@ export default function LibraryPage() {
 
   const { data: books, isLoading: booksLoading, error: booksError } = useBooks();
   const { data: summary, isLoading: summaryLoading } = useLibrarySummary();
+
+  useOpenParam({
+    ready: !booksLoading && !booksError,
+    onOpen: ({ id }) => {
+      const book = books?.find((b) => b.id === id);
+      if (!book) return false;
+      setModal({ open: true, book });
+      return true;
+    },
+  });
 
   if (isPaymentRequiredError(booksError)) {
     return <ModuleLockedNotice moduleName="Biblioteca" />;

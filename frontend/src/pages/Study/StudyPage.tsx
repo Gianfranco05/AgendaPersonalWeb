@@ -6,6 +6,7 @@ import { useSubjects, useExams, useStudySummary, removeSubject, removeExam } fro
 import type { Subject, Exam, SubjectStatus } from '../../types';
 import SubjectForm from './SubjectForm';
 import ExamForm from './ExamForm';
+import { useOpenParam } from '../../hooks/useOpenParam';
 
 const STATUS_LABELS: Record<SubjectStatus, string> = {
   cursando: 'Cursando',
@@ -43,6 +44,29 @@ export default function StudyPage() {
   const [examModal, setExamModal] = useState<{ open: boolean; exam: Exam | null }>({
     open: false,
     exam: null,
+  });
+
+  // Desde el buscador: `entity` distingue materia de examen (el examen trae su
+  // materia en `parent`, pero alcanza con el id para encontrarlo).
+  useOpenParam({
+    ready: !subjectsLoading && !examsLoading && !subjectsError && !examsError,
+    onOpen: ({ id, entity }) => {
+      if (entity !== 'exam') {
+        const subject = subjects?.find((s) => s.id === id);
+        if (subject) {
+          setSubjectModal({ open: true, subject });
+          return true;
+        }
+      }
+      if (entity !== 'subject') {
+        const exam = exams?.find((e) => e.id === id);
+        if (exam) {
+          setExamModal({ open: true, exam });
+          return true;
+        }
+      }
+      return false;
+    },
   });
 
   if (isPaymentRequiredError(subjectsError) || isPaymentRequiredError(examsError) || isPaymentRequiredError(summaryError)) {

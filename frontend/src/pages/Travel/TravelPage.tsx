@@ -2,10 +2,12 @@ import { useState } from 'react';
 import { Plane, Plus, Pencil, Trash2, ChevronDown, Luggage } from 'lucide-react';
 import { LoadingSkeleton } from '../../components/LoadingSkeleton';
 import ModuleLockedNotice, { isPaymentRequiredError } from '../../components/ModuleLockedNotice';
-import { useTrips, useTravelSummary, removeTrip } from '../../hooks/useTravel';
+import { useTrips, useTravelSummary, usePackingItems, removeTrip } from '../../hooks/useTravel';
 import type { Trip, TripStatus } from '../../types';
 import TripForm from './TripForm';
 import PackingChecklist from './PackingChecklist';
+import { useOpenParam } from '../../hooks/useOpenParam';
+import { revealItem } from '../../utils/reveal';
 
 const STATUS_LABELS: Record<TripStatus, string> = {
   planeado: 'Planeado',
@@ -31,6 +33,34 @@ export default function TravelPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [editingTrip, setEditingTrip] = useState<Trip | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  // Desde el buscador: un ítem del equipaje se muestra expandiendo su viaje. Se
+  // pide también acá su lista (misma clave SWR que el checklist, sin request
+  // extra) para saber si el ítem existe antes de buscarlo en el DOM.
+  const [openTripId, setOpenTripId] = useState<string | null>(null);
+  const { data: openTripItems } = usePackingItems(openTripId);
+
+  useOpenParam({
+    ready: !isLoading && !tripsError,
+    onOpen: ({ id, entity, parent }) => {
+      if (entity !== 'packing_item') {
+        const target = trips?.find((t) => t.id === id);
+        if (!target) return false;
+        handleEdit(target);
+        return true;
+      }
+      if (!parent || !trips?.some((t) => t.id === parent)) return false;
+      if (openTripId !== parent || expandedId !== parent) {
+        setOpenTripId(parent);
+        setExpandedId(parent);
+        return 'wait';
+      }
+      if (!openTripItems) return 'wait';
+      if (!openTripItems.some((i) => i.id === id)) return false;
+      // El checklist usa la misma lista: aparece en este mismo render o el siguiente.
+      return revealItem(id) || 'wait';
+    },
+  });
 
   const error = tripsError ?? summaryError;
   if (isPaymentRequiredError(error)) {

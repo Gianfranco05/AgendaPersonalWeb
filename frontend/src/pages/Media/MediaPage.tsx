@@ -6,6 +6,7 @@ import { useMediaItems, useMediaSummary, removeMediaItem } from '../../hooks/use
 import type { MediaItem, MediaStatus } from '../../types';
 import MediaForm from './MediaForm';
 import MediaCard from './MediaCard';
+import { useOpenParam } from '../../hooks/useOpenParam';
 
 const FILTERS: { key: MediaStatus | 'all'; label: string }[] = [
   { key: 'all', label: 'Todos' },
@@ -20,6 +21,16 @@ export default function MediaPage() {
 
   const { data: items, isLoading: itemsLoading, error: itemsError } = useMediaItems();
   const { data: summary, isLoading: summaryLoading } = useMediaSummary();
+
+  useOpenParam({
+    ready: !itemsLoading && !itemsError,
+    onOpen: ({ id }) => {
+      const item = items?.find((i) => i.id === id);
+      if (!item) return false;
+      setModal({ open: true, item });
+      return true;
+    },
+  });
 
   if (isPaymentRequiredError(itemsError)) {
     return <ModuleLockedNotice moduleName="Películas y Series" />;
