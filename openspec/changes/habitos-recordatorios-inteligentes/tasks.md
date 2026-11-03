@@ -1,9 +1,9 @@
 ## 1. Backend — Modelo y migración
 
-- [ ] 1.1 Crear `backend/app/modules/habitos_recordatorios/__init__.py` y `models.py` con `HabitReminderSettings` (`user_id` único, `enabled` default false, `hour` 20, `minute` 0, `daily_cap` 3, `streak_alerts` true, `timezone_offset_minutes` null, `CheckConstraint` de rangos) y `HabitReminderDispatch` (`local_date` `Date`, `slot` `String(5)`, `status`, `goal_ids` JSON en `Text`, `UniqueConstraint("user_id", "local_date", "slot")`, índice `(user_id, local_date)`) según design D2
+- [ ] 1.1 Crear `backend/app/modules/habitos_recordatorios/__init__.py` y `models.py` con `HabitReminderSettings` (`user_id` único, `enabled` default/server_default **true**, `hour` 20, `minute` 0, `daily_cap` 3, `streak_alerts` true, `timezone_offset_minutes` null, `CheckConstraint` de rangos) y `HabitReminderDispatch` (`local_date` `Date`, `slot` `String(5)`, `status`, `goal_ids` JSON en `Text`, `UniqueConstraint("user_id", "local_date", "slot")`, índice `(user_id, local_date)`) según design D2
 - [ ] 1.2 Agregar a `Goal` (`backend/app/modules/metas/models.py`) `reminder_enabled` (`server_default=true()`), `reminder_hour`, `reminder_minute` (null) y el check "ambas null o ambas con valor"
 - [ ] 1.3 Registrar los modelos donde se importan para `Base.metadata`/Alembic (mismo lugar que el resto de los módulos)
-- [ ] 1.4 Crear la migración en `backend/migrations/versions/` con el número siguiente al head vigente (hoy `019_habit_reminders`, `down_revision` = head al implementar; ojo con migraciones de changes hermanos): `add_column` en `goals`, `create_table` de las dos tablas con checks/índices/unique; `downgrade` con `batch_alter_table` para SQLite
+- [ ] 1.4 Crear la migración en `backend/migrations/versions/` con el número siguiente al head vigente (`023_habit_reminders`, `down_revision = "022_onboarding_seen"`): `add_column` en `goals`, `create_table` de las dos tablas con checks/índices/unique; `downgrade` con `batch_alter_table` para SQLite
 - [ ] 1.5 Verificar `alembic heads` = un solo head y `upgrade head` / `downgrade -1` / `upgrade head` en SQLite
 
 ## 2. Backend — Lógica de pendientes, racha y mensajes
@@ -26,7 +26,7 @@
 ## 4. Backend — Scheduler
 
 - [ ] 4.1 `core/redis_claim.py`: agregar `release_claim(key)` best-effort (no lanza; sin Redis no hace nada)
-- [ ] 4.2 `habitos_recordatorios/scheduler.py`: `_tick(now_utc)` con la consulta liviana de hábitos con recordatorio de usuarios con `enabled = true`, agrupado por usuario → slots, cálculo de hora/día local y slots en ventana (design D5 pasos 1–3)
+- [ ] 4.2 `habitos_recordatorios/scheduler.py`: `_tick(now_utc)` con la consulta liviana de hábitos con recordatorio de usuarios con push token y con configuración habilitada o sin fila (ON por defecto), agrupado por usuario → slots, cálculo de hora/día local y slots en ventana (design D5 pasos 1–3)
 - [ ] 4.3 Dedup en tres capas: set en memoria `(user_id, local_date, slot)`, `claim_once("habit-reminder:{user}:{date}:{slot}", 129600)` e `INSERT` en `habit_reminder_dispatches` en transacción propia; `IntegrityError` → rollback y no enviar; otro error → sacar del set, `release_claim` y relanzar
 - [ ] 4.4 Estados `nothing` / `capped` (conteo de `sent` del día vs `daily_cap`) / `no_devices` / `sent`, y fusión de varios slots del mismo usuario en el mismo ciclo (`sent` + `merged`)
 - [ ] 4.5 Envío con `PushService.send_to_user` y `data = {type: "habit_reminder", local_date, goal_ids}`; errores por usuario logueados sin cortar el ciclo
@@ -41,7 +41,7 @@
 - [ ] 5.4 Tope diario: cap 2 con slots 08:00/13:00/20:00 → 2 envíos y `capped`; racha: 12 días → texto 🔥, 2 días → texto plano, `streak_alerts=false` → plano, la racha no agrega pushes
 - [ ] 5.5 Ventana: caída y vuelta a las 20:40 envía; a las 21:05 no; slot 23:30 y vuelta a las 00:10 del día siguiente no; 19:59 no evalúa; 20:00 y 20:15 al volver a las 20:20 → una push con la unión (`sent` + `merged`)
 - [ ] 5.6 Dedup: dos `_tick` concurrentes → una push; ciclos cada minuto de 20:00 a 20:59 → una; "reinicio" (limpiar set) sin Redis → no reenvía por la fila única; claim de Redis perdido → no envía; error de DB al insertar → no envía y reintenta en el ciclo siguiente (mock); probar con `send_to_user` mockeado
-- [ ] 5.7 Interruptor general apagado o sin fila → nada; usuario sin tokens → `no_devices` sin error; Expo caído no corta el ciclo; poda de dispatches > 30 días
+- [ ] 5.7 Interruptor general apagado → nada; usuario con token y sin fila → recibe con defaults; usuario sin token → nada; usuario sin tokens → `no_devices` sin error; Expo caído no corta el ciclo; poda de dispatches > 30 días
 - [ ] 5.8 API: GET con defaults no crea fila; `has_push_devices`; PUT parcial conserva el resto; 422 para `24:00`, `daily_cap` 0/6, offset ±841; `/today` con `upcoming`, `sent` y `pending_count = 0`; 401 sin sesión
 - [ ] 5.9 `test_metas.py`: crear/editar hábito con `reminder_time`, borrar la hora con null, `reminder_enabled=false`, cliente viejo sin campos nuevos → defaults, formato inválido → 422
 - [ ] 5.10 Aislamiento (`test_tenant_isolation.py` + casos propios): registros de B no marcan el hábito de A; settings y `/today` por usuario; `PUT /goals/{id}` de otro usuario → 404; el scheduler no mezcla usuarios
@@ -58,7 +58,7 @@
 
 ## 7. Web — UI (`frontend/`)
 
-- [ ] 7.1 `src/pages/Settings/HabitReminderSection.tsx`: switch general, hora, máximo por día (1–5), rachas, resumen de hoy, nota "llegan a la app de Android" y aviso si `has_push_devices` es false; dark mode; agregarla en `SettingsPage.tsx` junto a `ReminderSection`
+- [ ] 7.1 `src/pages/Settings/HabitReminderSection.tsx` (y un interruptor de un toque para apagar los avisos en `HabitsPage`): switch general, hora, máximo por día (1–5), rachas, resumen de hoy, nota "llegan a la app de Android" y aviso si `has_push_devices` es false; dark mode; agregarla en `SettingsPage.tsx` junto a `ReminderSection`
 - [ ] 7.2 `src/pages/Goals/GoalForm.tsx`: para `binary`/`metric`, checkbox "Recordarme si no lo marqué" + `input type="time"` opcional (vacío = hora general); Zod con `z.boolean()`/`z.string()` + `refine`, sin `z.coerce`; ocultos para `progress`/`savings`
 - [ ] 7.3 Tests de componentes: la sección guarda `{enabled, time, …}`; aviso sin dispositivos; el form de `progress` no muestra los campos; el de hábito envía `reminder_time` o null
 - [ ] 7.4 `npx vitest run --maxWorkers=2`, `npm run build` y lint sin errores
@@ -76,7 +76,7 @@
 
 - [ ] 9.1 [mobile] `src/screens/RemindersScreen.tsx`: tarjeta "Hábitos sin marcar" (switch, `TimeField`, `NumberStepper` 1–5, switch de rachas, resumen de hoy); al encender pedir permiso + `ensurePushRegistered()` y avisar si el celular no puede recibir push
 - [ ] 9.2 [mobile] `src/components/HabitFormSheet.tsx`: sección "Recordatorio" con switch "Recordarme si no lo marqué", chips "Hora general (HH:MM)" / "Otra hora" + `TimeField`; atajo para activar el interruptor general si está apagado
-- [ ] 9.3 [mobile] `src/screens/HabitsScreen.tsx`: banner descartable "¿Te avisamos a las 20:00 si te falta marcar algún hábito?" [Activar] [Ahora no] con el descarte guardado por usuario en el almacenamiento local
+- [ ] 9.3 [mobile] `src/screens/HabitsScreen.tsx`: interruptor de un toque (campana) para apagar/encender los avisos, y banner descartable "permití las notificaciones" [Permitir] [Ahora no] cuando están encendidos y falta el token, con el descarte guardado por usuario en el almacenamiento local
 - [ ] 9.4 [mobile] Modo claro/oscuro con tokens Stitch y safe-area en los sheets; sin textos de compra
 - [ ] 9.5 [mobile] `npx tsc --noEmit` sin errores
 
@@ -85,7 +85,7 @@
 - [ ] 10.1 Aplicar la migración en Postgres (PGlite o docker compose) y probar `upgrade`/`downgrade`; verificar en Postgres el `INSERT` duplicado en `habit_reminder_dispatches` (`IntegrityError` + rollback sin romper la sesión del ciclo)
 - [ ] 10.2 Por API contra el backend real: `GET/PUT /habit-reminders/settings`, hábito con hora propia, `GET /today` antes y después de marcar (métrico 0 vs > 0)
 - [ ] 10.3 Web con `VITE_MOCK_ENABLED=false`: configurar en Configuración y en el formulario del hábito; recargar y ver los valores persistidos
-- [ ] 10.4 Mobile (build lan contra el backend real): activar desde el banner (permiso + token registrado, `has_push_devices` true), configurar una hora 2–3 minutos adelante, dejar dos hábitos sin marcar → llega **una** push agrupada; marcar todo y configurar otra hora → no llega nada; tocar la push abre Hábitos (en caliente y en frío)
+- [ ] 10.4 Mobile (build lan contra el backend real): dar el permiso desde el banner (token registrado, `has_push_devices` true), configurar una hora 2–3 minutos adelante, dejar dos hábitos sin marcar → llega **una** push agrupada; marcar todo y configurar otra hora → no llega nada; tocar la push abre Hábitos (en caliente y en frío)
 - [ ] 10.5 Dedup real: gunicorn con 2+ workers y Redis → una sola push; sin Redis y reiniciando el proceso dentro de la ventana → no se repite
 - [ ] 10.6 Recuperación: apagar el backend antes de la hora y levantarlo dentro de los 60 minutos (llega) y pasado ese plazo (no llega)
 - [ ] 10.7 Export de cuenta contiene las tablas nuevas; borrar una cuenta de prueba no deja filas

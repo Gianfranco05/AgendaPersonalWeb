@@ -37,13 +37,13 @@
 
 ### D2. Modelo de datos
 
-**Tabla nueva `habit_reminder_settings`** (una fila por usuario, se crea en el primer `PUT`):
+**Tabla nueva `habit_reminder_settings`** (una fila por usuario, se crea en el primer `PUT`; **sin fila el usuario se trata como habilitado con los defaults**):
 
 | Columna | Tipo | Null | Notas |
 |---|---|---|---|
 | `id` | `String(36)` PK | no | uuid4 |
 | `user_id` | `String(36)` FK `users.id` | no | `unique`, index |
-| `enabled` | `Boolean` | no | default/server_default **false** (interruptor general) |
+| `enabled` | `Boolean` | no | default/server_default **true** (interruptor general; decisión del usuario: encendido por defecto) |
 | `hour` | `Integer` | no | default 20, check 0–23 |
 | `minute` | `Integer` | no | default 0, check 0–59 |
 | `daily_cap` | `Integer` | no | default 3, check 1–5 (pushes de hábitos por día local) |
@@ -79,7 +79,7 @@ API: las horas viajan como `"HH:MM"` (`^([01]\d|2[0-3]):[0-5]\d$`) y se guardan 
 
 ### D3. API
 
-- `GET /api/v1/habit-reminders/settings` → `{enabled, time, daily_cap, streak_alerts, timezone_offset_minutes, has_push_devices}`. Sin fila devuelve los defaults **sin escribir** (un GET no crea filas). `has_push_devices` = el usuario tiene ≥ 1 `push_tokens`.
+- `GET /api/v1/habit-reminders/settings` → `{enabled, time, daily_cap, streak_alerts, timezone_offset_minutes, has_push_devices}`. Sin fila devuelve los defaults (`enabled: true`) **sin escribir** (un GET no crea filas). `has_push_devices` = el usuario tiene ≥ 1 `push_tokens`.
 - `PUT /api/v1/habit-reminders/settings` → parcial (`exclude_unset`), upsert, misma respuesta. Validación 422 en español: `time` con el regex, `daily_cap` 1–5, `timezone_offset_minutes` −840..840. Un `null` explícito en un campo no nulo se ignora (mismo criterio que `/settings`).
 - `GET /api/v1/habit-reminders/today?tz_offset_minutes=` → `{local_date, enabled, slots: [{time, status, habits: [{id, title, icon, streak}]}], pending_count}`. `status` por slot: `upcoming` (todavía no llegó la hora), `due` (en ventana, sin evaluar), o el `status` de la fila de dispatch si ya se evaluó. Reusa exactamente la lógica del scheduler (D4) — sirve para la UI ("Hoy a las 20:00 te avisamos de: Agua, Leer") y para verificar contra el backend real sin esperar a la hora. `tz_offset_minutes` opcional: si falta usa el de la configuración, y si tampoco hay, −180.
 - Goals (`backend/app/api/v1/goals.py` + `metas/schemas.py`): `GoalCreate` suma `reminder_enabled: bool = True` y `reminder_time: "HH:MM" | null = null`; `GoalUpdateRequest` los suma opcionales (`reminder_time: null` explícito borra la hora propia); `GoalResponse` devuelve ambos en las 4 rutas que lo arman (conviene un helper `_to_response(goal)` para no repetir el constructor). El service traduce `reminder_time` ↔ `reminder_hour`/`reminder_minute`. Aplica a todos los tipos pero solo tiene efecto en `binary`/`metric`.
@@ -99,7 +99,7 @@ Un hábito está **pendiente** en `local_date` si:
 
 Loop por minuto alineado al inicio del minuto (como los otros dos), arrancado y cancelado en el `lifespan` junto a `run_reminder_scheduler` y `run_investment_alert_scheduler`. Cada `_tick(now_utc)`:
 
-1. **Una consulta liviana**: hábitos (`id`, `user_id`, horas) con `reminder_enabled` y tipo hábito de usuarios con `habit_reminder_settings.enabled = true`, más la hora general y el offset de cada uno. Se agrupa en memoria por usuario → conjunto de slots.
+1. **Una consulta liviana**: hábitos (`id`, `user_id`, horas) con `reminder_enabled` y tipo hábito de usuarios que **tienen al menos un push token** y cuya configuración está habilitada **o no existe** (`LEFT JOIN habit_reminder_settings`, `settings.id IS NULL OR settings.enabled`), más la hora general y el offset de cada uno (sin fila: 20:00, −180, tope 3, rachas on). Los usuarios sin token no se evalúan: no hay a quién avisar. Se agrupa en memoria por usuario → conjunto de slots.
 2. Por usuario: `local_now = now_utc + offset` (offset o −180), `local_date`, `m = minutos del día`. Un slot `T` está **en ventana** si `T <= m < min(T + 60, 1440)`. Fuera de la ventana no se evalúa nunca: tras una caída de más de 60 minutos, o si cambió el día local, el aviso de ese slot se pierde (no se mandan avisos viejos).
 3. Se toman los slots en ventana cuya clave `(user_id, local_date, slot)` no esté en el set en memoria del proceso; se agregan al set.
 4. Por cada slot: `claim_once(f"habit-reminder:{user_id}:{local_date}:{slot}", 129600)`. Si lo ganó otro worker, se saltea.
@@ -131,9 +131,9 @@ Se guarda en `habit_reminder_settings.timezone_offset_minutes`. Los clientes lo 
 - `src/lib/notifications.ts`: exportar `ensurePushRegistered(): Promise<boolean>` (envuelve `initPush()`), sumar `{ kind: 'habits' }` a `NotificationTarget` y `type === 'habit_reminder'` en `targetFromData`.
 - `src/hooks/useNotificationTaps.ts`: `habits` → `navigate('HabitsTab', { screen: 'HabitsHome' })`.
 - `src/hooks/useHabitReminders.ts` (SWR de `settings` y `today`) y funciones en `src/api/endpoints.ts` (escrituras con `queued(...)`, `tzOffsetMinutes()` en cada `PUT`).
-- **Ajustes › Recordatorios** (`RemindersScreen`): tarjeta "Hábitos sin marcar" arriba de la lista: switch "Avisarme si me falta marcar un hábito", `TimeField` "Hora", `NumberStepper` "Máximo de avisos por día" (1–5), switch "Destacar rachas en riesgo", y el resumen de `/today` ("Hoy a las 20:00: Agua, Leer" / "Ya marcaste todo hoy"). Al encender: `ensurePushRegistered()`; si devuelve false, aviso "Este celular no puede recibir avisos del servidor (permiso de notificaciones o versión de la app)" y la configuración se guarda igual.
+- **Ajustes › Recordatorios** (`RemindersScreen`): tarjeta "Hábitos sin marcar" arriba de la lista: switch "Avisarme si me falta marcar un hábito", `TimeField` "Hora", `NumberStepper` "Máximo de avisos por día" (1–5), switch "Destacar rachas en riesgo", y el resumen de `/today` ("Hoy a las 20:00: Agua, Leer" / "Ya marcaste todo hoy"). Al encender (o al tocar "Permitir"): `ensurePushRegistered()`; si devuelve false, aviso "Este celular no puede recibir avisos del servidor (permiso de notificaciones o versión de la app)" y la configuración se guarda igual.
 - **Formulario del hábito** (`HabitFormSheet`): sección "Recordatorio": switch "Recordarme si no lo marqué" (default on) y chips "Hora general (20:00)" / "Otra hora" + `TimeField`. Con el interruptor general apagado, una línea "Activá los avisos de hábitos" que lo enciende (con la misma lógica de permiso).
-- **Hábitos** (`HabitsScreen`): banner descartable si el interruptor general está apagado y hay ≥ 1 hábito: "¿Te avisamos a las 20:00 si te falta marcar algún hábito?" [Activar] [Ahora no]; el descarte se guarda en el almacenamiento local del dispositivo por usuario.
+- **Hábitos** (`HabitsScreen`), con los avisos encendidos por defecto: (a) un interruptor de un toque (ícono de campana en el encabezado, con estado "Avisos activados/apagados") que apaga/enciende `enabled` sin salir de la pantalla; (b) banner descartable cuando el interruptor está encendido, hay ≥ 1 hábito y el celular no tiene token de push (`has_push_devices` false o permiso no concedido): "Para avisarte si te falta marcar un hábito, permití las notificaciones" [Permitir] [Ahora no]; [Permitir] pide el permiso de Android en contexto y registra el token; el descarte se guarda en el almacenamiento local del dispositivo por usuario.
 - Al abrir la app con la configuración activa: `ensurePushRegistered()` silencioso (sin pedir permiso si ya fue denegado) + resincronización del offset (D7).
 - Sin textos de compra ni precios (no aplica).
 
@@ -147,11 +147,11 @@ Se guarda en `habit_reminder_settings.timezone_offset_minutes`. Los clientes lo 
 
 - `OWNED_TABLES`: `("habit_reminder_dispatches", HabitReminderDispatch)` y `("habit_reminder_settings", HabitReminderSettings)` (sin FKs entre sí ni hacia goals: el orden no importa, van con las tablas independientes).
 - Toda consulta filtra por `user_id`; el scheduler arma claves y consultas por usuario y nunca mezcla registros de un usuario con hábitos de otro (el `JOIN` de registros filtra por `goal_id` **y** `user_id`).
-- Migración nueva (número siguiente al head al momento de implementar, hoy sería `019_habit_reminders`; `down_revision` = head vigente): `add_column` en `goals` (`reminder_enabled` con `server_default=true`), `create_table` de las dos tablas con checks/índices/unique; `downgrade` con `batch_alter_table` para SQLite. Verificación en Postgres (PGlite) del upgrade, del `INSERT`/`IntegrityError` y del rollback de sesión tras el conflicto.
+- Migración nueva `023_habit_reminders` (`down_revision = "022_onboarding_seen"`, único head al implementar): `add_column` en `goals` (`reminder_enabled` con `server_default=true`), `create_table` de las dos tablas con checks/índices/unique; `downgrade` con `batch_alter_table` para SQLite. Verificación en Postgres (PGlite) del upgrade, del `INSERT`/`IntegrityError` y del rollback de sesión tras el conflicto.
 
 ## Dependencias
 
-- **Migraciones de changes hermanos** (`finanzas-recurrentes`, `finanzas-datos-mercado`, `app-bloqueo-y-bienvenida`, …): todos pueden crear una migración `019_*`. Esta propuesta no fija número: al implementar se toma el siguiente libre y se verifica `alembic heads` = un solo head.
+- **Migraciones de changes hermanos**: al implementar el head era `022_onboarding_seen`; esta migración es `023_habit_reminders`. Se verifica `alembic heads` = un solo head.
 - **`app-bloqueo-y-bienvenida`**: (a) si la app está bloqueada, la navegación del tap a Hábitos debe ocurrir después de desbloquear (lo resuelve ese change; acá solo se agrega el `type`); (b) si ese change suma una preferencia para ocultar el contenido de las notificaciones, el armado del mensaje (D6) debe usar un texto genérico ("Te faltan hábitos por marcar hoy") — punto de extensión: `build_message(..., hide_content: bool)`; (c) la bienvenida puede ofrecer activar estos avisos usando `PUT /habit-reminders/settings`.
 - **`widgets-android`**: si el widget marca hábitos, tiene que pasar por la misma API de check-in para que el server los vea; marcas en la cola offline todavía no enviadas pueden producir un aviso de algo ya marcado (ver Riesgos). El widget puede reusar `GET /habit-reminders/today` para mostrar pendientes.
 - **Cualquier change que agregue tipos de push** (p. ej. `finanzas-recurrentes`): `NotificationTarget`/`targetFromData`/`useNotificationTaps` se editan en paralelo; al integrar se unen los casos.
@@ -171,17 +171,19 @@ Se guarda en `habit_reminder_settings.timezone_offset_minutes`. Los clientes lo 
 
 ## Migration Plan
 
-1. Deploy con la migración (`alembic upgrade head` en el arranque de prod): columnas nuevas con defaults, tablas vacías. Nadie recibe nada hasta activar (interruptor general apagado por defecto).
+1. Deploy con la migración (`alembic upgrade head` en el arranque de prod): columnas nuevas con defaults, tablas vacías. **Los avisos están encendidos por defecto** (decisión del usuario): todo usuario con al menos un push token registrado empezará a recibir, a las 20:00 locales (−180 si no hay offset guardado), como máximo `daily_cap` (3) avisos de hábitos por día, y solo si le falta marcar algo. Mitigaciones: apagado de un toque en Hábitos (web y mobile) y en Configuración, texto sobrio sin insistencia, y que no se manda nada si ya marcó todo. Los usuarios sin token no reciben nada.
 2. Clientes viejos: los campos nuevos de `GoalResponse` son aditivos y `reminder_enabled` tiene default, así que crear/editar hábitos desde una app vieja sigue funcionando.
 3. Rollback: apagar el scheduler (quitarlo del lifespan) basta para detener envíos; `alembic downgrade` al head anterior elimina tablas y columnas.
 
 ## Open Questions
 
-1. **¿Apagado por defecto?** Recomendación: sí, interruptor general apagado + banner en Hábitos para activarlo (evita pushes sorpresa a usuarios existentes y pide el permiso de Android en contexto). Alternativa: encendido para todos con push registrada.
-2. **Hora por defecto**: recomendación 20:00 (queda tiempo para hacer el hábito). Alternativa 21:00.
-3. **Tope diario**: recomendación default 3, configurable 1–5.
-4. **Racha en riesgo**: recomendación incluirla solo como texto dentro de la misma push, desde 3 días seguidos (sin push extra). Alternativa: push aparte más tarde (p. ej. 22:00) solo para rachas ≥ 7.
-5. **Métricas por debajo de la meta diaria**: recomendación contarlas como hechas con cualquier valor > 0 en esta versión (lo pedido). Alternativa futura: "Te falta 1 L de Agua".
-6. **Frecuencia / días de la semana**: recomendación dejarlo para un change propio ("habitos-frecuencia") que también ajuste rachas y estadísticas; este scheduler ya filtra por un predicado (D4) donde se enchufaría.
-7. **Ventana de recuperación**: recomendación 60 minutos.
-8. **Botón "Probar ahora"** (push de prueba con los pendientes actuales): recomendación no en esta versión; `GET /today` alcanza para verificar. Si se agrega, con rate limit.
+Decididas (el usuario resolvió la primera; el resto adopta las recomendaciones de la propuesta):
+
+1. **Encendido por defecto: SÍ** (decisión del usuario, cambia la recomendación original). El interruptor general arranca en `true`; sin fila se trata como habilitado. Alcanza a usuarios existentes con push token, sin opt-in. Riesgo asumido y mitigado en Migration Plan (apagado de un toque, texto sobrio, tope 3).
+2. **Hora por defecto**: 20:00, con hora propia por hábito.
+3. **Tope diario**: default 3, configurable 1–5.
+4. **Racha en riesgo**: texto dentro de la misma push desde 3 días seguidos, sin push extra. Nombres de hábitos visibles en la pantalla bloqueada por defecto.
+5. **Métricas por debajo de la meta diaria**: cuentan como hechas con cualquier valor > 0.
+6. **Frecuencia / días de la semana**: fuera de alcance (change propio).
+7. **Ventana de recuperación**: 60 minutos.
+8. **Botón "Probar ahora"**: no en esta versión.

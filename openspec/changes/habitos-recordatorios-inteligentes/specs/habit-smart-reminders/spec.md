@@ -36,7 +36,7 @@ The system SHALL consider a habit pending on a user's local date when all of the
 - **THEN** it SHALL NOT be included in any habit reminder
 
 ### Requirement: Smart reminder delivery
-For every user whose habit reminder settings have `enabled = true`, the system SHALL evaluate each reminder slot (the general time, plus every distinct per-habit time) once per local date, and SHALL send a remote push through the existing push infrastructure and Android channel `recordatorios` only when at least one habit assigned to that slot is pending at evaluation time. The push data SHALL be `{type: "habit_reminder", local_date, goal_ids}` where `goal_ids` lists the pending habits included.
+For every user that has at least one registered push token and whose habit reminder settings have `enabled = true` or do not exist (reminders are on by default, with the default settings), the system SHALL evaluate each reminder slot (the general time, plus every distinct per-habit time) once per local date, and SHALL send a remote push through the existing push infrastructure and Android channel `recordatorios` only when at least one habit assigned to that slot is pending at evaluation time. The push data SHALL be `{type: "habit_reminder", local_date, goal_ids}` where `goal_ids` lists the pending habits included.
 
 #### Scenario: Habit missing at reminder time
 - **WHEN** the general time is 20:00, the user's offset is −180, "Tomar agua" has no record for 2026-10-25 and the scheduler runs at 2026-10-25 23:00 UTC
@@ -47,8 +47,16 @@ For every user whose habit reminder settings have `enabled = true`, the system S
 - **THEN** no push SHALL be sent for that slot and the slot SHALL be recorded with status `nothing`
 
 #### Scenario: Master switch off
-- **WHEN** the user's habit reminder settings have `enabled = false` or do not exist
+- **WHEN** the user's habit reminder settings have `enabled = false`
 - **THEN** no habit reminder SHALL be sent to that user
+
+#### Scenario: User without a settings row
+- **WHEN** a user with a push token and pending habits has no `habit_reminder_settings` row and it is 20:00 local (UTC-3)
+- **THEN** the push SHALL be sent using the default settings and no row SHALL be required
+
+#### Scenario: User without push tokens
+- **WHEN** a user without any push token has pending habits
+- **THEN** nothing SHALL be sent and no error SHALL be raised
 
 #### Scenario: Per-habit time
 - **WHEN** "Leer" has its own time 22:30 and the general time is 20:00

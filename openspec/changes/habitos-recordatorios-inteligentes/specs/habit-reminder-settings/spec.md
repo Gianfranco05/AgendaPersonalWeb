@@ -1,11 +1,11 @@
 ## ADDED Requirements
 
 ### Requirement: Read habit reminder settings
-The system SHALL expose `GET /api/v1/habit-reminders/settings` for the authenticated user returning `enabled`, `time` ("HH:MM"), `daily_cap`, `streak_alerts`, `timezone_offset_minutes` and `has_push_devices` (true when the user has at least one registered push token). When the user has no settings row the system SHALL return the defaults (`enabled = false`, `time = "20:00"`, `daily_cap = 3`, `streak_alerts = true`, `timezone_offset_minutes = null`) without creating a row.
+The system SHALL expose `GET /api/v1/habit-reminders/settings` for the authenticated user returning `enabled`, `time` ("HH:MM"), `daily_cap`, `streak_alerts`, `timezone_offset_minutes` and `has_push_devices` (true when the user has at least one registered push token). When the user has no settings row the system SHALL return the defaults (`enabled = true`, `time = "20:00"`, `daily_cap = 3`, `streak_alerts = true`, `timezone_offset_minutes = null`) without creating a row.
 
 #### Scenario: Defaults for a new user
 - **WHEN** a user who never configured habit reminders requests the settings
-- **THEN** the response SHALL contain the defaults and no `habit_reminder_settings` row SHALL be created
+- **THEN** the response SHALL contain the defaults with `enabled: true` and no `habit_reminder_settings` row SHALL be created
 
 #### Scenario: Push device flag
 - **WHEN** the user has one registered push token
@@ -88,11 +88,15 @@ All habit reminder settings, overview and dispatch data SHALL be scoped to the a
 - **THEN** the export SHALL include both tables and the deletion SHALL remove their rows
 
 ### Requirement: Mobile habit reminder configuration
-The mobile app SHALL offer, in Ajustes › Recordatorios, a "Hábitos sin marcar" section with the master switch, the general time, the daily cap (1–5), the streak toggle and today's overview; and in the habit form a "Recordarme si no lo marqué" switch with "Hora general" or a custom time. When the master switch is off and the user has at least one habit, the Hábitos screen SHALL show a dismissible banner to enable it. Enabling reminders SHALL request notification permission and register the device push token; when the device cannot receive server push the app SHALL say so instead of promising the reminder. On app start and return to foreground with reminders enabled, the app SHALL re-register the push token silently and update `timezone_offset_minutes` if the device offset changed.
+The mobile app SHALL offer, in Ajustes › Recordatorios, a "Hábitos sin marcar" section with the master switch, the general time, the daily cap (1–5), the streak toggle and today's overview; and in the habit form a "Recordarme si no lo marqué" switch with "Hora general" or a custom time. Habit reminders SHALL be enabled by default. The Hábitos screen SHALL offer a one-tap switch to turn the reminders off and on. When reminders are enabled, the user has at least one habit and the device has no registered push token, the Hábitos screen SHALL show a dismissible banner that requests notification permission in context and registers the token. Enabling reminders from settings SHALL also request notification permission and register the device push token; when the device cannot receive server push the app SHALL say so instead of promising the reminder. On app start and return to foreground with reminders enabled, the app SHALL re-register the push token silently and update `timezone_offset_minutes` if the device offset changed.
 
-#### Scenario: Enable from the banner
-- **WHEN** the user taps "Activar" on the Hábitos banner and grants notification permission
-- **THEN** the settings SHALL be saved with `enabled: true` and the device offset, and the device push token SHALL be registered
+#### Scenario: Grant permission from the banner
+- **WHEN** the user taps "Permitir" on the Hábitos banner and grants notification permission
+- **THEN** the device push token SHALL be registered and the device offset SHALL be saved
+
+#### Scenario: Turn off with one tap
+- **WHEN** the user taps the reminders switch on the Hábitos screen
+- **THEN** the settings SHALL be saved with `enabled: false`
 
 #### Scenario: Device without server push
 - **WHEN** the user enables reminders on a device where push registration fails
@@ -107,7 +111,7 @@ The mobile app SHALL offer, in Ajustes › Recordatorios, a "Hábitos sin marcar
 - **THEN** the banner SHALL not be shown again on that device for that user
 
 ### Requirement: Web habit reminder configuration
-The web app SHALL offer in Configuración a habit reminders section with the same controls and today's overview, stating that notifications are delivered to the Android app and warning when `has_push_devices` is false; and in the goal form, for `binary` and `metric` types only, a "Recordarme si no lo marqué" checkbox and an optional time input (empty = general time). Forms SHALL validate with Zod without `z.coerce`. Mock mode SHALL support the new endpoints.
+The web app SHALL offer in Configuración a habit reminders section with the same controls and today's overview (and a one-tap switch to turn the reminders off in the Hábitos page), stating that notifications are delivered to the Android app and warning when `has_push_devices` is false; and in the goal form, for `binary` and `metric` types only, a "Recordarme si no lo marqué" checkbox and an optional time input (empty = general time). Forms SHALL validate with Zod without `z.coerce`. Mock mode SHALL support the new endpoints.
 
 #### Scenario: Save settings on the web
 - **WHEN** the user enables habit reminders at 21:00 in Configuración
