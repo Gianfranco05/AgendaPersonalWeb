@@ -6,6 +6,7 @@ import type { Note } from '../../types';
 import NotesSidebar from './NotesSidebar';
 import NoteEditor from './NoteEditor';
 import { parseServerTimestamp } from '../../utils/date';
+import { useOpenParam } from '../../hooks/useOpenParam';
 
 export default function NotesPage() {
   const [notes, setNotes] = useState<Note[]>([]);
@@ -56,6 +57,43 @@ export default function NotesPage() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const selectedNote = notes.find((n) => n.id === selectedId) || null;
+
+  // Las notas archivadas no vienen en la lista normal: si el buscador lleva a
+  // una, se pide una vez la lista completa. 'missing' = tampoco está ahí.
+  const archivedLookup = useRef<'idle' | 'pending' | 'done'>('idle');
+  const [, setLookupTick] = useState(0);
+
+  useOpenParam({
+    ready: !loading,
+    onOpen: ({ id }) => {
+      const found = notes.find((n) => n.id === id);
+      if (found) {
+        setSearch('');
+        setActiveTag(null);
+        setSelectedId(id);
+        setMobileView('editor');
+        return true;
+      }
+      if (archivedLookup.current === 'done') return false;
+      if (archivedLookup.current === 'idle') {
+        archivedLookup.current = 'pending';
+        fetchNotes(true)
+          .then((all) => {
+            // Solo se suman las que faltan: no pisar ediciones locales.
+            setNotes((prev) => {
+              const known = new Set(prev.map((n) => n.id));
+              return [...prev, ...all.filter((n) => !known.has(n.id))];
+            });
+          })
+          .catch(() => undefined)
+          .finally(() => {
+            archivedLookup.current = 'done';
+            setLookupTick((t) => t + 1);
+          });
+      }
+      return 'wait';
+    },
+  });
 
   function handleNew() {
     const newNote: Note = {

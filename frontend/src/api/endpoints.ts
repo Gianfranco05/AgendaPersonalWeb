@@ -261,7 +261,8 @@ export async function deleteTransaction(id: string): Promise<void> {
 
 // ── Notes ──
 
-export async function fetchNotes(): Promise<Note[]> {
+/** `includeArchived`: el buscador puede llevar a una nota archivada, que la lista normal no trae. */
+export async function fetchNotes(includeArchived = false): Promise<Note[]> {
   if (MOCK_ENABLED) {
     const mockNotes: Note[] = [
       {
@@ -300,7 +301,9 @@ export async function fetchNotes(): Promise<Note[]> {
     ];
     return mockDelay(mockNotes);
   }
-  const { data } = await apiClient.get<Note[]>('/api/v1/notes');
+  const { data } = await apiClient.get<Note[]>('/api/v1/notes', {
+    params: includeArchived ? { include_archived: true } : undefined,
+  });
   return data;
 }
 

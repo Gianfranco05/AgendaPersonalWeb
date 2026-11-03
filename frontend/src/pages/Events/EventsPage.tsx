@@ -7,6 +7,7 @@ import type { CalendarEvent } from '../../types';
 import CalendarGrid from './CalendarGrid';
 import EventList from './EventList';
 import EventForm from './EventForm';
+import { useOpenParam } from '../../hooks/useOpenParam';
 
 export default function EventsPage() {
   const [year, setYear] = useState(new Date().getFullYear());
@@ -17,6 +18,20 @@ export default function EventsPage() {
   const [exporting, setExporting] = useState(false);
 
   const { data: events, isLoading, mutate } = useEvents();
+
+  useOpenParam({
+    ready: !isLoading,
+    onOpen: ({ id }) => {
+      const target = events?.find((e) => e.id === id);
+      if (!target) return false;
+      // El calendario va al mes del evento para que el contexto coincida con el form.
+      const start = new Date(target.start_datetime);
+      setYear(start.getFullYear());
+      setMonth(start.getMonth());
+      handleEdit(target);
+      return true;
+    },
+  });
 
   async function handleExport() {
     setExporting(true);

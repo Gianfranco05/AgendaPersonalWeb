@@ -63,6 +63,7 @@ export default function TaskCard({ task, index, onUpdate, onDelete }: TaskCardPr
       {(provided, snapshot) => (
         <div
           ref={provided.innerRef}
+          id={`item-${task.id}`}
           {...provided.draggableProps}
           {...provided.dragHandleProps}
           className={`group rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3 shadow-sm transition-shadow ${

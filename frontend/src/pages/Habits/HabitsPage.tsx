@@ -8,6 +8,7 @@ import CheckInButton from '../Goals/CheckInButton';
 import GoalForm from '../Goals/GoalForm';
 import MonthlyHabitGrid from './MonthlyHabitGrid';
 import Switch from '../../components/Switch';
+import { useOpenParam } from '../../hooks/useOpenParam';
 import {
   useHabitReminderSettings,
   saveHabitReminderSettings,
@@ -25,6 +26,19 @@ export default function HabitsPage() {
   const [tab, setTab] = useState<Tab>('rachas');
   const { data: reminderSettings } = useHabitReminderSettings();
   useSyncReminderOffset(reminderSettings);
+
+  useOpenParam({
+    ready: !isLoading,
+    onOpen: ({ id }) => {
+      const target = habits?.find((h) => h.id === id);
+      if (!target) return false;
+      setTab('rachas');
+      setEditingHabit(target);
+      setFormType(target.goal_type === 'metric' ? 'metric' : 'binary');
+      setShowForm(true);
+      return true;
+    },
+  });
 
   function handleNew(type: 'binary' | 'metric' = 'binary') {
     setEditingHabit(null);
