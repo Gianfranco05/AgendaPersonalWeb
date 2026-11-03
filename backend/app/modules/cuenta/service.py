@@ -27,6 +27,10 @@ from app.modules.finanzas.models import BankAccount, Budget, Category, Transacti
 from app.modules.inversiones.models import Investment
 from app.modules.recurrentes.models import RecurringOccurrence, RecurringTransaction
 from app.modules.fitness.models import Exercise, WorkoutSession
+from app.modules.habitos_recordatorios.models import (
+    HabitReminderDispatch,
+    HabitReminderSettings,
+)
 from app.modules.biblioteca.models import Book
 from app.modules.estudio.models import Exam, Subject
 from app.modules.peliculas.models import MediaItem
@@ -61,6 +65,9 @@ OWNED_TABLES: list[tuple[str, Any]] = [
     ("recurring_transactions", RecurringTransaction),
     ("budgets", Budget),
     ("habit_records", HabitRecord),
+    # Sin FKs hacia otras tablas del usuario: el orden entre ellas no importa.
+    ("habit_reminder_dispatches", HabitReminderDispatch),
+    ("habit_reminder_settings", HabitReminderSettings),
     ("exams", Exam),
     ("packing_items", PackingItem),
     ("maintenance_records", MaintenanceRecord),

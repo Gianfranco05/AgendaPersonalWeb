@@ -34,3 +34,15 @@ async def claim_once(key: str, ttl_seconds: int) -> bool:
         logger.warning("Scheduler: Redis no disponible para deduplicar", exc_info=True)
         _redis_client = None
         return True
+
+
+async def release_claim(key: str) -> None:
+    """Libera un claim (best-effort): lo usa un scheduler cuyo ciclo fallo antes
+    de dejar su marca persistente, para que otro ciclo pueda reintentar. Sin
+    Redis, o si no responde, no hace nada y nunca lanza."""
+    if not settings.REDIS_URL or _redis_client is None:
+        return
+    try:
+        await _redis_client.delete(key)
+    except Exception:
+        logger.warning("Scheduler: no se pudo liberar el claim de Redis", exc_info=True)

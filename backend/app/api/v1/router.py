@@ -25,6 +25,7 @@ from app.modules.proyectos.api_routes import router as projects_router
 from app.modules.inversiones.api_routes import router as investments_router
 from app.modules.mercado.api_routes import router as market_router
 from app.modules.recurrentes.api_routes import router as recurring_router
+from app.modules.habitos_recordatorios.api_routes import router as habit_reminders_router
 from app.infra.router import router as infra_router
 
 api_router = APIRouter()
@@ -36,6 +37,7 @@ api_router.include_router(recurring_router)
 api_router.include_router(notes_router)
 api_router.include_router(events_router)
 api_router.include_router(goals_router)
+api_router.include_router(habit_reminders_router)
 api_router.include_router(settings_router)
 api_router.include_router(fitness_router)
 api_router.include_router(nutrition_router)

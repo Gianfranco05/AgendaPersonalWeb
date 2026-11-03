@@ -415,3 +415,71 @@ async def test_delete_requiere_autenticacion(client):
         "DELETE", "/api/v1/me", json={"password": TEST_PASSWORD}
     )
     assert response.status_code == 401
+
+
+async def _seed_avisos_de_habitos(db_session, user_id: str, slot: str = "20:00"):
+    from app.modules.habitos_recordatorios.models import (
+        HabitReminderDispatch,
+        HabitReminderSettings,
+    )
+
+    db_session.add(HabitReminderSettings(user_id=user_id, hour=21, minute=15, daily_cap=2))
+    db_session.add(
+        HabitReminderDispatch(
+            user_id=user_id, local_date=date(2026, 10, 25), slot=slot, status="sent"
+        )
+    )
+    await db_session.commit()
+
+
+@pytest.mark.asyncio
+async def test_export_incluye_los_avisos_de_habitos_propios_y_no_los_ajenos(
+    api_auth_client, db_session, test_user
+):
+    otro = User(
+        email="avisos-ajenos@example.com",
+        password_hash=hash_password("otra-password"),
+        full_name="Ajeno",
+    )
+    db_session.add(otro)
+    await db_session.flush()
+    await _seed_avisos_de_habitos(db_session, str(test_user.id), "20:00")
+    await _seed_avisos_de_habitos(db_session, str(otro.id), "07:00")
+
+    data = (await api_auth_client.get("/api/v1/me/export")).json()
+    assert [(s["hour"], s["minute"], s["daily_cap"]) for s in data["habit_reminder_settings"]] == [
+        (21, 15, 2)
+    ]
+    assert [d["slot"] for d in data["habit_reminder_dispatches"]] == ["20:00"]
+    assert data["habit_reminder_dispatches"][0]["local_date"] == "2026-10-25"
+
+
+@pytest.mark.asyncio
+async def test_borrar_la_cuenta_borra_los_avisos_de_habitos_y_no_los_ajenos(
+    api_auth_client, db_session, test_user
+):
+    from app.modules.habitos_recordatorios.models import (
+        HabitReminderDispatch,
+        HabitReminderSettings,
+    )
+
+    otro = User(
+        email="avisos-sobreviviente@example.com",
+        password_hash=hash_password("otra-password"),
+        full_name="Sobreviviente",
+    )
+    db_session.add(otro)
+    await db_session.flush()
+    otro_id = str(otro.id)
+    await _seed_avisos_de_habitos(db_session, str(test_user.id))
+    await _seed_avisos_de_habitos(db_session, otro_id)
+
+    response = await api_auth_client.request(
+        "DELETE", "/api/v1/me", json={"password": TEST_PASSWORD}
+    )
+    assert response.status_code == 200
+
+    db_session.expire_all()
+    for model in (HabitReminderSettings, HabitReminderDispatch):
+        rows = (await db_session.execute(select(model.user_id))).scalars().all()
+        assert rows == [otro_id]

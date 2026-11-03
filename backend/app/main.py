@@ -26,6 +26,7 @@ from app.modules.recordatorios.scheduler import run_reminder_scheduler
 from app.modules.inversiones.scheduler import run_investment_alert_scheduler
 from app.modules.mercado.scheduler import run_market_data_scheduler
 from app.modules.recurrentes.scheduler import run_recurring_scheduler
+from app.modules.habitos_recordatorios.scheduler import run_habit_reminder_scheduler
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +51,7 @@ async def lifespan(app: FastAPI):
         asyncio.create_task(run_reminder_scheduler()),
         asyncio.create_task(run_investment_alert_scheduler()),
         asyncio.create_task(run_recurring_scheduler()),
+        asyncio.create_task(run_habit_reminder_scheduler()),
     ]
     if settings.MARKET_DATA_ENABLED:
         scheduler_tasks.append(asyncio.create_task(run_market_data_scheduler()))

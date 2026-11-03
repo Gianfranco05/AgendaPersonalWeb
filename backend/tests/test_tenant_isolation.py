@@ -383,3 +383,28 @@ async def test_user_b_no_renueva_ni_ve_renovaciones_de_user_a(user_a, user_b):
     assert (await user_b.post(url + "/renew", json=body)).status_code == 404
     assert (await user_b.get(url + "/renewals")).status_code == 404
     assert (await user_a.get(url)).json()["status"] == "active"
+
+
+async def test_user_b_does_not_see_user_a_habit_reminders(user_a, user_b):
+    created = await user_a.post("/api/v1/goals", json={
+        "title": "Habito privado A",
+        "goal_type": "binary",
+        "reminder_time": "07:30",
+    })
+    assert created.status_code == 201
+    goal_id = created.json()["id"]
+    await user_a.put("/api/v1/habit-reminders/settings", json={"enabled": False, "time": "06:00"})
+
+    # Lo de B es suyo: ni el habito, ni la hora, ni la configuracion de A.
+    overview = (await user_b.get(
+        "/api/v1/habit-reminders/today", params={"tz_offset_minutes": -180}
+    )).json()
+    assert overview["pending_count"] == 0 and overview["slots"] == []
+    theirs = (await user_b.get("/api/v1/habit-reminders/settings")).json()
+    assert theirs["enabled"] is True and theirs["time"] == "20:00"
+
+    # Y B no puede editar el aviso del habito de A.
+    resp = await user_b.put(f"/api/v1/goals/{goal_id}", json={"reminder_enabled": False})
+    assert resp.status_code == 404
+    mine = [g for g in (await user_a.get("/api/v1/goals")).json() if g["id"] == goal_id][0]
+    assert mine["reminder_enabled"] is True and mine["reminder_time"] == "07:30"
