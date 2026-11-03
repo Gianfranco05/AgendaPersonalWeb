@@ -23,6 +23,8 @@ import type {
   Settings,
   Session,
   Reminder,
+  HabitReminderSettings,
+  HabitReminderToday,
   ModuleInfo,
   StoreCatalog,
   Subject,
@@ -478,6 +480,8 @@ export async function fetchGoals(): Promise<Goal[]> {
         color: '#3B82F6',
         icon: 'fa-bullseye',
         is_completed: false,
+        reminder_enabled: true,
+        reminder_time: null,
       },
     ];
     return mockDelay(mockGoals);
@@ -499,6 +503,8 @@ export async function createGoal(goal: Record<string, unknown>): Promise<Goal> {
     color: goal.color ?? '#7C3AED',
     icon: goal.icon ?? 'fa-bullseye',
     end_date: goal.end_date || null,
+    reminder_enabled: goal.reminder_enabled ?? true,
+    reminder_time: goal.reminder_time || null,
   });
   return data;
 }
@@ -516,6 +522,9 @@ export async function updateGoal(id: string, goal: Record<string, unknown>): Pro
     color: goal.color,
     icon: goal.icon,
     end_date: goal.end_date,
+    // Solo se mandan si vienen: una meta numérica no toca los avisos del hábito.
+    ...('reminder_enabled' in goal && { reminder_enabled: goal.reminder_enabled }),
+    ...('reminder_time' in goal && { reminder_time: goal.reminder_time || null }),
   });
   return data;
 }
@@ -2120,6 +2129,64 @@ export async function fetchReminders(): Promise<Reminder[]> {
     ]);
   }
   const { data } = await apiClient.get<Reminder[]>('/api/v1/reminders');
+  return data;
+}
+
+// ── Avisos de hábitos sin marcar ──
+
+let mockHabitReminderSettings: HabitReminderSettings = {
+  enabled: true,
+  time: '20:00',
+  daily_cap: 3,
+  streak_alerts: true,
+  timezone_offset_minutes: null,
+  has_push_devices: false,
+};
+
+export async function fetchHabitReminderSettings(): Promise<HabitReminderSettings> {
+  if (MOCK_ENABLED) {
+    return mockDelay({ ...mockHabitReminderSettings });
+  }
+  const { data } = await apiClient.get<HabitReminderSettings>('/api/v1/habit-reminders/settings');
+  return data;
+}
+
+// PUT parcial. Siempre viaja el huso de este navegador: el server decide el
+// "hoy" y la hora del aviso con él (minutos al este de UTC).
+export async function updateHabitReminderSettings(
+  patch: Partial<Omit<HabitReminderSettings, 'has_push_devices'>>,
+): Promise<HabitReminderSettings> {
+  if (MOCK_ENABLED) {
+    mockHabitReminderSettings = {
+      ...mockHabitReminderSettings,
+      ...patch,
+      timezone_offset_minutes: patch.timezone_offset_minutes ?? localTzOffsetMinutes(),
+    };
+    return mockDelay({ ...mockHabitReminderSettings });
+  }
+  const { data } = await apiClient.put<HabitReminderSettings>('/api/v1/habit-reminders/settings', {
+    ...patch,
+    timezone_offset_minutes: localTzOffsetMinutes(),
+  });
+  return data;
+}
+
+export async function fetchHabitReminderToday(): Promise<HabitReminderToday> {
+  if (MOCK_ENABLED) {
+    const habits = [
+      { id: 'g3', title: 'Meditar diariamente', icon: 'fa-bullseye', streak: 4 },
+      { id: 'g4', title: 'Tomar agua', icon: null, streak: 0 },
+    ];
+    return mockDelay({
+      local_date: toLocalDateString(),
+      enabled: mockHabitReminderSettings.enabled,
+      pending_count: habits.length,
+      slots: [{ time: mockHabitReminderSettings.time, status: 'upcoming', habits }],
+    });
+  }
+  const { data } = await apiClient.get<HabitReminderToday>('/api/v1/habit-reminders/today', {
+    params: { tz_offset_minutes: localTzOffsetMinutes() },
+  });
   return data;
 }
 

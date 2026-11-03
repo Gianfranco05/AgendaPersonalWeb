@@ -15,6 +15,11 @@ const schema = z
     // Opcional: un hábito diario no tiene fecha de cierre y la API acepta end_date nulo.
     deadline: z.string(),
     color: z.string().min(1, 'El color es requerido'),
+    // Aviso "no marcaste este hábito hoy" (solo binary/metric). Vacío = hora general.
+    reminder_enabled: z.boolean(),
+    reminder_time: z
+      .string()
+      .refine((v) => v === '' || /^([01]\d|2[0-3]):[0-5]\d$/.test(v), 'Ingresá una hora válida'),
   })
   .superRefine((data, ctx) => {
     if ((data.goal_type === 'progress' || data.goal_type === 'savings') && !(data.target > 0)) {
@@ -73,6 +78,8 @@ export default function GoalForm({
       unit: '',
       deadline: '',
       color: '#7C3AED',
+      reminder_enabled: true,
+      reminder_time: '',
     },
   });
 
@@ -88,9 +95,14 @@ export default function GoalForm({
         unit: goal.unit ?? '',
         deadline: goal.end_date ?? '',
         color: goal.color,
+        reminder_enabled: goal.reminder_enabled ?? true,
+        reminder_time: goal.reminder_time ?? '',
       });
     }
   }, [goal, reset]);
+
+  const isHabit = goalType === 'binary' || goalType === 'metric';
+  const reminderEnabled = watch('reminder_enabled');
 
   async function onSubmit(data: FormData) {
     const payload: Omit<Goal, 'id'> = {
@@ -109,6 +121,11 @@ export default function GoalForm({
       color: data.color,
       icon: goal?.icon ?? 'fa-bullseye',
       is_completed: goal?.is_completed ?? false,
+      // Solo los hábitos tienen aviso: una meta numérica o de ahorro no lo manda.
+      ...(isHabit && {
+        reminder_enabled: data.reminder_enabled,
+        reminder_time: data.reminder_enabled && data.reminder_time ? data.reminder_time : null,
+      }),
     };
     await onSave(payload, goal?.id);
     onClose();
@@ -243,6 +260,34 @@ export default function GoalForm({
             <input {...register('deadline')} type="date" className={inputCls} />
             {errors.deadline && <p className={errorCls}>{errors.deadline.message}</p>}
           </div>
+
+          {isHabit && (
+            <div className="space-y-2 rounded-lg border border-gray-200 dark:border-slate-700 p-3">
+              <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-slate-200">
+                <input {...register('reminder_enabled')} type="checkbox" className="h-4 w-4 rounded" />
+                Recordarme si no lo marqué
+              </label>
+              <div>
+                <label
+                  htmlFor="goal-reminder-time"
+                  className="mb-1 block text-xs font-medium text-gray-500 dark:text-slate-400"
+                >
+                  Hora propia (opcional)
+                </label>
+                <input
+                  id="goal-reminder-time"
+                  {...register('reminder_time')}
+                  type="time"
+                  disabled={!reminderEnabled}
+                  className={`${inputCls} disabled:opacity-50`}
+                />
+                <p className="mt-1 text-xs text-gray-400 dark:text-slate-500">
+                  Vacío = usa la hora general de los avisos (Configuración).
+                </p>
+                {errors.reminder_time && <p className={errorCls}>{errors.reminder_time.message}</p>}
+              </div>
+            </div>
+          )}
 
           <div>
             <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-slate-400">Color</label>

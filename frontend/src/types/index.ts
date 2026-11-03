@@ -179,6 +179,41 @@ export interface Goal {
   color: string;
   icon: string;
   is_completed: boolean;
+  // Aviso "no marcaste este hábito hoy" (solo binary/metric). `reminder_time`
+  // null/ausente = usa la hora general de los avisos.
+  reminder_enabled?: boolean;
+  reminder_time?: string | null;
+}
+
+// Avisos de hábitos sin marcar (push a la app de Android). Encendidos por defecto.
+export interface HabitReminderSettings {
+  enabled: boolean;
+  time: string; // "HH:MM"
+  daily_cap: number; // 1-5
+  streak_alerts: boolean;
+  timezone_offset_minutes: number | null;
+  has_push_devices: boolean;
+}
+
+export type HabitReminderSlotStatus =
+  | 'upcoming'
+  | 'due'
+  | 'missed'
+  | 'sent'
+  | 'merged'
+  | 'nothing'
+  | 'capped'
+  | 'no_devices';
+
+export interface HabitReminderToday {
+  local_date: string;
+  enabled: boolean;
+  pending_count: number;
+  slots: {
+    time: string;
+    status: HabitReminderSlotStatus;
+    habits: { id: string; title: string; icon: string | null; streak: number }[];
+  }[];
 }
 
 export interface HabitRecord {

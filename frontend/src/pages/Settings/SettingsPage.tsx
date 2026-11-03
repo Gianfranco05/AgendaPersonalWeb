@@ -7,6 +7,7 @@ import { useSettings, syncGoogle, disconnectGoogle } from '../../hooks/useSettin
 import { exportMyData, deleteMyAccount } from '../../api/endpoints';
 import SessionsSection from './SessionsSection';
 import ReminderSection from './ReminderSection';
+import HabitReminderSection from './HabitReminderSection';
 import { useOnboardingStore } from '../../store/onboardingStore';
 import { toLocalDateString } from '../../utils/date';
 
@@ -302,6 +303,8 @@ export default function SettingsPage() {
       </div>
 
       <SessionsSection />
+
+      <HabitReminderSection />
 
       <ReminderSection />
 
