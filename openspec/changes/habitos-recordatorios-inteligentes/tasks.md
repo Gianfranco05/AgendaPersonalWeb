@@ -65,28 +65,28 @@
 
 ## 8. Mobile — API, tipos y hooks (`C:\Proyectos\vida-personal-mobile`)
 
-- [ ] 8.1 [mobile] `src/types`: `HabitReminderSettings`, `HabitReminderToday`; `Goal` con `reminder_enabled`/`reminder_time`
-- [ ] 8.2 [mobile] `src/api/endpoints.ts`: settings (PUT con `queued(...)` y `tzOffsetMinutes()`), today (`tz_offset_minutes`), y los campos nuevos en crear/editar hábito
-- [ ] 8.3 [mobile] `src/hooks/useHabitReminders.ts` (SWR); revalidar `today` al marcar/editar hábitos (`src/hooks/useGoals.ts`)
-- [ ] 8.4 [mobile] `src/lib/notifications.ts`: exportar `ensurePushRegistered()` (envuelve `initPush`), `{ kind: 'habits' }` en `NotificationTarget` y `type === 'habit_reminder'` en `targetFromData`
-- [ ] 8.5 [mobile] `src/hooks/useNotificationTaps.ts`: `habits` → `navigate('HabitsTab', { screen: 'HabitsHome' })`
-- [ ] 8.6 [mobile] Al montar `TabNavigator` y al volver a primer plano (`AppState`), con la configuración activa: `ensurePushRegistered()` silencioso y resincronizar el offset si difiere
+- [x] 8.1 [mobile] `src/types`: `HabitReminderSettings`, `HabitReminderToday`; `Goal` con `reminder_enabled`/`reminder_time`
+- [x] 8.2 [mobile] `src/api/endpoints.ts`: settings (PUT con `queued(...)` y `tzOffsetMinutes()`), today (`tz_offset_minutes`), y los campos nuevos en crear/editar hábito
+- [x] 8.3 [mobile] `src/hooks/useHabitReminders.ts` (SWR); revalidar `today` al marcar/editar hábitos (`src/hooks/useGoals.ts`)
+- [x] 8.4 [mobile] `src/lib/notifications.ts`: exportar `ensurePushRegistered()` (envuelve `initPush`), `{ kind: 'habits' }` en `NotificationTarget` y `type === 'habit_reminder'` en `targetFromData`
+- [x] 8.5 [mobile] `src/hooks/useNotificationTaps.ts`: `habits` → `navigate('HabitsTab', { screen: 'HabitsHome' })`
+- [x] 8.6 [mobile] Al montar `TabNavigator` y al volver a primer plano (`AppState`), con la configuración activa: `ensurePushRegistered()` silencioso y resincronizar el offset si difiere
 
 ## 9. Mobile — UI (`C:\Proyectos\vida-personal-mobile`)
 
-- [ ] 9.1 [mobile] `src/screens/RemindersScreen.tsx`: tarjeta "Hábitos sin marcar" (switch, `TimeField`, `NumberStepper` 1–5, switch de rachas, resumen de hoy); al encender pedir permiso + `ensurePushRegistered()` y avisar si el celular no puede recibir push
-- [ ] 9.2 [mobile] `src/components/HabitFormSheet.tsx`: sección "Recordatorio" con switch "Recordarme si no lo marqué", chips "Hora general (HH:MM)" / "Otra hora" + `TimeField`; atajo para activar el interruptor general si está apagado
-- [ ] 9.3 [mobile] `src/screens/HabitsScreen.tsx`: interruptor de un toque (campana) para apagar/encender los avisos, y banner descartable "permití las notificaciones" [Permitir] [Ahora no] cuando están encendidos y falta el token, con el descarte guardado por usuario en el almacenamiento local
-- [ ] 9.4 [mobile] Modo claro/oscuro con tokens Stitch y safe-area en los sheets; sin textos de compra
-- [ ] 9.5 [mobile] `npx tsc --noEmit` sin errores
+- [x] 9.1 [mobile] `src/screens/RemindersScreen.tsx`: tarjeta "Hábitos sin marcar" (switch, `TimeField`, `NumberStepper` 1–5, switch de rachas, resumen de hoy); al encender pedir permiso + `ensurePushRegistered()` y avisar si el celular no puede recibir push
+- [x] 9.2 [mobile] `src/components/HabitFormSheet.tsx`: sección "Recordatorio" con switch "Recordarme si no lo marqué", chips "Hora general (HH:MM)" / "Otra hora" + `TimeField`; atajo para activar el interruptor general si está apagado
+- [x] 9.3 [mobile] `src/screens/HabitsScreen.tsx`: interruptor de un toque (campana) para apagar/encender los avisos, y banner descartable "permití las notificaciones" [Permitir] [Ahora no] cuando están encendidos y falta el token, con el descarte guardado por usuario en el almacenamiento local
+- [x] 9.4 [mobile] Modo claro/oscuro con tokens Stitch y safe-area en los sheets; sin textos de compra
+- [x] 9.5 [mobile] `npx tsc --noEmit` sin errores
 
 ## 10. Verificación contra el backend real (no mock)
 
-- [ ] 10.1 Aplicar la migración en Postgres (PGlite o docker compose) y probar `upgrade`/`downgrade`; verificar en Postgres el `INSERT` duplicado en `habit_reminder_dispatches` (`IntegrityError` + rollback sin romper la sesión del ciclo)
-- [ ] 10.2 Por API contra el backend real: `GET/PUT /habit-reminders/settings`, hábito con hora propia, `GET /today` antes y después de marcar (métrico 0 vs > 0)
-- [ ] 10.3 Web con `VITE_MOCK_ENABLED=false`: configurar en Configuración y en el formulario del hábito; recargar y ver los valores persistidos
+- [x] 10.1 Aplicar la migración en Postgres (PGlite o docker compose) y probar `upgrade`/`downgrade`; verificar en Postgres el `INSERT` duplicado en `habit_reminder_dispatches` (`IntegrityError` + rollback sin romper la sesión del ciclo)
+- [x] 10.2 Por API contra el backend real: `GET/PUT /habit-reminders/settings`, hábito con hora propia, `GET /today` antes y después de marcar (métrico 0 vs > 0)
+- [x] 10.3 Web con `VITE_MOCK_ENABLED=false`: configurar en Configuración y en el formulario del hábito; recargar y ver los valores persistidos
 - [ ] 10.4 Mobile (build lan contra el backend real): dar el permiso desde el banner (token registrado, `has_push_devices` true), configurar una hora 2–3 minutos adelante, dejar dos hábitos sin marcar → llega **una** push agrupada; marcar todo y configurar otra hora → no llega nada; tocar la push abre Hábitos (en caliente y en frío)
 - [ ] 10.5 Dedup real: gunicorn con 2+ workers y Redis → una sola push; sin Redis y reiniciando el proceso dentro de la ventana → no se repite
 - [ ] 10.6 Recuperación: apagar el backend antes de la hora y levantarlo dentro de los 60 minutos (llega) y pasado ese plazo (no llega)
-- [ ] 10.7 Export de cuenta contiene las tablas nuevas; borrar una cuenta de prueba no deja filas
-- [ ] 10.8 `openspec validate habitos-recordatorios-inteligentes --strict` y marcar las tareas completadas
+- [x] 10.7 Export de cuenta contiene las tablas nuevas; borrar una cuenta de prueba no deja filas
+- [x] 10.8 `openspec validate habitos-recordatorios-inteligentes --strict` y marcar las tareas completadas
