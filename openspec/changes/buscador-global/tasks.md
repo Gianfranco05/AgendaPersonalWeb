@@ -31,20 +31,20 @@
 
 ## 4. Web — API, tipos, mock y hooks (`frontend/`)
 
-- [ ] 4.1 Tipos en `src/types`: `SearchType`, `SearchItem`, `SearchGroup`, `SearchResponse`
-- [ ] 4.2 `src/utils/search.ts`: `foldText` (misma tabla que el backend), `tokenize`, ranking y cálculo de highlights para el mock, con tests unitarios (incluye un test que fija la tabla de plegado para detectar divergencias con `normalize.py`)
-- [ ] 4.3 `src/api/endpoints.ts`: `searchAll(q, { types, limit })` → `GET /search`; en `MOCK_ENABLED`, `searchMock` sobre los datos mock existentes respetando `owned/enabled` de los módulos mock
-- [ ] 4.4 `src/hooks/useSearch.ts` (debounce 250 ms, sin llamada con < 2 caracteres, key `['search', q, types, limit]`, `keepPreviousData`) y `src/hooks/useOpenParam.ts` (lee `open`/`entity`/`parent`/`tab`, espera datos, llama al handler, limpia con `replace`, toast "Ese elemento ya no existe")
+- [x] 4.1 Tipos en `src/types`: `SearchType`, `SearchItem`, `SearchGroup`, `SearchResponse`
+- [x] 4.2 `src/utils/search.ts`: `foldText` (misma tabla que el backend), `tokenize`, ranking y cálculo de highlights para el mock, con tests unitarios (incluye un test que fija la tabla de plegado para detectar divergencias con `normalize.py`)
+- [x] 4.3 `src/api/endpoints.ts`: `searchAll(q, { types, limit })` → `GET /search`; en `MOCK_ENABLED`, `searchMock` sobre los datos mock existentes respetando `owned/enabled` de los módulos mock
+- [x] 4.4 `src/hooks/useSearch.ts` (debounce 250 ms, sin llamada con < 2 caracteres, key `['search', q, types, limit]`, `keepPreviousData`) y `src/hooks/useOpenParam.ts` (lee `open`/`entity`/`parent`/`tab`, espera datos, llama al handler, limpia con `replace`, toast "Ese elemento ya no existe")
 
 ## 5. Web — UI (`frontend/`)
 
-- [ ] 5.1 `src/components/search/Highlight.tsx`: corta por offsets y envuelve en `<mark>` (estilos claro/oscuro), sin `dangerouslySetInnerHTML`
-- [ ] 5.2 `src/components/search/SearchPalette.tsx` + `SearchResultItem.tsx`: modal con foco atrapado, input, grupos con label e ícono, fecha local (`src/utils/date.ts`) y `meta` formateado, estados ayuda/cargando/vacío/error/429, "Ver más en {label}", combobox ARIA y navegación `↑/↓/Enter/Esc` con wrap
-- [ ] 5.3 `src/components/Layout.tsx`: montar la paleta, listener global `Ctrl+K`/`⌘K` (solo en el layout autenticado, `preventDefault`), botón "Buscar" en la barra lateral y en la cabecera mobile (`lg:hidden`)
-- [ ] 5.4 Páginas destino con `useOpenParam`: `Notes`, `Tasks` (KanbanBoard), `Events`, `Habits`, `Goals`, `Finance` (pestaña inicial desde `tab` + modal de transacción/inversión), `Study` (materia/examen), `Library`, `Media`, `Work`, `Travel` (viaje/ítem), `Vehicle` (vehículo/mantenimiento), `Projects` (proyecto/tarea); abrir el modal existente o, si no hay, scroll + resaltado con `id="item-<id>"`
-- [ ] 5.5 Tests de componentes: atajo abre/cierra y restaura foco; debounce manda una sola request; < 2 caracteres no llama; teclado recorre grupos con wrap y `Enter` navega al `path`; título con `<img onerror>` se muestra literal; "Ver más" pide `limit=20`; `useOpenParam` abre el modal y limpia la URL, e id inexistente muestra el toast
-- [ ] 5.6 `frontend/nginx.conf`, `nginx.dev.conf` y `nginx.tls.conf`: `location = /api/v1/search` con el mismo proxy que `/api/` y `access_log` con un `log_format` que use `$uri` (sin query string) (design D9)
-- [ ] 5.7 `npx vitest run --maxWorkers=2`, `npm run build` y lint sin errores
+- [x] 5.1 `src/components/search/Highlight.tsx`: corta por offsets y envuelve en `<mark>` (estilos claro/oscuro), sin `dangerouslySetInnerHTML`
+- [x] 5.2 `src/components/search/SearchPalette.tsx` + `SearchResultItem.tsx`: modal con foco atrapado, input, grupos con label e ícono, fecha local (`src/utils/date.ts`) y `meta` formateado, estados ayuda/cargando/vacío/error/429, "Ver más en {label}", combobox ARIA y navegación `↑/↓/Enter/Esc` con wrap
+- [x] 5.3 `src/components/Layout.tsx`: montar la paleta, listener global `Ctrl+K`/`⌘K` (solo en el layout autenticado, `preventDefault`), botón "Buscar" en la barra lateral y en la cabecera mobile (`lg:hidden`)
+- [x] 5.4 Páginas destino con `useOpenParam`: `Notes`, `Tasks` (KanbanBoard), `Events`, `Habits`, `Goals`, `Finance` (pestaña inicial desde `tab` + modal de transacción/inversión), `Study` (materia/examen), `Library`, `Media`, `Work`, `Travel` (viaje/ítem), `Vehicle` (vehículo/mantenimiento), `Projects` (proyecto/tarea); abrir el modal existente o, si no hay, scroll + resaltado con `id="item-<id>"`
+- [x] 5.5 Tests de componentes: atajo abre/cierra y restaura foco; debounce manda una sola request; < 2 caracteres no llama; teclado recorre grupos con wrap y `Enter` navega al `path`; título con `<img onerror>` se muestra literal; "Ver más" pide `limit=20`; `useOpenParam` abre el modal y limpia la URL, e id inexistente muestra el toast
+- [x] 5.6 `frontend/nginx.conf`, `nginx.dev.conf` y `nginx.tls.conf`: `location = /api/v1/search` con el mismo proxy que `/api/` y `access_log` con un `log_format` que use `$uri` (sin query string) (design D9)
+- [x] 5.7 `npx vitest run --maxWorkers=2`, `npm run build` y lint sin errores (el frontend no tiene eslint configurado: se verifica con `tsc -b --noEmit`)
 
 ## 6. Mobile — API, hooks y navegación (`C:\Proyectos\vida-personal-mobile`)
 
