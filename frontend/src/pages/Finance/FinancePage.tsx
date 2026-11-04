@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef, lazy, Suspense } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { TrendingUp, TrendingDown, Wallet, Plus, Repeat, X } from 'lucide-react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { TrendingUp, TrendingDown, Wallet, Plus, Repeat, X, Download, Upload } from 'lucide-react';
 import { LoadingSkeleton } from '../../components/LoadingSkeleton';
 import { useFinanceSummary, useTransactions, removeTransaction } from '../../hooks/useFinance';
 import { usePendingOccurrences } from '../../hooks/useRecurring';
 import type { Recurring, Transaction } from '../../types';
 import TransactionTable from './TransactionTable';
 import TransactionModal from './TransactionModal';
+import ExportModal from './ExportModal';
 import TransactionFilters from './TransactionFilters';
 import BudgetsSection from './BudgetsSection';
 import SavingsGoalsSection from './SavingsGoalsSection';
@@ -73,6 +74,7 @@ export default function FinancePage() {
     type: '',
   });
   const [showModal, setShowModal] = useState(false);
+  const [showExport, setShowExport] = useState(false);
   const [editingTx, setEditingTx] = useState<Transaction | null>(null);
   // Filtro "movimientos de esta recurrencia" y alta de una recurrente desde una transacción.
   const [recurrenceFilter, setRecurrenceFilter] = useState<{ id: string; name: string } | null>(null);
@@ -181,15 +183,32 @@ export default function FinancePage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-gray-800 dark:text-slate-100">Finanzas</h2>
-        {tab === 'transacciones' && (
+        <div className="flex flex-wrap items-center justify-end gap-2">
           <button
-            onClick={handleNew}
-            className="flex items-center gap-2 rounded-lg bg-brand-charcoal px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-charcoal-hover"
+            type="button"
+            onClick={() => setShowExport(true)}
+            className="flex items-center gap-2 rounded-lg border border-gray-200 dark:border-slate-700 px-3 py-2 text-sm text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-700/50"
           >
-            <Plus size={16} />
-            Nueva transacción
+            <Download size={16} />
+            Exportar
           </button>
-        )}
+          <Link
+            to="/finances/import"
+            className="flex items-center gap-2 rounded-lg border border-gray-200 dark:border-slate-700 px-3 py-2 text-sm text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-700/50"
+          >
+            <Upload size={16} />
+            Importar
+          </Link>
+          {tab === 'transacciones' && (
+            <button
+              onClick={handleNew}
+              className="flex items-center gap-2 rounded-lg bg-brand-charcoal px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-charcoal-hover"
+            >
+              <Plus size={16} />
+              Nueva transacción
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="flex max-w-full overflow-x-auto rounded-lg border border-gray-200 dark:border-slate-700 p-0.5 w-fit">
@@ -357,6 +376,10 @@ export default function FinancePage() {
             setTab('recurrentes');
           }}
         />
+      )}
+
+      {showExport && (
+        <ExportModal defaults={filters} onClose={() => setShowExport(false)} />
       )}
 
       {showModal && (

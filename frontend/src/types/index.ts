@@ -17,6 +17,8 @@ export interface Transaction {
   // borre; `recurrence_id` es null en ese caso ("recurrencia eliminada").
   is_recurring?: boolean;
   recurrence_id?: string | null;
+  // Lote de importación que lo creó (null/ausente si se cargó a mano).
+  import_batch_id?: string | null;
 }
 
 export interface Note {
@@ -953,4 +955,139 @@ export interface SearchGroup {
 export interface SearchResponse {
   query: string;
   groups: SearchGroup[];
+}
+
+
+// ── Exportar / importar Finanzas ──
+
+export type FinanceExportFormat = 'xlsx' | 'pdf';
+
+export interface FinanceExportParams {
+  format: FinanceExportFormat;
+  date_from?: string;
+  date_to?: string;
+  type?: 'income' | 'expense';
+  // Id de categoría propia o 'none' (sin categoría).
+  category_id?: string;
+  account_id?: string;
+  include_investments?: boolean;
+}
+
+export interface FinanceExportFile {
+  blob: Blob;
+  filename: string;
+}
+
+export type ImportPresetKey = 'mercadopago_release' | 'mercadopago_account_money' | 'generic';
+
+export interface ImportPreset {
+  key: ImportPresetKey;
+  label: string;
+  description: string;
+  required_fields: string[];
+}
+
+export type ImportAmountMode = 'signed' | 'debit_credit' | 'amount_and_type';
+
+export interface ImportColumnFilter {
+  column: number;
+  values: string[];
+}
+
+// Las columnas van por posición (índice) en el archivo.
+export interface ImportMapping {
+  date: number | null;
+  time: number | null;
+  description: number[];
+  amount_mode: ImportAmountMode;
+  amount: number | null;
+  fallback_amount: number | null;
+  debit: number | null;
+  credit: number | null;
+  type_column: number | null;
+  type_values: Record<string, string[]>;
+  currency: number | null;
+  default_currency: string;
+  reference: number | null;
+  include_when: ImportColumnFilter | null;
+  skip_when: ImportColumnFilter | null;
+  translations: Record<string, string>;
+  date_format: 'auto' | 'dd/mm/yyyy' | 'mm/dd/yyyy' | 'yyyy-mm-dd' | 'iso_datetime';
+  decimal_separator: 'auto' | ',' | '.';
+  invert_sign: boolean;
+  tz_offset_minutes: number;
+}
+
+export type ImportRowStatus = 'ok' | 'error' | 'skipped' | 'duplicate' | 'possible_duplicate';
+
+export interface ParsedImportRow {
+  index: number;
+  source_line: number;
+  date: string | null;
+  time: string | null;
+  description: string;
+  // Decimal del server como string ("1234.50"): solo se muestra, nunca se reenvía.
+  amount: string | null;
+  type: 'income' | 'expense' | null;
+  currency: string | null;
+  reference: string;
+  status: ImportRowStatus;
+  errors: string[];
+  row_hash: string | null;
+  duplicate_of: { id: string; date: string; description: string } | null;
+  suggested_category_id: string | null;
+  suggestion_source: 'history' | 'rule' | 'none';
+  merchant_category: string;
+}
+
+export interface ImportPreview {
+  batch_id: string;
+  preset: ImportPresetKey;
+  detected_preset: ImportPresetKey;
+  mapping: ImportMapping;
+  mapping_source: 'preset' | 'remembered' | 'heuristic' | 'user';
+  mapping_complete: boolean;
+  headers: string[];
+  header_row: number;
+  sample_rows: string[][];
+  rows: ParsedImportRow[];
+  counts: Record<'ok' | 'error' | 'duplicate' | 'possible_duplicate' | 'skipped', number>;
+  totals_by_currency: { currency: string; income: string; expense: string; count: number }[];
+  warnings: string[];
+  expires_at: string | null;
+  filename: string;
+  account_id: string | null;
+}
+
+export interface ImportBatch {
+  id: string;
+  status: 'preview' | 'confirmed' | 'undone';
+  preset: string;
+  filename: string;
+  account_id: string | null;
+  row_count: number;
+  imported_count: number;
+  skipped_count: number;
+  duplicate_count: number;
+  error_count: number;
+  edited_count: number;
+  created_at: string | null;
+  confirmed_at: string | null;
+  undone_at: string | null;
+}
+
+export interface ImportMappingUpdate {
+  preset?: ImportPresetKey;
+  header_row?: number;
+  mapping?: ImportMapping;
+  account_id?: string;
+}
+
+export interface ImportConfirmRow {
+  index: number;
+  include: boolean;
+  // undefined = la sugerida; '' = sin categoría.
+  category_id?: string;
+  type?: 'income' | 'expense';
+  description?: string;
 }

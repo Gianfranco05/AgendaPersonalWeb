@@ -52,13 +52,13 @@
 
 ## 7. Web (`frontend/`)
 
-- [ ] 7.1 `src/types`: `FinanceExportParams`, `ImportPreset`, `ImportMapping`, `ImportPreview`, `ParsedImportRow`, `ImportBatch`; `Transaction.import_batch_id?`
-- [ ] 7.2 `src/api/endpoints.ts`: `downloadFinanceExport` (blob + filename de `Content-Disposition`), `fetchImportPresets`, `previewImport` (`FormData`), `updateImportMapping`, `confirmImport`, `fetchImports`, `undoImport`, `discardImportPreview`, con `tz_offset_minutes` y mocks (`MOCK_ENABLED`) con un duplicado y un error
-- [ ] 7.3 `src/hooks/useFinanceImport.ts`: SWR `finance/imports` y revalidación de `finance/summary`, `finance/transactions`, `finance/reports` (y `finance/net-worth`) tras confirmar o deshacer
-- [ ] 7.4 `src/pages/Finance/ExportModal.tsx` (RHF + Zod sin `z.coerce`, fechas con `src/utils/date.ts`, prellenado con filtros activos, formato, inversiones, errores 422/429) y botones "Exportar" e "Importar" en `FinancePage.tsx`
-- [ ] 7.5 `src/pages/Finance/Import/ImportPage.tsx` + ruta lazy `/finances/import` en `App.tsx`: `UploadStep` (drop zone `.csv,.xlsx`, tamaño en cliente, origen, cuenta, ayuda de Mercado Pago), `MappingPanel`, `PreviewTable` (checkbox, chips, categoría sugerida con origen, tipo, filtro, totales, paginado de a 100), paso de confirmación y resultado
-- [ ] 7.6 `ImportHistory.tsx` con "Deshacer" y advertencia de editados; dark mode, voseo, sin scroll horizontal de página en móvil
-- [ ] 7.7 Tests vitest: endpoints (multipart, blob + filename, mocks), `ExportModal` (defaults y validación), `PreviewTable` (armado del request de confirmación con exclusiones y overrides), invalidación de caché; `npx vitest run --maxWorkers=2` y `npm run build` en verde
+- [x] 7.1 `src/types`: `FinanceExportParams`, `ImportPreset`, `ImportMapping`, `ImportPreview`, `ParsedImportRow`, `ImportBatch`; `Transaction.import_batch_id?`
+- [x] 7.2 `src/api/endpoints.ts`: `downloadFinanceExport` (blob + filename de `Content-Disposition`), `fetchImportPresets`, `previewImport` (`FormData`), `updateImportMapping`, `confirmImport`, `fetchImports`, `undoImport`, `discardImportPreview`, con `tz_offset_minutes` y mocks (`MOCK_ENABLED`) con un duplicado y un error
+- [x] 7.3 `src/hooks/useFinanceImport.ts`: SWR `finance/imports` y revalidación de `finance/summary`, `finance/transactions`, `finance/reports` (y `finance/net-worth`) tras confirmar o deshacer
+- [x] 7.4 `src/pages/Finance/ExportModal.tsx` (RHF + Zod sin `z.coerce`, fechas con `src/utils/date.ts`, prellenado con filtros activos, formato, inversiones, errores 422/429) y botones "Exportar" e "Importar" en `FinancePage.tsx`
+- [x] 7.5 `src/pages/Finance/Import/ImportPage.tsx` + ruta lazy `/finances/import` en `App.tsx`: `UploadStep` (drop zone `.csv,.xlsx`, tamaño en cliente, origen, cuenta, ayuda de Mercado Pago), `MappingPanel`, `PreviewTable` (checkbox, chips, categoría sugerida con origen, tipo, filtro, totales, paginado de a 100), paso de confirmación y resultado
+- [x] 7.6 `ImportHistory.tsx` con "Deshacer" y advertencia de editados; dark mode, voseo, sin scroll horizontal de página en móvil
+- [x] 7.7 Tests vitest: endpoints (multipart, blob + filename, mocks), `ExportModal` (defaults y validación), `PreviewTable` (armado del request de confirmación con exclusiones y overrides), invalidación de caché; `npx vitest run --maxWorkers=2` y `npm run build` en verde
 
 ## 8. Mobile (`C:\Proyectos\vida-personal-mobile`)
 

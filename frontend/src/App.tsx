@@ -18,6 +18,7 @@ import { useAuthStore } from './store/authStore';
 import { GOOGLE_CALLBACK_PATH } from './api/client';
 
 const FinancePage = lazy(() => import('./pages/Finance/FinancePage'));
+const ImportPage = lazy(() => import('./pages/Finance/Import/ImportPage'));
 const NotesPage = lazy(() => import('./pages/Notes/NotesPage'));
 const KanbanBoard = lazy(() => import('./pages/Tasks/KanbanBoard'));
 const EventsPage = lazy(() => import('./pages/Events/EventsPage'));
@@ -78,6 +79,7 @@ export default function App() {
               <Route element={<Layout />}>
                 <Route path="/" element={<DashboardPage />} />
                 <Route path="/finances" element={<Suspense fallback={<LoadingSkeleton type="page" />}><FinancePage /></Suspense>} />
+                <Route path="/finances/import" element={<Suspense fallback={<LoadingSkeleton type="page" />}><ImportPage /></Suspense>} />
                 <Route path="/events" element={<Suspense fallback={<LoadingSkeleton type="page" />}><EventsPage /></Suspense>} />
                 <Route path="/goals" element={<GoalsPage />} />
                 <Route path="/fitness" element={<Suspense fallback={<LoadingSkeleton type="page" />}><FitnessPage /></Suspense>} />

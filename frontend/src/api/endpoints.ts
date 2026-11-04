@@ -20,6 +20,14 @@ import type {
   BudgetProgress,
   FinanceReports,
   BankAccount,
+  FinanceExportParams,
+  FinanceExportFile,
+  ImportPreset,
+  ImportPreview,
+  ImportBatch,
+  ImportMappingUpdate,
+  ImportConfirmRow,
+  ParsedImportRow,
   Settings,
   Session,
   Reminder,
@@ -975,6 +983,181 @@ export async function fetchFinanceReports(): Promise<FinanceReports> {
     monthly: data.monthly.map((m) => ({ ...m, income: num(m.income), expense: num(m.expense) })),
     total_expenses: num(data.total_expenses),
   };
+}
+
+// ── Exportar / importar Finanzas ──
+
+function filenameFromDisposition(header: unknown, fallback: string): string {
+  const match = typeof header === 'string' ? /filename="?([^";]+)"?/i.exec(header) : null;
+  return match?.[1] ?? fallback;
+}
+
+export async function downloadFinanceExport(params: FinanceExportParams): Promise<FinanceExportFile> {
+  const fallback = `cancen-finanzas.${params.format}`;
+  if (MOCK_ENABLED) {
+    const mime =
+      params.format === 'pdf'
+        ? 'application/pdf'
+        : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    return mockDelay({ blob: new Blob(['mock'], { type: mime }), filename: fallback });
+  }
+  const response = await apiClient.get<Blob>('/api/v1/finance/export', {
+    params: { ...params, tz_offset_minutes: tzOffsetMinutes() },
+    responseType: 'blob',
+  });
+  return {
+    blob: response.data,
+    filename: filenameFromDisposition(response.headers['content-disposition'], fallback),
+  };
+}
+
+const MOCK_IMPORT_PRESETS: ImportPreset[] = [
+  {
+    key: 'mercadopago_release',
+    label: 'Mercado Pago · Dinero disponible',
+    description: 'Reporte de dinero disponible de Mercado Pago, en .csv o .xlsx.',
+    required_fields: ['Fecha', 'Tipo de registro', 'Crédito neto', 'Débito neto'],
+  },
+  {
+    key: 'mercadopago_account_money',
+    label: 'Mercado Pago · Dinero en cuenta',
+    description: 'Reporte de dinero en cuenta de Mercado Pago, en .csv o .xlsx.',
+    required_fields: ['Fecha de la transacción', 'Tipo de transacción', 'Monto neto'],
+  },
+  {
+    key: 'generic',
+    label: 'Otro banco o billetera (CSV/Excel)',
+    description: 'Cualquier archivo con fecha, descripción y monto.',
+    required_fields: ['Fecha', 'Monto, o Débito y Crédito'],
+  },
+];
+
+export async function fetchImportPresets(): Promise<ImportPreset[]> {
+  if (MOCK_ENABLED) return mockDelay(MOCK_IMPORT_PRESETS);
+  const { data } = await apiClient.get<ImportPreset[]>('/api/v1/finance/imports/presets');
+  return data;
+}
+
+function mockImportPreview(filename: string): ImportPreview {
+  const base = {
+    time: null,
+    currency: 'ARS',
+    reference: '',
+    errors: [],
+    row_hash: 'x',
+    duplicate_of: null,
+    suggested_category_id: null,
+    suggestion_source: 'none' as const,
+    merchant_category: 'other',
+  };
+  const rows: ParsedImportRow[] = [
+    { ...base, index: 0, source_line: 2, date: '2026-10-01', description: 'Compra Coto', amount: '1234.56', type: 'expense', status: 'ok' },
+    { ...base, index: 1, source_line: 3, date: '2026-10-02', description: 'Sueldo', amount: '250000.00', type: 'income', status: 'ok' },
+    { ...base, index: 2, source_line: 4, date: '2026-10-03', description: 'Netflix', amount: '8500.00', type: 'expense', status: 'ok', suggestion_source: 'rule', merchant_category: 'entertainment' },
+    { ...base, index: 3, source_line: 5, date: '2026-10-04', description: 'Uber', amount: '3200.00', type: 'expense', status: 'ok' },
+    { ...base, index: 4, source_line: 6, date: '2026-10-05', description: 'Farmacity', amount: '5400.00', type: 'expense', status: 'ok' },
+    {
+      ...base, index: 5, source_line: 7, date: '2026-10-06', description: 'Compra Coto', amount: '1234.56',
+      type: 'expense', status: 'duplicate', errors: ['Ya importado.'],
+      duplicate_of: { id: 'm1', date: '2026-10-06', description: 'Compra Coto' },
+    },
+    {
+      ...base, index: 6, source_line: 8, date: '2026-10-07', description: 'Retiro cajero', amount: '20000.00',
+      type: 'expense', status: 'possible_duplicate', errors: ['Se parece a un movimiento que ya tenés.'],
+      duplicate_of: { id: 'm2', date: '2026-10-07', description: 'Cajero automático' },
+    },
+    {
+      ...base, index: 7, source_line: 9, date: null, description: 'Fila rota', amount: null, type: null,
+      currency: null, status: 'error', errors: ['Fecha: fecha inválida'],
+    },
+  ];
+  return {
+    batch_id: 'mock-batch',
+    preset: 'generic',
+    detected_preset: 'generic',
+    mapping: {
+      date: 0, time: null, description: [1], amount_mode: 'signed', amount: 2, fallback_amount: null,
+      debit: null, credit: null, type_column: null, type_values: {}, currency: null,
+      default_currency: 'ARS', reference: null, include_when: null, skip_when: null, translations: {},
+      date_format: 'auto', decimal_separator: 'auto', invert_sign: false, tz_offset_minutes: -180,
+    },
+    mapping_source: 'heuristic',
+    mapping_complete: true,
+    headers: ['Fecha', 'Descripción', 'Importe'],
+    header_row: 0,
+    sample_rows: [['01/10/2026', 'Compra Coto', '-1.234,56']],
+    rows,
+    counts: { ok: 5, error: 1, duplicate: 1, possible_duplicate: 1, skipped: 0 },
+    totals_by_currency: [{ currency: 'ARS', income: '250000.00', expense: '19334.56', count: 5 }],
+    warnings: [],
+    expires_at: null,
+    filename,
+    account_id: null,
+  };
+}
+
+export async function previewImport(
+  file: File,
+  opts: { preset?: string; account_id?: string } = {},
+): Promise<ImportPreview> {
+  if (MOCK_ENABLED) return mockDelay(mockImportPreview(file.name));
+  const form = new FormData();
+  form.append('file', file);
+  if (opts.preset && opts.preset !== 'auto') form.append('preset', opts.preset);
+  if (opts.account_id) form.append('account_id', opts.account_id);
+  form.append('tz_offset_minutes', String(tzOffsetMinutes()));
+  const { data } = await apiClient.post<ImportPreview>('/api/v1/finance/imports/preview', form);
+  return data;
+}
+
+export async function updateImportMapping(
+  batchId: string,
+  update: ImportMappingUpdate,
+): Promise<ImportPreview> {
+  if (MOCK_ENABLED) return mockDelay(mockImportPreview('mock.csv'));
+  const { data } = await apiClient.put<ImportPreview>(`/api/v1/finance/imports/${batchId}/mapping`, {
+    ...update,
+    tz_offset_minutes: tzOffsetMinutes(),
+  });
+  return data;
+}
+
+function mockImportBatch(over: Partial<ImportBatch> = {}): ImportBatch {
+  return {
+    id: 'mock-batch', status: 'confirmed', preset: 'generic', filename: 'movimientos.csv', account_id: null,
+    row_count: 8, imported_count: 5, skipped_count: 0, duplicate_count: 1, error_count: 1, edited_count: 0,
+    created_at: new Date().toISOString(), confirmed_at: new Date().toISOString(), undone_at: null, ...over,
+  };
+}
+
+export async function confirmImport(batchId: string, rows: ImportConfirmRow[]): Promise<ImportBatch> {
+  if (MOCK_ENABLED) {
+    const included = rows.filter((r) => r.include).length;
+    return mockDelay(mockImportBatch({ id: batchId, status: 'confirmed', imported_count: included }));
+  }
+  const { data } = await apiClient.post<ImportBatch>(`/api/v1/finance/imports/${batchId}/confirm`, { rows });
+  return data;
+}
+
+export async function fetchImports(): Promise<ImportBatch[]> {
+  if (MOCK_ENABLED) return mockDelay([mockImportBatch()]);
+  const { data } = await apiClient.get<ImportBatch[]>('/api/v1/finance/imports', { params: { limit: 20 } });
+  return data;
+}
+
+/** Deshace un lote confirmado (borra sus movimientos). */
+export async function undoImport(batchId: string): Promise<ImportBatch> {
+  if (MOCK_ENABLED) {
+    return mockDelay(mockImportBatch({ id: batchId, status: 'undone', undone_at: new Date().toISOString() }));
+  }
+  const { data } = await apiClient.delete<ImportBatch>(`/api/v1/finance/imports/${batchId}`);
+  return data;
+}
+
+/** Descarta una previsualización (no crea nada). */
+export async function discardImportPreview(batchId: string): Promise<void> {
+  if (MOCK_ENABLED) return mockDelay(undefined);
+  await apiClient.delete(`/api/v1/finance/imports/${batchId}`);
 }
 
 // ── Bank Accounts ──
