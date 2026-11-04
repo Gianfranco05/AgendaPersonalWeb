@@ -47,7 +47,7 @@ class ImportBatch(Base):
     account_id: Mapped[Optional[str]] = mapped_column(
         String(36), ForeignKey("bank_accounts.id", ondelete="SET NULL"), nullable=True
     )
-    raw_table: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    raw_table: Mapped[Optional[list]] = mapped_column(JSON(none_as_null=True), nullable=True)
     row_count: Mapped[int] = mapped_column(Integer, default=0)
     imported_count: Mapped[int] = mapped_column(Integer, default=0)
     skipped_count: Mapped[int] = mapped_column(Integer, default=0)

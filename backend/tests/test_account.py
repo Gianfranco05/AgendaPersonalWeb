@@ -483,3 +483,54 @@ async def test_borrar_la_cuenta_borra_los_avisos_de_habitos_y_no_los_ajenos(
     for model in (HabitReminderSettings, HabitReminderDispatch):
         rows = (await db_session.execute(select(model.user_id))).scalars().all()
         assert rows == [otro_id]
+
+
+async def _seed_lote_importado(db_session, user):
+    from decimal import Decimal
+
+    from app.modules.finanzas.models import BankAccount, Transaction
+    from app.modules.finanzas.transfer.models import ImportBatch
+
+    cuenta = BankAccount(user_id=str(user.id), name="MP", account_type="checking")
+    db_session.add(cuenta)
+    await db_session.flush()
+    lote = ImportBatch(
+        user_id=str(user.id), status="preview", preset="generic", filename="mov.csv",
+        file_sha256="0" * 64, header_signature="1" * 64, mapping={}, account_id=cuenta.id,
+        raw_table={"kind": "csv", "rows": [["datos", "financieros"]]},
+    )
+    db_session.add(lote)
+    await db_session.flush()
+    db_session.add(
+        Transaction(
+            user_id=str(user.id), amount=Decimal("10"), type="expense", transaction_date="2026-10-01",
+            product_name="Importado", account_type="cash", payment_method="cash",
+            import_batch_id=lote.id, import_row_hash="a" * 64,
+        )
+    )
+    await db_session.commit()
+    return lote
+
+
+@pytest.mark.asyncio
+async def test_export_incluye_lotes_de_importacion_sin_las_celdas_crudas(
+    api_auth_client, db_session, test_user
+):
+    lote = await _seed_lote_importado(db_session, test_user)
+    data = (await api_auth_client.get("/api/v1/me/export")).json()
+    assert [b["id"] for b in data["import_batches"]] == [lote.id]
+    assert "raw_table" not in data["import_batches"][0]
+    assert "financieros" not in str(data["import_batches"])
+    assert data["transactions"][0]["import_batch_id"] == lote.id
+    assert data["transactions"][0]["import_row_hash"] == "a" * 64
+
+
+@pytest.mark.asyncio
+async def test_borrar_la_cuenta_borra_los_lotes_importados(api_auth_client, db_session, test_user):
+    from app.modules.finanzas.transfer.models import ImportBatch
+
+    await _seed_lote_importado(db_session, test_user)
+    response = await api_auth_client.request("DELETE", "/api/v1/me", json={"password": TEST_PASSWORD})
+    assert response.status_code == 200
+    db_session.expire_all()
+    assert await db_session.scalar(select(func.count()).select_from(ImportBatch)) == 0

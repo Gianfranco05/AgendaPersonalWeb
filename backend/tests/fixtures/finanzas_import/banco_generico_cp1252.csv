@@ -1,0 +1,7 @@
+Banco Ejemplo S.A.;;;;
+Cuenta Corriente 0000-0000;;;;
+;;;;
+Fecha;Concepto;Débito;Crédito;Saldo
+01/10/2026;COMPRA COTO SUC 12;1.234,56;;98.765,44
+02/10/2026;Acreditación sueldo;;250.000,00;348.765,44
+13/10/2026;Pago servicio Edenor;8.500,00;;340.265,44

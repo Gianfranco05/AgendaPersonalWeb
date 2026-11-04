@@ -144,7 +144,10 @@ def _decode(data: bytes) -> str:
 def _pick_delimiter(sample_lines: list[str]) -> str:
     best, best_score = ",", -1
     for delim in (";", ",", "\t", "|"):
-        widths = [len(r) for r in csv.reader(sample_lines, delimiter=delim) if r]
+        try:
+            widths = [len(r) for r in csv.reader(sample_lines, delimiter=delim) if r]
+        except csv.Error:  # celda enorme (limite de campo del modulo csv)
+            continue
         if not widths:
             continue
         modal = max(set(widths), key=lambda w: (widths.count(w) if w > 1 else 0, w))
