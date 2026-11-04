@@ -218,13 +218,13 @@ Todas bajo `/api/v1`, autenticadas, filtradas por `user_id`; un id ajeno respond
 
 ### D15. Migración
 
-`0NN_finance_imports` (número = siguiente libre al implementar; `finanzas-recurrentes` planea `019_recurring_transactions` y `finanzas-datos-mercado` `019_market_data`), `down_revision` = head vigente en ese momento. `upgrade`: `create_table("import_batches", ...)` con checks e índices; `batch_alter_table("transactions")` para sumar `import_batch_id` (FK con nombre explícito `fk_transactions_import_batch_id`, `ondelete="SET NULL"`) e `import_row_hash` + índice. `downgrade`: índice, columnas (batch, por SQLite) y tabla. Verificar en SQLite y en Postgres (PGlite) que hay un solo head y que `upgrade`/`downgrade`/`upgrade` funcionan con datos.
+`024_finance_imports` con `down_revision = "023_habit_reminders"` (head vigente al implementar; una sola cadena). `upgrade`: `create_table("import_batches", ...)` con check e índices; `batch_alter_table("transactions")` para sumar `import_batch_id` (FK con nombre explícito `fk_transactions_import_batch_id`, `ondelete="SET NULL"`) e `import_row_hash` + índice. `downgrade`: índice, FK, columnas (batch, por SQLite) y tabla. Verificado en SQLite (upgrade/downgrade/upgrade con datos) y en Postgres (PGlite).
 
 ## Dependencias
 
-- **`finanzas-inversiones`** (implementado en backend/web, mobile pendiente): el export usa `InvestmentService.summary`/`net_worth`. En mobile, las dos changes agregan herramientas a `TOOLS` de `FinanceScreen`: quien implemente segundo hace merge de la lista, no la reemplaza.
-- **`finanzas-datos-mercado`**: si cambia de dónde sale la cotización (`get_rates`), el export la toma igual porque pasa por `InvestmentService`; no hay que tocar nada acá.
-- **`finanzas-recurrentes`**: usa `transactions.is_recurring`/`recurring_parent_id`; este change suma otras columnas a `transactions` en otra migración. Coordinar el orden de las migraciones (una sola cadena, sin dos heads). Lo importado nunca es recurrente.
+- **`finanzas-inversiones`** (implementado): el export usa `InvestmentService.summary`/`net_worth`. En mobile, las dos changes agregan herramientas a `TOOLS` de `FinanceScreen`: quien implemente segundo hace merge de la lista, no la reemplaza.
+- **`finanzas-datos-mercado`** (implementado): la cotización sale de `InvestmentService.get_rates` (fuente elegida por el usuario: oficial/MEP/blue/manual; `modules/mercado`). El export de inversiones agrega un bloque "Cotizaciones" con la fuente y la fecha. Si cambia de dónde sale la cotización (`get_rates`), el export la toma igual porque pasa por `InvestmentService`; no hay que tocar nada acá.
+- **`finanzas-recurrentes`** (implementado): las transacciones se vinculan a su plantilla por `transactions.recurring_parent_id` (expuesto como `recurrence_id`), sin FK; las plantillas viven en `recurring_transactions` / `recurring_occurrences` (`modules/recurrentes`). Lo importado nunca es recurrente (`is_recurring = false`, `recurring_parent_id = NULL`), y **deshacer es borrado lógico**, así que no rompe `recurring_occurrences.transaction_id` ni ninguna FK. El export de cuenta/borrado respeta el orden de `OWNED_TABLES`: `recurring_occurrences` → `transactions` → `import_batches` → `recurring_transactions` → … → `bank_accounts`.
 - **`buscador-global`**: los movimientos importados aparecen en la búsqueda sin cambios (son transacciones comunes).
 - Sin dependencias bloqueantes: este change se puede implementar antes o después de los otros.
 
@@ -248,12 +248,18 @@ Todas bajo `/api/v1`, autenticadas, filtradas por `user_id`; un id ajeno respond
 3. Mobile: build nuevo por `expo-document-picker` (módulo nativo).
 4. **Rollback**: revertir web/mobile no requiere nada; revertir backend con `alembic downgrade` al head anterior borra lotes y huellas (los movimientos importados quedan como movimientos comunes).
 
-## Open Questions
+## Decisiones del usuario (antes "Preguntas abiertas")
 
-1. **¿Tenés un export real de Mercado Pago (Dinero disponible o Dinero en cuenta, el que te deje descargar tu cuenta personal) y de tu banco/billetera?** Anonimizado (cambiando montos y descripciones) sirve para fijar los alias en español y, si querés, un preset de Galicia/Santander/Brubank/Ualá. *Recomendación*: sí, al menos Mercado Pago; sin archivo real se implementa el genérico y el preset de MP por identificadores en inglés.
-2. **Deshacer: ¿borrado lógico de todo el lote, también lo editado después?** *Recomendación*: sí, con la advertencia del conteo de editados (es lo esperable de "deshacer la importación").
-3. **Posibles duplicados: ¿desmarcados por defecto?** *Recomendación*: sí (es más fácil sumar uno que limpiar dobles).
-4. **PDF con emojis de categorías**: ¿alcanza con quitarlos o embebemos una fuente Unicode (~750 KB)? *Recomendación*: quitarlos por ahora.
-5. **Topes** (2 MiB / 5.000 filas por import; 20.000 filas xlsx / 5.000 PDF por export): *Recomendación*: dejarlos así; son configurables por `config.py` sin variable de entorno obligatoria.
-6. **¿Sumar `.xls` viejo** (requiere `xlrd`, otra dependencia) si tu banco solo da ese formato? *Recomendación*: no por ahora; pedir "guardar como .xlsx/.csv".
-7. **Transferencias entre cuentas propias** (banco → Mercado Pago aparecen como egreso e ingreso): *Recomendación*: fuera de alcance; el usuario puede destildar una de las dos en el preview.
+1. **Archivo real de Mercado Pago**: el usuario **no** aportó un export anonimizado. El preset de MP se construyó con el formato documentado/público (re-verificado por búsqueda web en noviembre 2026: `TRANSACTION_TYPE` incluye además `CASHBACK` y variantes `*_SHIPPING`; `SETTLEMENT_NET_AMOUNT` es el efecto real sobre el saldo; se recomienda CSV en UTF-8) y es **tolerante**: alias de encabezados en en/es/pt, separador `;` o `,`, BOM, utf-8/latin-1, decimales es-AR. El genérico con mapeo de columnas queda como respaldo. **Pendiente: validar con un archivo real** y completar los alias en español (tarea 9.4).
+2. **Deshacer** borra el lote completo (incluye lo editado después), con advertencia previa y conteo de editados. **Decidido.**
+3. **Posibles duplicados** vienen **destildados**. **Decidido.**
+4. **PDF con emojis**: se quitan (sin fuente embebida). **Decidido.**
+5. **Topes**: import 2 MiB / 5.000 filas; export 20.000 filas en xlsx, 5.000 en PDF. **Decidido.**
+6. **Sin `.xls`** (se pide guardar como .xlsx/.csv). **Decidido.**
+7. **Transferencias entre cuentas propias**: fuera de alcance. **Decidido.**
+8. **Dinero**: `Decimal` de punta a punta (parseo, preview, JSON como string, inserción) con tope `Money` ±9.999.999.999,99. **`payment_method` y `account_type` solo toman valores del enum del backend** (`transfer` en presets de MP, `other` en genérico; `account_type` de la cuenta destino o `checking`): hubo un bug pasado donde la web mandaba "Efectivo" y daba 500.
+9. **Mobile**: sin CTAs de compra, precios ni "comprar en la web".
+
+## Alcance ampliado del export (acordado al implementar)
+
+Con `include_investments=true` el reporte suma, además de activos y patrimonio, el bloque **Cotizaciones** (USD/EUR→ARS con fuente efectiva y fecha, de `modulos/mercado`) y las **plantillas recurrentes** del usuario (hoja/sección "Recurrentes": nombre, tipo, monto, moneda, frecuencia, próxima fecha, estado). Los movimientos generados por una recurrente salen en Movimientos como cualquier otro.

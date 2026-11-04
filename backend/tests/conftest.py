@@ -16,6 +16,8 @@ from app.database import get_db
 from app.core.http_security import (
     auth_rate_limiter,
     billing_rate_limiter,
+    export_rate_limiter,
+    import_rate_limiter,
     search_rate_limiter,
     withdrawal_rate_limiter,
 )
@@ -63,6 +65,8 @@ async def _reset_rate_limiter():
     auth_rate_limiter.reset()
     billing_rate_limiter.reset()
     search_rate_limiter.reset()
+    export_rate_limiter.reset()
+    import_rate_limiter.reset()
     withdrawal_rate_limiter.reset()
     yield
 

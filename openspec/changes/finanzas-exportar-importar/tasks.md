@@ -1,24 +1,24 @@
 ## 1. Backend — Dependencias y configuración
 
-- [ ] 1.1 Confirmar versiones con `pip index versions` y agregar a `backend/requirements.txt` con `==` y comentario: `openpyxl==3.1.5`, `et-xmlfile`, `defusedxml==0.7.1`, `reportlab` 4.5.x (no la 5.1.0 recién publicada), `pillow` y `charset-normalizer` en las versiones que pida reportlab (design D2)
+- [x] 1.1 Confirmar versiones con `pip index versions` y agregar a `backend/requirements.txt` con `==` y comentario: `openpyxl==3.1.5`, `et-xmlfile`, `defusedxml==0.7.1`, `reportlab` 4.5.x (no la 5.1.0 recién publicada), `pillow` y `charset-normalizer` en las versiones que pida reportlab (design D2)
 - [ ] 1.2 Construir la imagen del backend para `linux/arm64` (`docker buildx build --platform linux/arm64 backend/`) y verificar que ninguna dependencia compila desde fuente ni pide paquetes `apt`; anotar el aumento de tamaño
-- [ ] 1.3 `backend/app/config.py`: `FINANCE_EXPORT_MAX_ROWS_XLSX=20000`, `FINANCE_EXPORT_MAX_ROWS_PDF=5000`, `FINANCE_IMPORT_MAX_BYTES=2 MiB`, `FINANCE_IMPORT_MAX_ROWS=5000`, `FINANCE_IMPORT_MAX_COLUMNS=50`, `FINANCE_IMPORT_PREVIEW_TTL_HOURS=24` (todos con default; sin variables obligatorias en `docker-compose.prod.yml`)
-- [ ] 1.4 `backend/app/core/http_security.py`: `export_rate_limiter` (10/300 s) e `import_rate_limiter` (20/600 s) por `user_id` con dependencias `rate_limit_finance_export` / `rate_limit_finance_import`; `BodySizeLimitMiddleware` con tope por ruta para `POST /api/v1/finance/imports/preview` (`FINANCE_IMPORT_MAX_BYTES + 64 KiB`), sin cambiar el global de 1 MiB
+- [x] 1.3 `backend/app/config.py`: `FINANCE_EXPORT_MAX_ROWS_XLSX=20000`, `FINANCE_EXPORT_MAX_ROWS_PDF=5000`, `FINANCE_IMPORT_MAX_BYTES=2 MiB`, `FINANCE_IMPORT_MAX_ROWS=5000`, `FINANCE_IMPORT_MAX_COLUMNS=50`, `FINANCE_IMPORT_PREVIEW_TTL_HOURS=24` (todos con default; sin variables obligatorias en `docker-compose.prod.yml`)
+- [x] 1.4 `backend/app/core/http_security.py`: `export_rate_limiter` (10/300 s) e `import_rate_limiter` (20/600 s) por `user_id` con dependencias `rate_limit_finance_export` / `rate_limit_finance_import`; `BodySizeLimitMiddleware` con tope por ruta para `POST /api/v1/finance/imports/preview` (`FINANCE_IMPORT_MAX_BYTES + 64 KiB`), sin cambiar el global de 1 MiB
 
 ## 2. Backend — Modelo y migración
 
-- [ ] 2.1 Crear `backend/app/modules/finanzas/transfer/__init__.py` y `models.py` con `ImportBatch` (columnas, checks e índices de design D11; `JSON` de SQLAlchemy; FK `account_id` con `ondelete="SET NULL"`)
-- [ ] 2.2 `backend/app/modules/finanzas/models.py`: sumar a `Transaction` `import_batch_id` (FK nombrada, `ondelete="SET NULL"`) e `import_row_hash` (`String(64)`) con índice `(user_id, import_row_hash)`; registrar el modelo nuevo donde se importan los modelos para `Base.metadata`
-- [ ] 2.3 Migración `backend/migrations/versions/0NN_finance_imports.py` con el siguiente número libre y `down_revision` = head vigente (coordinar con `finanzas-recurrentes`/`finanzas-datos-mercado`): `create_table`, `batch_alter_table("transactions")` para columnas + FK + índice; `downgrade` simétrico con batch
-- [ ] 2.4 Verificar `alembic heads` = un solo head y `upgrade head` / `downgrade -1` / `upgrade head` en SQLite
-- [ ] 2.5 `TransactionResponse` (`finanzas/schemas.py`) suma `import_batch_id: Optional[UUID] = None` (aditivo)
-- [ ] 2.6 `backend/app/modules/cuenta/service.py`: `("import_batches", ImportBatch)` en `OWNED_TABLES` después de `transactions` y antes de `bank_accounts`; `REDACTED_COLUMNS["import_batches"] = {"raw_table"}`
+- [x] 2.1 Crear `backend/app/modules/finanzas/transfer/__init__.py` y `models.py` con `ImportBatch` (columnas, checks e índices de design D11; `JSON` de SQLAlchemy; FK `account_id` con `ondelete="SET NULL"`)
+- [x] 2.2 `backend/app/modules/finanzas/models.py`: sumar a `Transaction` `import_batch_id` (FK nombrada, `ondelete="SET NULL"`) e `import_row_hash` (`String(64)`) con índice `(user_id, import_row_hash)`; registrar el modelo nuevo donde se importan los modelos para `Base.metadata`
+- [x] 2.3 Migración `backend/migrations/versions/024_finance_imports.py` con `down_revision = "023_habit_reminders"`: `create_table`, `batch_alter_table("transactions")` para columnas + FK + índice; `downgrade` simétrico con batch
+- [x] 2.4 Verificar `alembic heads` = un solo head y `upgrade head` / `downgrade -1` / `upgrade head` en SQLite
+- [x] 2.5 `TransactionResponse` (`finanzas/schemas.py`) suma `import_batch_id: Optional[UUID] = None` (aditivo)
+- [x] 2.6 `backend/app/modules/cuenta/service.py`: `("import_batches", ImportBatch)` en `OWNED_TABLES` después de `transactions` y antes de `bank_accounts`; `REDACTED_COLUMNS["import_batches"] = {"raw_table"}`
 
 ## 3. Backend — Export
 
 - [ ] 3.1 `transfer/cells.py`: `safe_text()` (prefijo `'` para `= + - @ \t \r \n`), `pdf_safe()` (quita lo que no entra en cp1252), `format_money_ar(Decimal, currency)`, `format_date_ar`, etiquetas en español de tipo y medio de pago; sin `locale`
-- [ ] 3.2 `transfer/report_data.py`: `ReportFilters` (defaults de rango con `local_today`, `date_to >= date_from`, máximo 5 años, `category_id="none"`), resolución de `account_id` a (tipo, últimos 4, banco) con 404 si es ajena, `COUNT` previo con topes → 422, consulta única con `LEFT JOIN categories`, agregados por moneda/categoría/mes en `Decimal`, bloque de inversiones vía `InvestmentService.summary`/`net_worth`
-- [ ] 3.3 `transfer/export_xlsx.py`: `Workbook(write_only=True)`, hojas Resumen/Movimientos/Por categoría/Por mes/Inversiones (D4), `WriteOnlyCell` con `data_type="s"` + `safe_text` en todo texto, números con formato y egresos en rojo, fechas `DD/MM/YYYY`, encabezado fijo y autofiltro, `creator="Can_cen"`
+- [ ] 3.2 `transfer/report_data.py`: `ReportFilters` (defaults de rango con `local_today`, `date_to >= date_from`, máximo 5 años, `category_id="none"`), resolución de `account_id` a (tipo, últimos 4, banco) con 404 si es ajena, `COUNT` previo con topes → 422, consulta única con `LEFT JOIN categories`, agregados por moneda/categoría/mes en `Decimal`, bloque de inversiones vía `InvestmentService.summary`/`net_worth`, cotizaciones vigentes (`get_rates`) y plantillas recurrentes del usuario
+- [ ] 3.3 `transfer/export_xlsx.py`: `Workbook(write_only=True)`, hojas Resumen/Movimientos/Por categoría/Por mes/Inversiones/Recurrentes (D4), `WriteOnlyCell` con `data_type="s"` + `safe_text` en todo texto, números con formato y egresos en rojo, fechas `DD/MM/YYYY`, encabezado fijo y autofiltro, `creator="Can_cen"`
 - [ ] 3.4 `transfer/export_pdf.py`: Platypus A4, encabezado con logotipo "C_C" + "Can_cen" + período, pie "Generado el … · Página X de Y" (canvas de dos pasadas), tablas con `repeatRows=1`, colores de ingreso/egreso, top 15 categorías + "Otras", sección de inversiones/patrimonio
 - [ ] 3.5 Router `backend/app/api/v1/finance_transfer.py` (`prefix="/finance"`) con `GET /export`: validación de query, rate limit, generación en `run_in_threadpool` sobre `SpooledTemporaryFile`, `StreamingResponse` por chunks con `Content-Length`, `Content-Disposition`, `Cache-Control: no-store`; incluirlo en `backend/app/api/v1/router.py`
 

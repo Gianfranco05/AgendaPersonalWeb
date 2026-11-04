@@ -105,6 +105,15 @@ class Settings(BaseSettings):
     # tocar max_length en cada campo de texto de cada modulo.
     MAX_REQUEST_BODY_SIZE: int = 1_048_576  # 1 MiB
 
+    # Exportar / importar Finanzas (change finanzas-exportar-importar). Todos
+    # con default: no hay variables obligatorias en docker-compose.prod.yml.
+    FINANCE_EXPORT_MAX_ROWS_XLSX: int = 20_000
+    FINANCE_EXPORT_MAX_ROWS_PDF: int = 5_000
+    FINANCE_IMPORT_MAX_BYTES: int = 2 * 1024 * 1024  # 2 MiB
+    FINANCE_IMPORT_MAX_ROWS: int = 5_000
+    FINANCE_IMPORT_MAX_COLUMNS: int = 50
+    FINANCE_IMPORT_PREVIEW_TTL_HOURS: int = 24
+
     # Email transaccional (Resend). Sin API key los mails se loguean en vez de
     # enviarse — asi dev y tests funcionan sin red ni cuenta.
     RESEND_API_KEY: str = ""

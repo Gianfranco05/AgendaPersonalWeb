@@ -24,6 +24,7 @@ from app.modules.auth.models import RefreshToken, User, VerificationToken
 from app.modules.billing.models import StripeCustomer
 from app.modules.eventos.models import Event
 from app.modules.finanzas.models import BankAccount, Budget, Category, Transaction
+from app.modules.finanzas.transfer.models import ImportBatch
 from app.modules.inversiones.models import Investment
 from app.modules.recurrentes.models import RecurringOccurrence, RecurringTransaction
 from app.modules.fitness.models import Exercise, WorkoutSession
@@ -61,6 +62,10 @@ OWNED_TABLES: list[tuple[str, Any]] = [
     # Las ocurrencias apuntan a transactions y a su plantilla: van antes que ambas.
     ("recurring_occurrences", RecurringOccurrence),
     ("transactions", Transaction),
+    # El lote lo referencian las transacciones (import_batch_id) y el lote
+    # referencia a bank_accounts (account_id): va despues de las primeras y
+    # antes de la segunda.
+    ("import_batches", ImportBatch),
     # La plantilla apunta a categories y bank_accounts: va antes que ellas.
     ("recurring_transactions", RecurringTransaction),
     ("budgets", Budget),
@@ -120,6 +125,8 @@ REDACTED_COLUMNS: dict[str, set[str]] = {
     # exponerlos solo sirve para enumerar la cuenta de Stripe del negocio.
     "stripe_customers": {"stripe_customer_id"},
     "module_purchases": {"stripe_session_id"},
+    # Celdas del archivo subido: transitorias (maximo 24 h) y pueden pesar MB.
+    "import_batches": {"raw_table"},
 }
 
 

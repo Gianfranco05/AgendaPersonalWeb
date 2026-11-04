@@ -51,6 +51,8 @@ class Transaction(Base):
     __table_args__ = (
         # "Movimientos de esta recurrencia" (filtro `recurrence_id`).
         Index("ix_transactions_recurring_parent_id", "recurring_parent_id"),
+        # Deteccion de duplicados al importar (misma huella de fila).
+        Index("ix_transactions_user_import_hash", "user_id", "import_row_hash"),
     )
 
     id: Mapped[str] = mapped_column(
@@ -83,6 +85,15 @@ class Transaction(Base):
 
     is_recurring: Mapped[bool] = mapped_column(Boolean, default=False)
     recurring_parent_id: Mapped[str] = mapped_column(String(36), nullable=True)
+
+    #: Lote de importacion que creo este movimiento (None si es manual). La FK
+    #: es SET NULL: borrar el lote no borra los movimientos.
+    import_batch_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("import_batches.id", ondelete="SET NULL", name="fk_transactions_import_batch_id"),
+        nullable=True,
+    )
+    import_row_hash: Mapped[str] = mapped_column(String(64), nullable=True)
 
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False)
     deleted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -165,3 +176,8 @@ class Budget(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+
+
+# Registra `import_batches` en Base.metadata junto con `transactions` (la FK
+# apunta ahi): sin esto alembic/create_all no la verian si nadie la importa.
+from app.modules.finanzas.transfer import models as _transfer_models  # noqa: E402,F401

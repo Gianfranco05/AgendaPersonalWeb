@@ -32,10 +32,14 @@ The export SHALL contain: a summary (period, applied filters, generation timesta
 
 #### Scenario: Investments section
 - **WHEN** `include_investments=true` and the user has active investments
-- **THEN** the export SHALL include an investments section and the net worth breakdown; with `include_investments=false` it SHALL NOT
+- **THEN** the export SHALL include an investments section, the net worth breakdown and the rates used (source and date); with `include_investments=false` it SHALL NOT
+
+#### Scenario: Recurring templates
+- **WHEN** `include_investments=true` and the user has recurring templates
+- **THEN** the export SHALL list only that user's templates (name, type, amount, currency, frequency, next date, status)
 
 ### Requirement: Excel format
-The `.xlsx` file SHALL have one sheet per section in the order Resumen, Movimientos, Por categoría, Por mes and (optional) Inversiones; header rows bold with frozen panes and autofilter; amounts written as numeric cells with a two-decimal thousands format; dates written as date cells formatted `DD/MM/YYYY`; workbook creator `Can_cen`.
+The `.xlsx` file SHALL have one sheet per section in the order Resumen, Movimientos, Por categoría, Por mes and (optional) Inversiones and Recurrentes; header rows bold with frozen panes and autofilter; amounts written as numeric cells with a two-decimal thousands format; dates written as date cells formatted `DD/MM/YYYY`; workbook creator `Can_cen`.
 
 #### Scenario: Numeric amounts
 - **WHEN** the Movimientos sheet is read back with openpyxl

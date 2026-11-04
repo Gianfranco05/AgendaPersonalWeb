@@ -59,5 +59,16 @@ sentry-sdk[fastapi]==2.57.0
 prometheus-client==0.25.0
 python-json-logger==4.1.0
 
+# Exportar/importar Finanzas (change finanzas-exportar-importar): Excel y PDF.
+# Wheels puros / manylinux aarch64, sin paquetes apt. defusedxml hace que
+# openpyxl bloquee entidades XML (billion laughs / XXE) en los .xlsx subidos.
+# reportlab 4.5.x y no 5.x (recien publicada).
+openpyxl==3.1.5
+et-xmlfile==2.0.0
+defusedxml==0.7.1
+reportlab==4.5.1
+pillow==12.3.0
+charset-normalizer==3.4.5
+
 # Development
 ruff==0.15.10

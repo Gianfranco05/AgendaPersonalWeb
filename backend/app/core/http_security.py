@@ -35,6 +35,10 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         return response
 
 
+IMPORT_UPLOAD_PATH = "/api/v1/finance/imports/preview"
+IMPORT_MULTIPART_OVERHEAD = 64 * 1024
+
+
 class BodySizeLimitMiddleware(BaseHTTPMiddleware):
     """Rechaza requests con body mas grande que `MAX_REQUEST_BODY_SIZE`.
 
@@ -47,6 +51,14 @@ class BodySizeLimitMiddleware(BaseHTTPMiddleware):
     nginx delante del proceso (`client_max_body_size`), no este middleware.
     """
 
+    @staticmethod
+    def _limit_for(request: Request) -> int:
+        # La subida de un archivo a importar necesita mas que el tope global
+        # (2 MiB de archivo + overhead multipart); el resto de las rutas no cambia.
+        if request.method == "POST" and request.url.path == IMPORT_UPLOAD_PATH:
+            return settings.FINANCE_IMPORT_MAX_BYTES + IMPORT_MULTIPART_OVERHEAD
+        return settings.MAX_REQUEST_BODY_SIZE
+
     async def dispatch(self, request: Request, call_next):
         content_length = request.headers.get("content-length")
         if content_length is not None:
@@ -54,7 +66,7 @@ class BodySizeLimitMiddleware(BaseHTTPMiddleware):
                 size = int(content_length)
             except ValueError:
                 size = None
-            if size is not None and size > settings.MAX_REQUEST_BODY_SIZE:
+            if size is not None and size > self._limit_for(request):
                 return Response(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE)
         return await call_next(request)
 
@@ -186,6 +198,10 @@ withdrawal_rate_limiter = _build_rate_limiter(max_attempts=5, window_seconds=360
 # rapido genera ~3 requests/s en rafagas cortas: 120/min no se alcanza en uso
 # real y corta un script que barra el endpoint. Bucket aparte del de auth.
 search_rate_limiter = _build_rate_limiter(max_attempts=120, window_seconds=60)
+# Exportar (genera un archivo: CPU) e importar (parsea un archivo subido):
+# por user_id, buckets separados.
+export_rate_limiter = _build_rate_limiter(max_attempts=10, window_seconds=300)
+import_rate_limiter = _build_rate_limiter(max_attempts=20, window_seconds=600)
 
 
 async def rate_limit_auth(request: Request) -> None:
@@ -238,5 +254,33 @@ async def rate_limit_withdrawal(request: Request) -> None:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Demasiados intentos. Probá de nuevo en unos minutos.",
+            headers={"Retry-After": str(retry_after)},
+        )
+
+
+async def rate_limit_finance_export(
+    current_user=Depends(get_current_user),
+) -> None:
+    if not settings.RATE_LIMIT_ENABLED:
+        return
+    retry_after = await export_rate_limiter.hit(str(current_user.id))
+    if retry_after:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Generaste muchos reportes seguidos. Esperá unos minutos y probá de nuevo.",
+            headers={"Retry-After": str(retry_after)},
+        )
+
+
+async def rate_limit_finance_import(
+    current_user=Depends(get_current_user),
+) -> None:
+    if not settings.RATE_LIMIT_ENABLED:
+        return
+    retry_after = await import_rate_limiter.hit(str(current_user.id))
+    if retry_after:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Subiste muchos archivos seguidos. Esperá unos minutos y probá de nuevo.",
             headers={"Retry-After": str(retry_after)},
         )
