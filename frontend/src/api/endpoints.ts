@@ -1004,6 +1004,8 @@ export async function downloadFinanceExport(params: FinanceExportParams): Promis
   const response = await apiClient.get<Blob>('/api/v1/finance/export', {
     params: { ...params, tz_offset_minutes: tzOffsetMinutes() },
     responseType: 'blob',
+    // Generar un PDF o un Excel grande tarda más que los 15 s del cliente.
+    timeout: 120000,
   });
   return {
     blob: response.data,
@@ -1106,7 +1108,13 @@ export async function previewImport(
   if (opts.preset && opts.preset !== 'auto') form.append('preset', opts.preset);
   if (opts.account_id) form.append('account_id', opts.account_id);
   form.append('tz_offset_minutes', String(tzOffsetMinutes()));
-  const { data } = await apiClient.post<ImportPreview>('/api/v1/finance/imports/preview', form);
+  // El cliente trae 'application/json' por defecto: sin pisarlo axios serializa el
+  // FormData como JSON y el server responde "Field required". Con 'multipart/form-data'
+  // axios lo suelta y el navegador arma el boundary.
+  const { data } = await apiClient.post<ImportPreview>('/api/v1/finance/imports/preview', form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 120000,
+  });
   return data;
 }
 

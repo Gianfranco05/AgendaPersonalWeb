@@ -48,7 +48,7 @@
 - [x] 6.3 `backend/tests/test_finance_import_api.py`: preview de cada preset, remap, confirm (cuenta destino, categorías, `import_batch_id`), duplicados al re-subir, dos filas idénticas en un archivo, posible duplicado contra un movimiento manual, confirm concurrente, 422/409/410/413/415, mapeo recordado por usuario, deshacer (balance, editados, re-importar después), limpieza de previews, rate limit
 - [x] 6.4 `backend/tests/test_finance_export.py`: xlsx leído con openpyxl (hojas, números, fechas, sin celdas fórmula, escape de `=HYPERLINK`, `+1`, `-2+3`, `@SUM`, montos negativos intactos), totales que cuadran por moneda, filtros (tipo, categoría, `none`, cuenta), inversiones on/off, PDF válido (`%PDF`, varias páginas, "$ 1.234,50", emoji sin fallar), topes 422, rango inválido, rate limit 429, headers de la respuesta
 - [x] 6.5 Aislamiento: extender `test_tenant_isolation.py` (lotes, export con `category_id`/`account_id` ajenos, sugerencias y duplicados sin datos de otro usuario); `test_account.py` (export sin `raw_table`, borrado con lotes y transacciones importadas); `test_infra.py` sin rutas públicas nuevas
-- [ ] 6.6 Regresión: suite completa `cd backend && python -m pytest -q` en verde (~777 + nuevos)
+- [x] 6.6 Regresión: suite completa `cd backend && python -m pytest -q` en verde (~777 + nuevos)
 
 ## 7. Web (`frontend/`)
 
@@ -62,19 +62,28 @@
 
 ## 8. Mobile (`C:\Proyectos\vida-personal-mobile`)
 
-- [ ] 8.1 [mobile] `npx expo install expo-document-picker` (versión de SDK 57) en `package.json`; anotar que requiere build nativo nuevo
+- [x] 8.1 [mobile] `npx expo install expo-document-picker` (versión de SDK 57) en `package.json`; anotar que requiere build nativo nuevo
 - [ ] 8.2 [mobile] `src/lib/exportFile.ts`: `shareBinaryFile(bytes, filename, mimeType, dialogTitle)` con `File`/`Paths.cache` y `Sharing.shareAsync` (UTI xlsx/pdf), fallback Blob en web; verificar en dispositivo que `File.write` acepta `Uint8Array` (si no, `File.downloadFileAsync` con `Authorization`)
-- [ ] 8.3 [mobile] `src/types` y `src/api/endpoints.ts`: `downloadFinanceExport` (`responseType: 'arraybuffer'`), `previewImport` (`FormData` con `{ uri, name, type }`), `updateImportMapping`, `confirmImport`, `fetchImports`, `undoImport`, sin `queued(...)`; `src/hooks/useFinanceImport.ts` con la misma invalidación que web
-- [ ] 8.4 [mobile] `src/screens/FinanceScreen.tsx`: herramientas "Exportar" e "Importar" en `TOOLS` (merge con las de `finanzas-inversiones`/`finanzas-recurrentes` si ya están) y registro de `ImportScreen` en el stack de Finanzas
-- [ ] 8.5 [mobile] `FinanceExportSheet` (`BottomSheet`, `DateField`, `FilterChips`, categoría, cuenta, switch inversiones, "Generar y compartir", aviso sin conexión)
-- [ ] 8.6 [mobile] `src/screens/ImportScreen.tsx` + `src/components/ImportRowItem.tsx`: elegir archivo (MIME CSV/XLSX variados), origen y cuenta, preview en `FlatList`, picker de categoría, sheet "Ajustar columnas", barra "Importar N movimientos", historial con "Deshacer"; tokens Stitch claro/oscuro, sin textos de compra
-- [ ] 8.7 [mobile] `npx tsc --noEmit` y tests existentes en verde
+- [x] 8.3 [mobile] `src/types` y `src/api/endpoints.ts`: `downloadFinanceExport` (`responseType: 'arraybuffer'`), `previewImport` (`FormData` con `{ uri, name, type }`), `updateImportMapping`, `confirmImport`, `fetchImports`, `undoImport`, sin `queued(...)`; `src/hooks/useFinanceImport.ts` con la misma invalidación que web
+- [x] 8.4 [mobile] `src/screens/FinanceScreen.tsx`: herramientas "Exportar" e "Importar" en `TOOLS` (merge con las de `finanzas-inversiones`/`finanzas-recurrentes` si ya están) y registro de `ImportScreen` en el stack de Finanzas
+- [x] 8.5 [mobile] `FinanceExportSheet` (`BottomSheet`, `DateField`, `FilterChips`, categoría, cuenta, switch inversiones, "Generar y compartir", aviso sin conexión)
+- [x] 8.6 [mobile] `src/screens/ImportScreen.tsx` + `src/components/ImportRowItem.tsx`: elegir archivo (MIME CSV/XLSX variados), origen y cuenta, preview en `FlatList`, picker de categoría, sheet "Ajustar columnas", barra "Importar N movimientos", historial con "Deshacer"; tokens Stitch claro/oscuro, sin textos de compra
+- [x] 8.7 [mobile] `npx tsc --noEmit` y tests existentes en verde
 
 ## 9. Verificación contra backend real (no mock)
 
 - [ ] 9.1 Postgres: `alembic upgrade head` / `downgrade -1` / `upgrade head` en PGlite (o Postgres en Docker) con datos previos en `transactions`; confirmar un import y borrar la cuenta sin errores de FK
-- [ ] 9.2 Web contra el backend real (`VITE_MOCK_ENABLED=false`): exportar xlsx y PDF de un mes con datos, abrir el .xlsx en Excel/LibreOffice (números sumables, fechas, sin fórmulas activas) y el PDF (marca, es-AR, paginado)
-- [ ] 9.3 Web: importar cada fixture, ajustar mapeo, confirmar, ver movimientos y balance actualizados, re-subir (todo "Ya importado"), deshacer y re-importar
+- [x] 9.2 Web contra el backend real (`VITE_MOCK_ENABLED=false`): exportar xlsx y PDF de un mes con datos, abrir el .xlsx en Excel/LibreOffice (números sumables, fechas, sin fórmulas activas) y el PDF (marca, es-AR, paginado)
+- [x] 9.3 Web: importar cada fixture, ajustar mapeo, confirmar, ver movimientos y balance actualizados, re-subir (todo "Ya importado"), deshacer y re-importar
 - [ ] 9.4 Con un export real anonimizado de Mercado Pago (y del banco/billetera del usuario si lo comparte): ajustar alias en español de los presets, sumarlo como fixture y repetir 9.3
 - [ ] 9.5 Mobile (build `lan` con `expo-document-picker`): exportar y compartir xlsx/PDF a Drive/WhatsApp, importar un CSV desde Descargas, deshacer desde el historial; probar en modo claro y oscuro
 - [ ] 9.6 Imagen ARM de producción: build y arranque con las dependencias nuevas, export PDF dentro del contenedor
+
+### Notas de verificación (apply)
+
+- 1.2 y 9.6 abiertas: el daemon de Docker no estaba corriendo, así que no se pudo construir la imagen ARM. Sí se verificó con `pip download --platform manylinux2014_aarch64 --python-version 3.11` que existen ruedas cp311 aarch64 de todas las dependencias nuevas (unos 9 MB extra).
+- 9.1 abierta: la migración 024 (upgrade, downgrade con datos, upgrade) y las FK (SET NULL al borrar lote o cuenta, orden de borrado de la cuenta) se verificaron en PGlite a nivel SQL. Falta correr confirmar y borrar cuenta de punta a punta contra Postgres real.
+- 9.2 y 9.3 hechas contra el backend real (SQLite, `VITE_MOCK_ENABLED=false`, UI en el navegador): export xlsx y PDF, importar CSV de Mercado Pago y de banco con números es-AR, re-subida (todo "Ya importado"), deshacer y re-importar. El .xlsx se abrió con openpyxl (sin celdas de fórmula), no con Excel/LibreOffice. En vivo apareció un bug que los tests con cliente simulado no veían: el cliente axios de la web manda `Content-Type: application/json` y serializaba el `FormData` como JSON ("Field required"). Corregido (y con test) en `previewImport`; además el timeout de export e import sube a 120 s.
+- Rendimiento medido: xlsx de 20.000 filas en 2,9 s (872 KB); PDF de unas 4.600 filas en 3,8 s (309 KB).
+- 9.4 abierta: no hay un export real de Mercado Pago; el parser es tolerante pero hay que validarlo con uno real.
+- 8.2 y 9.5 abiertas: dependen del dispositivo (que `File.write` acepte `Uint8Array`, la hoja de compartir, el selector de archivos).

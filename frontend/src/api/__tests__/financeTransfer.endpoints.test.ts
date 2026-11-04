@@ -40,6 +40,7 @@ describe('downloadFinanceExport', () => {
         tz_offset_minutes: expectedOffset,
       },
       responseType: 'blob',
+      timeout: 120000,
     })
     expect(file.blob).toBe(blob)
     expect(file.filename).toBe('cancen-finanzas_2026-10-31.xlsx')
@@ -65,6 +66,16 @@ describe('importacion', () => {
     expect((form as FormData).get('account_id')).toBe('acc1')
     expect((form as FormData).get('tz_offset_minutes')).toBe(String(expectedOffset))
     expect(out.batch_id).toBe('b1')
+  })
+
+  // El cliente axios trae 'application/json' por defecto: sin pisarlo, axios serializa el
+  // FormData como JSON y el server responde "Field required" (bug visto en vivo).
+  it('previewImport pisa el Content-Type JSON del cliente y amplia el timeout', async () => {
+    mockPost.mockResolvedValue({ data: {} })
+    await previewImport(new File(['x'], 'a.csv'))
+    const config = mockPost.mock.calls[0][2]
+    expect(config.headers['Content-Type']).toBe('multipart/form-data')
+    expect(config.timeout).toBeGreaterThan(15000)
   })
 
   it('previewImport omite preset auto y cuenta vacia', async () => {
