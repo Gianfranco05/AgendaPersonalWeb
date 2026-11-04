@@ -72,3 +72,4 @@ charset-normalizer==3.4.5
 
 # Development
 ruff==0.15.10
+pypdf==6.19.0  # tests: leer el texto de los PDF generados

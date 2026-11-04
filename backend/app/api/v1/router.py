@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from app.api.v1.finance import router as finance_router
+from app.api.v1.finance_transfer import router as finance_transfer_router
 from app.api.v1.notes import router as notes_router
 from app.api.v1.events import router as events_router
 from app.api.v1.goals import router as goals_router
@@ -32,6 +33,7 @@ from app.infra.router import router as infra_router
 api_router = APIRouter()
 
 api_router.include_router(finance_router)
+api_router.include_router(finance_transfer_router)
 api_router.include_router(investments_router)
 api_router.include_router(market_router)
 api_router.include_router(recurring_router)
