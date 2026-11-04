@@ -207,3 +207,14 @@ Desviaciones y hallazgos de la implementación respecto del diseño original:
 - **Cobertura de changes hermanos**: se revisaron `modules/inversiones` (ya es fuente `investments`), `modules/recurrentes` (reglas recurrentes), `modules/habitos_recordatorios` y bloqueo/bienvenida. Las reglas recurrentes y los ajustes de recordatorios **no** se agregan como tipos: el alcance del diseño son los 14 tipos y ninguna de esas entidades tiene una pantalla propia a la que abrir un resultado; sumar una fuente más es una entrada en `SEARCH_SOURCES`.
 - **Logs**: `sentry.py::scrub_search_query` (nuevo) saca el query string de los eventos y transacciones de `/api/v1/search` (`before_send` y `before_send_transaction`); Sentry adjunta `request.query_string` aunque `send_default_pii` sea `False`. En dev, `DEBUG=True` activa el echo de SQLAlchemy, que sí vuelca los parámetros de las consultas (incluido el término); producción fuerza `DEBUG=false`.
 - **Etiqueta de mantenimiento**: el título mostrado es "Tipo · Vehículo" con el tipo capitalizado (`Revision · Gol Trend`); la coincidencia se busca solo en `notes` (el tipo no es buscable por texto).
+
+### Rendimiento medido (tarea 8.3)
+
+Usuario de ~5.000 filas (1.500 notas de ~1,7 KB de promedio, más el resto de los tipos), `/search` sin `types`:
+
+| Motor | p50 | p95 | máx |
+|-------|-----|-----|-----|
+| SQLite (con caché del plegado por columna) | 300 ms | 354 ms | 408 ms |
+| PGlite (PG 18 en WASM, no representativo de PG nativo) | 358 ms | 528 ms | n/d |
+
+El objetivo p95 < 150 ms NO se cumple en esta máquina. Causa medida: los 14 `replace` anidados del plegado se aplican a todo el texto del usuario (LIKE plegado sobre 1.500 notas ≈ 69 ms contra ≈ 7 ms de un `lower() LIKE` simple). `types=notes` ronda 163 ms. Pendiente (no implementado): prefiltro barato `lower(col) LIKE` con vocales, ñ y no ASCII convertidos a `_`, que no puede dar falsos negativos (el test diferencial es la red de seguridad); si no alcanza, el Plan B (pg_trgm) ya está descrito arriba. No se verificó en Postgres nativo ni con nginx real (Docker no disponible: tarea 8.7 abierta).

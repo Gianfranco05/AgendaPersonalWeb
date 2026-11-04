@@ -62,11 +62,12 @@
 
 ## 8. Verificación contra el backend real (no mock)
 
-- [ ] 8.1 Levantar el backend contra Postgres (docker compose o PGlite vía npm) y correr por API búsquedas con tildes/mayúsculas ("cafe"/"CAFÉ", "reunion"/"REUNIÓN"), comodines (`20%`, `mi_a`) y tokens múltiples: mismos resultados que en SQLite, 422 para `q` corto/largo, nunca 500
-- [ ] 8.2 En Postgres, con la base creada con collation `C` o `es_AR.UTF-8`, confirmar que "reunion" encuentra "REUNIÓN" (el plegado no depende de la collation)
+- [x] 8.1 Levantar el backend contra Postgres (docker compose o PGlite vía npm) y correr por API búsquedas con tildes/mayúsculas ("cafe"/"CAFÉ", "reunion"/"REUNIÓN"), comodines (`20%`, `mi_a`) y tokens múltiples: mismos resultados que en SQLite, 422 para `q` corto/largo, nunca 500
+- [x] 8.2 En Postgres, con la base creada con collation `C` o `es_AR.UTF-8`, confirmar que "reunion" encuentra "REUNIÓN" (el plegado no depende de la collation)
 - [ ] 8.3 Medir latencia con un usuario sembrado de ~5.000 filas repartidas (notas largas incluidas): p95 de `/search` sin `types` < 150 ms; registrar el número en el change
-- [ ] 8.4 Con cobro configurado: usuario sin plantillas no ve grupos pagos; comprar (webhook de prueba) una plantilla → aparece; desactivarla en Módulos → desaparece
-- [ ] 8.5 Web con `VITE_MOCK_ENABLED=false`: `Ctrl+K` desde varias páginas, resultados en vivo, teclado, abrir nota/tarea/evento/movimiento/inversión/examen y ver el modal correcto; URL limpia al cerrar
+  - MEDIDO, NO CUMPLE: con ~5.000 filas (1.500 notas de ~1,7 KB) en SQLite p50 300 ms, p95 354 ms, máx 408 ms (PGlite/WASM p95 528 ms, no representativo de PG nativo). Causa: los 14 `replace` anidados del plegado sobre todo el texto del usuario. Sigue abierta; ver la nota de perf en design.md.
+- [x] 8.4 Con cobro configurado: usuario sin plantillas no ve grupos pagos; comprar (webhook de prueba) una plantilla → aparece; desactivarla en Módulos → desaparece
+- [x] 8.5 Web con `VITE_MOCK_ENABLED=false`: `Ctrl+K` desde varias páginas, resultados en vivo, teclado, abrir nota/tarea/evento/movimiento/inversión/examen y ver el modal correcto; URL limpia al cerrar
 - [ ] 8.6 Mobile (build lan o Expo contra el backend real): lupa en Inicio, buscar, tocar un resultado de cada tab y de una plantilla comprada, sin conexión muestra el aviso, no aparece ningún texto de compra
 - [ ] 8.7 nginx: una búsqueda en el stack de prod deja en el access log `/api/v1/search` sin el término
-- [ ] 8.8 Correr `openspec validate buscador-global --strict` y marcar las tareas completadas
+- [x] 8.8 Correr `openspec validate buscador-global --strict` y marcar las tareas completadas
