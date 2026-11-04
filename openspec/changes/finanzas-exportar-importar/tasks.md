@@ -24,12 +24,12 @@
 
 ## 4. Backend — Import: parseo
 
-- [ ] 4.1 `transfer/import_parse.py` — recepción: lectura del `UploadFile` por chunks con corte en `FINANCE_IMPORT_MAX_BYTES` (413), detección de tipo por contenido (zip `PK\x03\x04`, OLE `D0 CF 11 E0` → 415 con mensaje de `.xls`, binario → 415), nombre de archivo saneado (solo base, ≤ 255)
-- [ ] 4.2 XLSX seguro: inspección previa con `zipfile` (≤ 200 entradas, ≤ 25 MiB descomprimido, ratio ≤ 100, sin `..`/rutas absolutas, sin `vbaProject.bin`); `load_workbook(read_only=True, data_only=True)` con defusedxml instalado; primera hoja visible; fórmula sin valor cacheado → error de fila
-- [ ] 4.3 CSV: `utf-8-sig` con fallback `cp1252`, `csv.Sniffer` limitado a `, ; \t |`, limpieza de `NUL`; topes de filas (5.000 → 422), columnas (50) y celdas (500 caracteres)
-- [ ] 4.4 Detección de fila de encabezado en las primeras 30 filas y normalización de encabezados (minúsculas, sin tildes, espacios colapsados); `header_signature`
-- [ ] 4.5 Fechas (D8.7): ISO con offset → huso del usuario (fecha y hora locales), `yyyy-mm-dd`, `dd/mm/yyyy`, `dd-mm-yyyy`, `dd.mm.yyyy`, `dd/mm/yy`, celdas `datetime`, seriales de Excel; default día-primero con detección por columna; rango 2000-01-01..hoy+1 año
-- [ ] 4.6 Números `parse_amount_ar` (D8.8): símbolos, paréntesis y signo adelante/atrás, separadores con detección por columna u override, cuantizado a 2, tope `Money`, cero → `skipped`
+- [x] 4.1 `transfer/import_parse.py` — recepción: lectura del `UploadFile` por chunks con corte en `FINANCE_IMPORT_MAX_BYTES` (413), detección de tipo por contenido (zip `PK\x03\x04`, OLE `D0 CF 11 E0` → 415 con mensaje de `.xls`, binario → 415), nombre de archivo saneado (solo base, ≤ 255)
+- [x] 4.2 XLSX seguro: inspección previa con `zipfile` (≤ 200 entradas, ≤ 25 MiB descomprimido, ratio ≤ 100, sin `..`/rutas absolutas, sin `vbaProject.bin`); `load_workbook(read_only=True, data_only=True)` con defusedxml instalado; primera hoja visible; fórmula sin valor cacheado → error de fila
+- [x] 4.3 CSV: `utf-8-sig` con fallback `cp1252`, `csv.Sniffer` limitado a `, ; \t |`, limpieza de `NUL`; topes de filas (5.000 → 422), columnas (50) y celdas (500 caracteres)
+- [x] 4.4 Detección de fila de encabezado en las primeras 30 filas y normalización de encabezados (minúsculas, sin tildes, espacios colapsados); `header_signature`
+- [x] 4.5 Fechas (D8.7): ISO con offset → huso del usuario (fecha y hora locales), `yyyy-mm-dd`, `dd/mm/yyyy`, `dd-mm-yyyy`, `dd.mm.yyyy`, `dd/mm/yy`, celdas `datetime`, seriales de Excel; default día-primero con detección por columna; rango 2000-01-01..hoy+1 año
+- [x] 4.6 Números `parse_amount_ar` (D8.8): símbolos, paréntesis y signo adelante/atrás, separadores con detección por columna u override, cuantizado a 2, tope `Money`, cero → `skipped`
 - [ ] 4.7 Signo/tipo según `amount_mode` e `invert_sign`; moneda normalizada y permitida; descripción saneada (≤ 255 en `product_name`, resto a `notes`, vacía → "Movimiento importado")
 - [ ] 4.8 `transfer/import_presets.py`: `mercadopago_release`, `mercadopago_account_money` (alias en/es/pt, filas informativas → `skipped`, traducción de códigos `DESCRIPTION`, signo por `TRANSACTION_TYPE`) y `generic` con heurística de encabezados en español; elección automática por columnas requeridas
 
