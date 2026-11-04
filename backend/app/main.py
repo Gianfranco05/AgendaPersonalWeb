@@ -80,6 +80,8 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    # El export de Finanzas manda el nombre del archivo en Content-Disposition.
+    expose_headers=["Content-Disposition", "Retry-After"],
 )
 # Mas afuera que CORS: un body gigante se rechaza antes de que corra
 # cualquier otra cosa, en vez de gastar trabajo en CORS/rate-limit primero.
