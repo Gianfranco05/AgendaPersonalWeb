@@ -16,6 +16,7 @@ import re
 import unicodedata
 
 from sqlalchemy import func
+from sqlalchemy.orm.attributes import InstrumentedAttribute
 from sqlalchemy.sql.elements import ColumnElement
 
 #: Tabla unica de plegado. Ampliarla es agregar pares aca y en
@@ -38,12 +39,29 @@ class QueryError(ValueError):
     """La consulta no es valida (mensaje en espanol, listo para el 422)."""
 
 
-def fold(col) -> ColumnElement:
-    """Expresion SQL que pliega una columna: igual en Postgres y SQLite."""
+# Armar 14 `replace` anidados con SQLAlchemy cuesta ~3 ms; una busqueda pliega
+# decenas de veces las mismas columnas. La expresion es inmutable, asi que se
+# arma una vez por columna mapeada y se reutiliza (tambien ahorra generar la
+# cache key de la sentencia). La clave es el id del atributo y se guarda el
+# atributo junto a la expresion para que ese id no se reutilice.
+_FOLD_CACHE: dict[int, tuple] = {}
+
+
+def _build_fold(col) -> ColumnElement:
     expr = func.lower(func.coalesce(col, ""))
     for src, dst in FOLD_TABLE.items():
         expr = func.replace(expr, src, dst)
     return expr
+
+
+def fold(col) -> ColumnElement:
+    """Expresion SQL que pliega una columna: igual en Postgres y SQLite."""
+    if not isinstance(col, InstrumentedAttribute):
+        return _build_fold(col)  # columnas sueltas (tests): sin cache
+    hit = _FOLD_CACHE.get(id(col))
+    if hit is None:
+        hit = _FOLD_CACHE[id(col)] = (col, _build_fold(col))
+    return hit[1]
 
 
 def fold_text(text: str) -> str:
