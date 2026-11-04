@@ -1,10 +1,12 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { Plus } from 'lucide-react';
 import { LoadingSkeleton } from '../../components/LoadingSkeleton';
-import { fetchNotes, createNote, updateNote, deleteNote } from '../../api/endpoints';
+import { fetchNotes, createNote, updateNote, deleteNote, exportNotesJson } from '../../api/endpoints';
 import type { Note } from '../../types';
 import NotesSidebar from './NotesSidebar';
 import NoteEditor from './NoteEditor';
+import { parseServerTimestamp } from '../../utils/date';
+import { useOpenParam } from '../../hooks/useOpenParam';
 
 export default function NotesPage() {
   const [notes, setNotes] = useState<Note[]>([]);
@@ -12,15 +14,42 @@ export default function NotesPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [activeTag, setActiveTag] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
+  // Solo importa en pantallas chicas (en md+ se ven lista y editor a la vez).
+  const [mobileView, setMobileView] = useState<'list' | 'editor'>('list');
+  // El editor guarda lo pendiente al desmontarse: si la nota se borró desde la
+  // lista justo después de tipear, ese último guardado la recreaba (o daba 404).
+  const deletedIdsRef = useRef<Set<string>>(new Set());
+
+  async function handleExport() {
+    setExporting(true);
+    try {
+      const blob = await exportNotesJson();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'notas.json';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } finally {
+      setExporting(false);
+    }
+  }
 
   const loadNotes = useCallback(async () => {
     setLoading(true);
-    const data = await fetchNotes();
-    setNotes(data);
-    if (data.length > 0 && !selectedId) {
-      setSelectedId(data[0].id);
+    try {
+      const data = await fetchNotes();
+      setNotes(data);
+      if (data.length > 0 && !selectedId) {
+        setSelectedId(data[0].id);
+      }
+    } finally {
+      // Si falla la carga no se queda en el esqueleto para siempre.
+      setLoading(false);
     }
-    setLoading(false);
   }, [selectedId]);
 
   useEffect(() => {
@@ -28,6 +57,43 @@ export default function NotesPage() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const selectedNote = notes.find((n) => n.id === selectedId) || null;
+
+  // Las notas archivadas no vienen en la lista normal: si el buscador lleva a
+  // una, se pide una vez la lista completa. 'missing' = tampoco está ahí.
+  const archivedLookup = useRef<'idle' | 'pending' | 'done'>('idle');
+  const [, setLookupTick] = useState(0);
+
+  useOpenParam({
+    ready: !loading,
+    onOpen: ({ id }) => {
+      const found = notes.find((n) => n.id === id);
+      if (found) {
+        setSearch('');
+        setActiveTag(null);
+        setSelectedId(id);
+        setMobileView('editor');
+        return true;
+      }
+      if (archivedLookup.current === 'done') return false;
+      if (archivedLookup.current === 'idle') {
+        archivedLookup.current = 'pending';
+        fetchNotes(true)
+          .then((all) => {
+            // Solo se suman las que faltan: no pisar ediciones locales.
+            setNotes((prev) => {
+              const known = new Set(prev.map((n) => n.id));
+              return [...prev, ...all.filter((n) => !known.has(n.id))];
+            });
+          })
+          .catch(() => undefined)
+          .finally(() => {
+            archivedLookup.current = 'done';
+            setLookupTick((t) => t + 1);
+          });
+      }
+      return 'wait';
+    },
+  });
 
   function handleNew() {
     const newNote: Note = {
@@ -43,9 +109,16 @@ export default function NotesPage() {
     };
     setNotes((prev) => [newNote, ...prev]);
     setSelectedId(newNote.id);
+    setMobileView('editor');
+  }
+
+  function handleSelect(id: string) {
+    setSelectedId(id);
+    setMobileView('editor');
   }
 
   async function handleSave(note: Note) {
+    if (deletedIdsRef.current.has(note.id)) return;
     if (note.id.startsWith('temp-')) {
       const created = await createNote({
         title: note.title,
@@ -71,19 +144,33 @@ export default function NotesPage() {
   }
 
   async function handleDelete(id: string) {
+    deletedIdsRef.current.add(id);
     if (!id.startsWith('temp-')) {
-      await deleteNote(id);
+      try {
+        await deleteNote(id);
+      } catch (err) {
+        // No se borró: la nota sigue viva y tiene que poder guardarse.
+        deletedIdsRef.current.delete(id);
+        throw err;
+      }
     }
     setNotes((prev) => prev.filter((n) => n.id !== id));
     if (selectedId === id) {
       setSelectedId(null);
+      setMobileView('list');
     }
   }
 
-  function handlePin(id: string) {
-    setNotes((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, is_pinned: !n.is_pinned } : n))
-    );
+  async function handlePin(id: string) {
+    const target = notes.find((n) => n.id === id);
+    if (!target) return;
+    const isPinned = !target.is_pinned;
+    setNotes((prev) => prev.map((n) => (n.id === id ? { ...n, is_pinned: isPinned } : n)));
+    // Antes solo cambiaba el estado local: fijar desde la lista una nota que
+    // no estaba abierta en el editor se perdía al recargar.
+    if (!id.startsWith('temp-')) {
+      await updateNote(id, { is_pinned: isPinned });
+    }
   }
 
   function handleColorChange(id: string, color: string) {
@@ -107,7 +194,7 @@ export default function NotesPage() {
     })
     .sort((a, b) => {
       if (a.is_pinned !== b.is_pinned) return a.is_pinned ? -1 : 1;
-      return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
+      return parseServerTimestamp(b.updated_at).getTime() - parseServerTimestamp(a.updated_at).getTime();
     });
 
   return (
@@ -120,23 +207,28 @@ export default function NotesPage() {
         search={search}
         activeTag={activeTag}
         loading={loading}
-        onSelect={setSelectedId}
+        exporting={exporting}
+        hiddenOnMobile={mobileView === 'editor'}
+        onSelect={handleSelect}
         onSearchChange={setSearch}
         onTagSelect={setActiveTag}
         onPin={handlePin}
         onDelete={handleDelete}
         onNew={handleNew}
+        onExport={handleExport}
       />
 
       {/* Editor */}
-      <div className="flex flex-1 flex-col">
+      <div className={`min-w-0 flex-1 flex-col ${mobileView === 'list' ? 'hidden md:flex' : 'flex'}`}>
         {loading ? (
           <div className="flex flex-1 items-center justify-center p-8">
             <LoadingSkeleton type="card" />
           </div>
         ) : selectedNote ? (
           <NoteEditor
+            key={selectedNote.id}
             note={selectedNote}
+            onBack={() => setMobileView('list')}
             onSave={handleSave}
             onDelete={handleDelete}
             onColorChange={handleColorChange}

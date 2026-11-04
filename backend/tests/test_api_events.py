@@ -117,3 +117,85 @@ async def test_api_events_crud_full(api_auth_client):
 
     list_after = await api_auth_client.get("/api/v1/events")
     assert all(e["id"] != event_id for e in list_after.json())
+
+
+@pytest.mark.asyncio
+async def test_api_export_events_ics(api_auth_client):
+    await api_auth_client.post("/api/v1/events", json={
+        "title": "Evento exportable",
+        "description": "Descripcion, con coma",
+        "start_datetime": "2025-07-01T10:00:00",
+        "end_datetime": "2025-07-01T11:00:00",
+        "location": "Oficina",
+    })
+
+    response = await api_auth_client.get("/api/v1/events/export/ics")
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/calendar")
+    assert "eventos.ics" in response.headers["content-disposition"]
+    body = response.text
+    assert body.startswith("BEGIN:VCALENDAR")
+    assert "SUMMARY:Evento exportable" in body
+    assert "LOCATION:Oficina" in body
+    assert body.endswith("END:VCALENDAR\r\n")
+
+
+@pytest.mark.asyncio
+async def test_api_export_events_ics_requires_auth(client):
+    response = await client.get("/api/v1/events/export/ics")
+    assert response.status_code == 401
+
+
+# ── Hora de pared: lo que el cliente manda es lo que vuelve ────────────────
+
+@pytest.mark.asyncio
+async def test_evento_devuelve_la_misma_hora_de_pared_sin_offset(api_auth_client):
+    created = await api_auth_client.post("/api/v1/events", json={
+        "title": "Cena",
+        "start_datetime": "2026-10-07T21:30:00",
+        "end_datetime": "2026-10-07T23:00:00",
+    })
+    assert created.status_code == 201
+    # Sin "Z" ni offset: web y mobile hacen new Date(valor) y lo toman como
+    # hora local. Con "Z" (lo que daba Postgres) el evento se corria 3 horas.
+    assert created.json()["start_datetime"] == "2026-10-07T21:30:00"
+    assert created.json()["end_datetime"] == "2026-10-07T23:00:00"
+
+    listed = await api_auth_client.get("/api/v1/events")
+    assert listed.json()[0]["start_datetime"] == "2026-10-07T21:30:00"
+
+
+def test_el_valor_guardado_es_aware_en_utc_sin_depender_de_la_zona_del_servidor():
+    from datetime import timezone
+
+    from app.modules.eventos.schemas import EventCreate, EventUpdate
+
+    ev = EventCreate(title="x", start_datetime="2026-10-07T10:00:00")
+    assert ev.start_datetime.tzinfo == timezone.utc
+    assert ev.start_datetime.hour == 10
+
+    # Un cliente que mande offset explicito se normaliza a UTC.
+    ev = EventCreate(title="x", start_datetime="2026-10-07T10:00:00-03:00")
+    assert (ev.start_datetime.hour, ev.start_datetime.tzinfo) == (13, timezone.utc)
+
+    assert EventUpdate(start_datetime="2026-10-07T10:00:00").start_datetime.tzinfo == timezone.utc
+
+
+def test_end_after_start_no_revienta_con_naive_y_aware_mezclados():
+    from app.modules.eventos.schemas import EventCreate
+
+    with pytest.raises(ValueError):
+        EventCreate(
+            title="x",
+            start_datetime="2026-10-07T10:00:00",
+            end_datetime="2026-10-07T09:00:00-00:00",
+        )
+
+
+@pytest.mark.asyncio
+async def test_ics_exporta_hora_flotante_sin_z(api_auth_client):
+    await api_auth_client.post("/api/v1/events", json={
+        "title": "Cena", "start_datetime": "2026-10-07T21:30:00",
+    })
+    response = await api_auth_client.get("/api/v1/events/export/ics")
+    assert "DTSTART:20261007T213000\r\n" in response.text

@@ -1,8 +1,8 @@
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import Optional, Sequence
 
-from sqlalchemy import select, func, and_
+from sqlalchemy import select, func, and_, delete, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.finanzas.enums import (
@@ -14,6 +14,7 @@ from app.modules.finanzas.models import (
     BankAccount,
     Budget,
 )
+from app.modules.recurrentes.models import RecurringTransaction
 
 
 class TransactionRepository:
@@ -29,6 +30,7 @@ class TransactionRepository:
         date_to: Optional[date] = None,
         transaction_type: Optional[str] = None,
         category_id: Optional[str] = None,
+        recurrence_id: Optional[str] = None,
     ) -> Sequence[Transaction]:
         query = select(Transaction).where(
             and_(
@@ -45,6 +47,8 @@ class TransactionRepository:
             query = query.where(Transaction.type == transaction_type)
         if category_id:
             query = query.where(Transaction.category_id == category_id)
+        if recurrence_id:
+            query = query.where(Transaction.recurring_parent_id == recurrence_id)
 
         query = query.order_by(Transaction.transaction_date.desc())
         query = query.offset(skip).limit(limit)
@@ -59,6 +63,7 @@ class TransactionRepository:
         date_to: Optional[date] = None,
         transaction_type: Optional[str] = None,
         category_id: Optional[str] = None,
+        recurrence_id: Optional[str] = None,
     ) -> int:
         query = select(func.count()).where(
             and_(
@@ -75,6 +80,8 @@ class TransactionRepository:
             query = query.where(Transaction.type == transaction_type)
         if category_id:
             query = query.where(Transaction.category_id == category_id)
+        if recurrence_id:
+            query = query.where(Transaction.recurring_parent_id == recurrence_id)
 
         result = await self.db.execute(query)
         return result.scalar() or 0
@@ -105,7 +112,9 @@ class TransactionRepository:
 
     async def delete(self, transaction: Transaction) -> None:
         transaction.is_deleted = True
-        transaction.deleted_at = datetime.utcnow()
+        # Aware y en UTC: la columna es timestamptz y asyncpg interpreta un
+        # datetime naive como hora LOCAL del servidor, no como UTC.
+        transaction.deleted_at = datetime.now(timezone.utc)
         await self.db.commit()
 
     async def get_balance(self, user_id: str) -> dict:
@@ -187,6 +196,74 @@ class TransactionRepository:
 
         return data
 
+    async def get_expense_breakdown_by_category(self, user_id: str) -> list[dict]:
+        """Gasto total por categoria (solo `expense`, sin borrados), de mayor
+        a menor. Usado por el reporte de finanzas — misma consulta que tenia
+        la ruta HTML legacy (`finanzas/routes.py::reportes`)."""
+        result = await self.db.execute(
+            select(Category.name, Category.color, func.sum(Transaction.amount))
+            .join(Transaction, Transaction.category_id == Category.id, isouter=True)
+            .where(Transaction.user_id == user_id)
+            .where(Transaction.type == TransactionType.EXPENSE)
+            .where(Transaction.is_deleted == False)
+            .group_by(Category.id, Category.name, Category.color)
+            .order_by(func.sum(Transaction.amount).desc())
+        )
+        rows = [
+            {"name": name, "color": color, "total": Decimal(str(total))}
+            for name, color, total in result.all()
+        ]
+
+        no_category_result = await self.db.execute(
+            select(func.sum(Transaction.amount))
+            .where(Transaction.user_id == user_id)
+            .where(Transaction.type == TransactionType.EXPENSE)
+            .where(Transaction.is_deleted == False)
+            .where(Transaction.category_id == None)  # noqa: E711 (SQLAlchemy requiere == None)
+        )
+        no_category_total = no_category_result.scalar() or Decimal("0")
+        if no_category_total > 0:
+            rows.append({"name": "Sin categoría", "color": "#94A3B8", "total": Decimal(str(no_category_total))})
+
+        return rows
+
+    async def get_monthly_totals(self, user_id: str, month_starts: list[date]) -> list[dict]:
+        """Ingresos/egresos de cada mes en `month_starts` (cada uno el dia 1
+        de su mes). Una consulta por mes por tipo, igual que la ruta HTML
+        legacy — a esta escala (uso personal) no justifica una consulta
+        agrupada por mes con funciones de fecha especificas del motor."""
+        totals = []
+        for month_start in month_starts:
+            if month_start.month == 12:
+                month_end = date(month_start.year + 1, 1, 1)
+            else:
+                month_end = date(month_start.year, month_start.month + 1, 1)
+
+            income_result = await self.db.execute(
+                select(func.coalesce(func.sum(Transaction.amount), 0))
+                .where(Transaction.user_id == user_id)
+                .where(Transaction.type == TransactionType.INCOME)
+                .where(Transaction.is_deleted == False)
+                .where(Transaction.transaction_date >= month_start)
+                .where(Transaction.transaction_date < month_end)
+            )
+            expense_result = await self.db.execute(
+                select(func.coalesce(func.sum(Transaction.amount), 0))
+                .where(Transaction.user_id == user_id)
+                .where(Transaction.type == TransactionType.EXPENSE)
+                .where(Transaction.is_deleted == False)
+                .where(Transaction.transaction_date >= month_start)
+                .where(Transaction.transaction_date < month_end)
+            )
+            totals.append(
+                {
+                    "month": month_start,
+                    "income": Decimal(str(income_result.scalar() or 0)),
+                    "expense": Decimal(str(expense_result.scalar() or 0)),
+                }
+            )
+        return totals
+
 
 class CategoryRepository:
     def __init__(self, db: AsyncSession):
@@ -218,6 +295,26 @@ class CategoryRepository:
         return category
 
     async def delete(self, category: Category) -> None:
+        # Lo que apunta a la categoria se desvincula a mano: las FK no tienen
+        # ON DELETE, y en Postgres borrar una categoria con transacciones
+        # (incluso las borradas logicamente), presupuestos o subcategorias
+        # fallaba con un 500. SQLite no aplica FKs y lo escondia.
+        await self.db.execute(
+            update(Transaction)
+            .where(Transaction.category_id == category.id)
+            .values(category_id=None)
+        )
+        await self.db.execute(
+            update(Category).where(Category.parent_id == category.id).values(parent_id=None)
+        )
+        # Las plantillas recurrentes siguen vivas, solo sin categoria.
+        await self.db.execute(
+            update(RecurringTransaction)
+            .where(RecurringTransaction.category_id == category.id)
+            .values(category_id=None)
+        )
+        # Un presupuesto sin categoria no tiene sentido: se va con ella.
+        await self.db.execute(delete(Budget).where(Budget.category_id == category.id))
         await self.db.delete(category)
         await self.db.commit()
 
@@ -288,5 +385,12 @@ class BankAccountRepository:
         return account
 
     async def delete(self, account: BankAccount) -> None:
+        # Las FK no tienen ON DELETE: en Postgres borrar una cuenta usada por
+        # una plantilla recurrente fallaba con 500 (SQLite no aplica FKs).
+        await self.db.execute(
+            update(RecurringTransaction)
+            .where(RecurringTransaction.bank_account_id == account.id)
+            .values(bank_account_id=None)
+        )
         await self.db.delete(account)
         await self.db.commit()

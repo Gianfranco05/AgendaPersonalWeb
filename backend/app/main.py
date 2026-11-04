@@ -1,8 +1,11 @@
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+import hmac
+
+from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -16,9 +19,14 @@ from app.core.sentry import init_sentry
 from app.core.correlation import CorrelationMiddleware
 from app.core.request_logging import RequestLoggingMiddleware
 from app.core.metrics import PrometheusMiddleware
-from app.core.http_security import SecurityHeadersMiddleware
+from app.core.http_security import BodySizeLimitMiddleware, SecurityHeadersMiddleware
 from app.core.logging_config import setup_logging
 from app.core.health import health_router
+from app.modules.recordatorios.scheduler import run_reminder_scheduler
+from app.modules.inversiones.scheduler import run_investment_alert_scheduler
+from app.modules.mercado.scheduler import run_market_data_scheduler
+from app.modules.recurrentes.scheduler import run_recurring_scheduler
+from app.modules.habitos_recordatorios.scheduler import run_habit_reminder_scheduler
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +47,17 @@ async def lifespan(app: FastAPI):
     setup_logging()
     init_sentry()
     logger.info("Sentry initialized")
+    scheduler_tasks = [
+        asyncio.create_task(run_reminder_scheduler()),
+        asyncio.create_task(run_investment_alert_scheduler()),
+        asyncio.create_task(run_recurring_scheduler()),
+        asyncio.create_task(run_habit_reminder_scheduler()),
+    ]
+    if settings.MARKET_DATA_ENABLED:
+        scheduler_tasks.append(asyncio.create_task(run_market_data_scheduler()))
     yield
+    for task in scheduler_tasks:
+        task.cancel()
     await engine.dispose()
 
 
@@ -62,7 +80,12 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    # El export de Finanzas manda el nombre del archivo en Content-Disposition.
+    expose_headers=["Content-Disposition", "Retry-After"],
 )
+# Mas afuera que CORS: un body gigante se rechaza antes de que corra
+# cualquier otra cosa, en vez de gastar trabajo en CORS/rate-limit primero.
+app.add_middleware(BodySizeLimitMiddleware)
 
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR.parent / "static"
@@ -106,7 +129,13 @@ async def theme_middleware(request: Request, call_next):
 
 
 @app.get("/metrics")
-async def metrics():
+async def metrics(request: Request):
+    if settings.METRICS_TOKEN:
+        auth = request.headers.get("Authorization", "")
+        token = auth.removeprefix("Bearer ").strip()
+        # compare_digest en vez de == para no filtrar el token por timing.
+        if not token or not hmac.compare_digest(token, settings.METRICS_TOKEN):
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
     return Response(content=generate_latest(), media_type="text/plain; version=0.0.4")
 
 

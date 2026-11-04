@@ -20,6 +20,13 @@ build/
 *.db
 *.sqlite
 *.sqlite3
+# Copias manuales de la base de desarrollo: tienen emails y hashes de contraseñas.
+*.db.bak*
+*.db-journal
+*.db-wal
+*.db-shm
+# Cache de compilacion de TypeScript.
+*.tsbuildinfo
 
 # Archivos subidos por usuarios (datos personales)
 uploads/

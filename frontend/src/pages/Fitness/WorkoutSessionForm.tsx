@@ -5,6 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { X, Plus, Trash2 } from 'lucide-react';
 import { saveWorkoutSession } from '../../hooks/useFitness';
 import type { WorkoutSession } from '../../types';
+import { toLocalDateString } from '../../utils/date';
 
 const exerciseSchema = z.object({
   name: z.string().min(1, 'Requerido'),
@@ -43,7 +44,7 @@ export default function WorkoutSessionForm({ session, onClose, onSaved }: Props)
   } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
-      date: new Date().toISOString().split('T')[0],
+      date: toLocalDateString(),
       name: '',
       duration_minutes: null,
       notes: null,

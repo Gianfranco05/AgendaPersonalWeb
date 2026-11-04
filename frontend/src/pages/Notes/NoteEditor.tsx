@@ -1,7 +1,9 @@
-import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
-import { Pin, PinOff, Trash2, Palette } from 'lucide-react';
+import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
+import { Pin, PinOff, Trash2, Palette, ArrowLeft } from 'lucide-react';
 import { LoadingSkeleton } from '../../components/LoadingSkeleton';
 import type { Note } from '../../types';
+import { useTheme } from '../../context/ThemeContext';
+import { parseServerTimestamp } from '../../utils/date';
 
 const MDEditor = lazy(() => import('@uiw/react-md-editor'));
 
@@ -12,32 +14,63 @@ const NOTE_COLORS = [
 
 interface NoteEditorProps {
   note: Note;
-  onSave: (note: Note) => void;
+  onSave: (note: Note) => void | Promise<void>;
   onDelete: (id: string) => void;
   onColorChange: (id: string, color: string) => void;
+  /** Volver a la lista (solo se muestra en pantallas chicas). */
+  onBack?: () => void;
 }
 
-export default function NoteEditor({ note, onSave, onDelete, onColorChange }: NoteEditorProps) {
+// El padre monta este editor con `key={note.id}`: el estado local arranca de la
+// nota recibida y se reinicia solo al cambiar de nota.
+export default function NoteEditor({ note, onSave, onDelete, onColorChange, onBack }: NoteEditorProps) {
   const [title, setTitle] = useState(note.title);
   const [content, setContent] = useState(note.content);
   const [showColors, setShowColors] = useState(false);
+  const { theme } = useTheme();
+
+  // Refs para que el autosave no dependa de `note`/`onSave`: cambian en cada
+  // guardado (el padre reemplaza la nota) y, si fueran dependencias del
+  // efecto, cada guardado programaba el siguiente: un PUT por segundo para siempre.
+  const noteRef = useRef(note);
+  noteRef.current = note;
+  const onSaveRef = useRef(onSave);
+  onSaveRef.current = onSave;
+  const draftRef = useRef({ title, content });
+  draftRef.current = { title, content };
+  const savedRef = useRef({ title: note.title, content: note.content });
+  const deletedRef = useRef(false);
+
+  const flush = useCallback(() => {
+    const draft = draftRef.current;
+    const saved = savedRef.current;
+    if (deletedRef.current || (draft.title === saved.title && draft.content === saved.content)) return;
+    savedRef.current = { title: draft.title, content: draft.content };
+    Promise.resolve(
+      onSaveRef.current({ ...noteRef.current, ...draft, updated_at: new Date().toISOString() }),
+    ).catch(() => {
+      // Si falló, se vuelve a intentar con el próximo cambio.
+      savedRef.current = saved;
+    });
+  }, []);
 
   useEffect(() => {
-    setTitle(note.title);
-    setContent(note.content);
-  }, [note.id]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const save = useCallback(() => {
-    onSave({ ...note, title, content, updated_at: new Date().toISOString() });
-  }, [note, title, content, onSave]);
-
-  useEffect(() => {
-    const timer = setTimeout(save, 1000);
+    const timer = setTimeout(flush, 1000);
     return () => clearTimeout(timer);
-  }, [title, content, save]);
+  }, [title, content, flush]);
+
+  // Al cambiar de nota (o salir de la página) no se pierde lo editado en el último segundo.
+  useEffect(() => flush, [flush]);
+
+  function handleTogglePin() {
+    // Con el título/contenido en edición: guardar `note` a secas pisaba lo escrito.
+    savedRef.current = { title, content };
+    onSave({ ...note, title, content, is_pinned: !note.is_pinned });
+  }
 
   function handleDelete() {
     if (window.confirm('¿Eliminar esta nota?')) {
+      deletedRef.current = true;
       onDelete(note.id);
     }
   }
@@ -49,8 +82,18 @@ export default function NoteEditor({ note, onSave, onDelete, onColorChange }: No
         className="flex items-center gap-2 border-b px-4 py-2"
         style={{ borderLeftColor: note.color, borderLeftWidth: '3px' }}
       >
+        {onBack && (
+          <button
+            onClick={onBack}
+            className="rounded p-1 text-gray-400 dark:text-slate-500 transition-colors hover:bg-gray-100 dark:hover:bg-slate-700 md:hidden"
+            title="Volver a la lista"
+            aria-label="Volver a la lista"
+          >
+            <ArrowLeft size={16} />
+          </button>
+        )}
         <button
-          onClick={() => onSave({ ...note, is_pinned: !note.is_pinned })}
+          onClick={handleTogglePin}
           className="rounded p-1 text-gray-400 dark:text-slate-500 transition-colors hover:bg-gray-100 dark:hover:bg-slate-700 hover:text-brand-indigo"
           title={note.is_pinned ? 'Desfijar' : 'Fijar'}
         >
@@ -107,7 +150,7 @@ export default function NoteEditor({ note, onSave, onDelete, onColorChange }: No
       />
 
       {/* Editor */}
-      <div className="flex-1 overflow-hidden" data-color-mode="light">
+      <div className="flex-1 overflow-hidden" data-color-mode={theme}>
         <Suspense fallback={<LoadingSkeleton type="card" />}>
           <MDEditor
             value={content}
@@ -121,7 +164,15 @@ export default function NoteEditor({ note, onSave, onDelete, onColorChange }: No
 
       <div className="border-t border-gray-100 dark:border-slate-800 px-4 py-2">
         <span className="text-xs text-gray-400 dark:text-slate-500">
-          Última edición: {new Date(note.updated_at).toLocaleString('es-AR')}
+          Última edición: {parseServerTimestamp(note.updated_at).toLocaleString('es-AR', {
+            day: 'numeric',
+            month: 'numeric',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            // Sin esto algunos navegadores mostraban "03:11:09" para las 15:11 (12 h sin a. m./p. m.).
+            hourCycle: 'h23',
+          })}
         </span>
       </div>
     </div>

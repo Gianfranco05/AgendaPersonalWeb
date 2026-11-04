@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { screen } from '@testing-library/react'
 import { renderWithProviders } from '../../../test/test-utils'
 import KanbanBoard from '../KanbanBoard'
+import type { KanbanColumn } from '../../../types'
 
 vi.mock('../../../hooks/useKanban', () => ({
   useKanban: vi.fn(),
@@ -9,7 +10,7 @@ vi.mock('../../../hooks/useKanban', () => ({
 
 import { useKanban } from '../../../hooks/useKanban'
 
-const mockColumns = [
+const mockColumns: KanbanColumn[] = [
   { id: 'pending', title: 'Pendiente', tasks: [{ id: 't1', title: 'Task 1', description: '', area: 'Trabajo', priority: 'media', due_date: null, status: 'pending', order: 0 }] },
   { id: 'in_progress', title: 'En Proceso', tasks: [{ id: 't2', title: 'Task 2', description: '', area: 'Trabajo', priority: 'alta', due_date: null, status: 'in_progress', order: 0 }] },
   { id: 'completed', title: 'Completado', tasks: [] },

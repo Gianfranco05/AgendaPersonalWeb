@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { screen } from '@testing-library/react'
 import { renderWithProviders } from '../../../test/test-utils'
 
@@ -17,5 +17,10 @@ describe('DashboardPage', () => {
     expect(screen.getByText('Dashboard')).toBeInTheDocument()
     expect(screen.getByText('FinanceWidget')).toBeInTheDocument()
     expect(screen.getByText('NotesWidget')).toBeInTheDocument()
+  })
+
+  it('no muestra el widget de la Dream Machine salvo que se habilite', () => {
+    renderWithProviders(<DashboardPage />)
+    expect(screen.queryByText('InfraWidget')).not.toBeInTheDocument()
   })
 })

@@ -3,6 +3,7 @@ from typing import Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.clock import local_today
 from app.modules.nutricion.models import Meal
 from app.modules.nutricion.repository import NutricionRepository
 from app.modules.nutricion.schemas import MealCreate, MealUpdate, NutritionSummary
@@ -47,8 +48,10 @@ class NutricionService:
     async def delete_meal(self, meal: Meal) -> None:
         await self.repo.delete(meal)
 
-    async def get_summary(self, user_id: str) -> NutritionSummary:
-        today = date.today()
+    async def get_summary(
+        self, user_id: str, tz_offset_minutes: Optional[int] = None
+    ) -> NutritionSummary:
+        today = local_today(tz_offset_minutes)
         start_of_week = today - timedelta(days=today.weekday())
 
         today_totals = await self.repo.get_totals(user_id, today, today)

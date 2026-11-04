@@ -1,10 +1,15 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Sun, Moon, Save, Check, Loader2, Calendar, RefreshCw, Unlink, Download, Trash2, AlertTriangle } from 'lucide-react';
+import { Sun, Moon, Save, Check, Loader2, Calendar, RefreshCw, Unlink, Download, Trash2, AlertTriangle, HelpCircle } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { useTheme } from '../../context/ThemeContext';
 import { useSettings, syncGoogle, disconnectGoogle } from '../../hooks/useSettings';
 import { exportMyData, deleteMyAccount } from '../../api/endpoints';
+import SessionsSection from './SessionsSection';
+import ReminderSection from './ReminderSection';
+import HabitReminderSection from './HabitReminderSection';
+import { useOnboardingStore } from '../../store/onboardingStore';
+import { toLocalDateString } from '../../utils/date';
 
 const inputCls =
   'w-full rounded-lg border border-gray-200 dark:border-slate-700 px-3 py-2 text-sm focus:border-brand-indigo focus:outline-none focus:ring-1 focus:ring-brand-indigo disabled:bg-gray-50 disabled:text-gray-400';
@@ -20,6 +25,7 @@ const GOOGLE_ERROR_MESSAGES: Record<string, string> = {
 export default function SettingsPage() {
   const { user, updateProfile } = useAuthStore();
   const { theme, toggle } = useTheme();
+  const openTutorial = useOnboardingStore((s) => s.openReplay);
   const [displayName, setDisplayName] = useState(user?.full_name ?? '');
   const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState('');
@@ -88,7 +94,7 @@ export default function SettingsPage() {
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `vida-personal-${new Date().toISOString().slice(0, 10)}.json`;
+      link.download = `vida-personal-${toLocalDateString()}.json`;
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -198,6 +204,23 @@ export default function SettingsPage() {
         </div>
       </form>
 
+      <div className="space-y-3 rounded-xl bg-white dark:bg-slate-800 p-6 shadow-sm">
+        <div className="flex items-center gap-2">
+          <HelpCircle size={18} className="text-brand-indigo" />
+          <h3 className="text-sm font-semibold text-gray-700 dark:text-slate-200">Ayuda</h3>
+        </div>
+        <p className="text-sm text-gray-500 dark:text-slate-400">
+          Repasá cómo está organizada la app en cuatro pasos.
+        </p>
+        <button
+          type="button"
+          onClick={openTutorial}
+          className="flex items-center gap-2 rounded-lg border border-gray-200 dark:border-slate-700 px-4 py-2 text-sm text-gray-700 dark:text-slate-200 transition-colors hover:bg-gray-50 dark:hover:bg-slate-700/50"
+        >
+          Ver tutorial
+        </button>
+      </div>
+
       <div className="space-y-4 rounded-xl bg-white dark:bg-slate-800 p-6 shadow-sm">
         <div className="flex items-center gap-2">
           <Calendar size={18} className="text-brand-indigo" />
@@ -279,6 +302,12 @@ export default function SettingsPage() {
         )}
       </div>
 
+      <SessionsSection />
+
+      <HabitReminderSection />
+
+      <ReminderSection />
+
       <div className="space-y-4 rounded-xl border border-rose-200 dark:border-rose-900/50 bg-white dark:bg-slate-800 p-6 shadow-sm">
         <div className="flex items-center gap-2">
           <AlertTriangle size={18} className="text-rose-500" />
@@ -353,6 +382,10 @@ export default function SettingsPage() {
         {' · '}
         <Link to="/privacy" className="hover:underline">
           Política de Privacidad
+        </Link>
+        {' · '}
+        <Link to="/arrepentimiento" className="hover:underline">
+          Botón de arrepentimiento
         </Link>
       </p>
     </div>

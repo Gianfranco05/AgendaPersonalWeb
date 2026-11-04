@@ -8,14 +8,14 @@ interface Props {
   onDelete: (id: string) => void;
 }
 
-function formatDate(iso: string) {
+function formatDate(iso: string, allDay: boolean) {
   const d = new Date(iso);
   return d.toLocaleDateString('es-AR', {
     weekday: 'short',
     day: 'numeric',
     month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
+    // Un evento de todo el día se guarda a las 00:00: mostrar esa hora no dice nada.
+    ...(!allDay && { hour: '2-digit', minute: '2-digit' }),
   });
 }
 
@@ -50,7 +50,7 @@ export default function EventList({ events, onEdit, onDelete }: Props) {
             <div className="min-w-0 flex-1">
               <p className="text-sm font-medium text-gray-800 dark:text-slate-100">{ev.title}</p>
               <p className="mt-0.5 text-xs text-gray-500 dark:text-slate-400">
-                {formatDate(ev.start_datetime)}
+                {formatDate(ev.start_datetime, ev.is_all_day)}
                 {ev.is_all_day && ' (todo el día)'}
               </p>
               {ev.location && (

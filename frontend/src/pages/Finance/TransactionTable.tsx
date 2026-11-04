@@ -1,18 +1,44 @@
-import { useState } from 'react';
-import { Pencil, Trash2 } from 'lucide-react';
-import type { Transaction } from '../../types';
+import { useMemo, useState } from 'react';
+import { Pencil, Repeat, Trash2 } from 'lucide-react';
+import { useCategories } from '../../hooks/useFinance';
+import type { Category, Transaction } from '../../types';
 
 interface TransactionTableProps {
   transactions: Transaction[];
   onEdit: (tx: Transaction) => void;
   onDelete: (id: string) => void;
+  /** Abre "Nueva recurrente" precargada con esta transacción. */
+  onMakeRecurring?: (tx: Transaction) => void;
+  /** Muestra los movimientos de la recurrencia que generó la transacción. */
+  onViewRecurrence?: (recurrenceId: string) => void;
 }
 
-type SortKey = 'transaction_date' | 'product_name' | 'category_name' | 'amount' | 'type';
+type SortKey = 'transaction_date' | 'product_name' | 'category' | 'amount' | 'type';
 
-export default function TransactionTable({ transactions, onEdit, onDelete }: TransactionTableProps) {
+export default function TransactionTable({
+  transactions,
+  onEdit,
+  onDelete,
+  onMakeRecurring,
+  onViewRecurrence,
+}: TransactionTableProps) {
   const [sortKey, setSortKey] = useState<SortKey>('transaction_date');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  const { data: categories } = useCategories();
+
+  // La API devuelve solo category_id: el nombre y el color salen de acá.
+  const categoryById = useMemo(() => {
+    const map = new Map<string, Category>();
+    (categories ?? []).forEach((c) => map.set(c.id, c));
+    return map;
+  }, [categories]);
+
+  function sortValue(tx: Transaction, key: SortKey): string | number {
+    if (key === 'category') {
+      return tx.category_id ? categoryById.get(tx.category_id)?.name ?? '' : '';
+    }
+    return tx[key] ?? '';
+  }
 
   function handleSort(key: SortKey) {
     if (sortKey === key) {
@@ -25,8 +51,8 @@ export default function TransactionTable({ transactions, onEdit, onDelete }: Tra
 
   const sorted = [...transactions].sort((a, b) => {
     const dir = sortDir === 'asc' ? 1 : -1;
-    const va = a[sortKey] ?? '';
-    const vb = b[sortKey] ?? '';
+    const va = sortValue(a, sortKey);
+    const vb = sortValue(b, sortKey);
     if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * dir;
     return String(va).localeCompare(String(vb)) * dir;
   });
@@ -34,7 +60,7 @@ export default function TransactionTable({ transactions, onEdit, onDelete }: Tra
   const headers: { key: SortKey; label: string }[] = [
     { key: 'transaction_date', label: 'Fecha' },
     { key: 'product_name', label: 'Descripción' },
-    { key: 'category_name', label: 'Categoría' },
+    { key: 'category', label: 'Categoría' },
     { key: 'amount', label: 'Monto' },
     { key: 'type', label: 'Tipo' },
   ];
@@ -71,24 +97,46 @@ export default function TransactionTable({ transactions, onEdit, onDelete }: Tra
               </td>
             </tr>
           ) : (
-            sorted.map((tx) => (
+            sorted.map((tx) => {
+              const category = tx.category_id ? categoryById.get(tx.category_id) : undefined;
+              return (
               <tr
                 key={tx.id}
                 className="border-b border-gray-50 transition-colors hover:bg-gray-50 dark:hover:bg-slate-700/50"
               >
                 <td className="px-4 py-3 text-gray-600 dark:text-slate-300">{tx.transaction_date}</td>
-                <td className="max-w-[200px] truncate px-4 py-3 font-medium text-gray-800 dark:text-slate-100">
-                  {tx.product_name}
+                <td className="max-w-[220px] px-4 py-3 font-medium text-gray-800 dark:text-slate-100">
+                  <span className="block truncate">{tx.product_name}</span>
+                  {tx.is_recurring &&
+                    (tx.recurrence_id ? (
+                      <button
+                        type="button"
+                        onClick={() => onViewRecurrence?.(tx.recurrence_id as string)}
+                        title="Ver los movimientos de esta recurrencia"
+                        className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-sky-50 dark:bg-sky-500/15 px-2 py-0.5 text-xs font-medium text-sky-700 dark:text-sky-300 hover:underline"
+                      >
+                        <Repeat size={11} />
+                        Recurrente
+                      </button>
+                    ) : (
+                      <span
+                        title="Generada por una recurrencia que ya se eliminó"
+                        className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-gray-100 dark:bg-slate-700 px-2 py-0.5 text-xs font-medium text-gray-500 dark:text-slate-300"
+                      >
+                        <Repeat size={11} />
+                        Recurrencia eliminada
+                      </span>
+                    ))}
                 </td>
                 <td className="px-4 py-3">
                   <span className="inline-flex items-center gap-1.5">
-                    {tx.category_color && (
+                    {category?.color && (
                       <span
                         className="inline-block h-2 w-2 rounded-full"
-                        style={{ backgroundColor: tx.category_color }}
+                        style={{ backgroundColor: category.color }}
                       />
                     )}
-                    <span className="text-gray-600 dark:text-slate-300">{tx.category_name || '-'}</span>
+                    <span className="text-gray-600 dark:text-slate-300">{category?.name ?? '-'}</span>
                   </span>
                 </td>
                 <td className={`px-4 py-3 font-semibold ${tx.type === 'income' ? 'text-emerald-500' : 'text-rose-500'}`}>
@@ -107,6 +155,16 @@ export default function TransactionTable({ transactions, onEdit, onDelete }: Tra
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex justify-end gap-1">
+                    {onMakeRecurring && !tx.is_recurring && (
+                      <button
+                        onClick={() => onMakeRecurring(tx)}
+                        className="rounded-lg p-1.5 text-gray-400 dark:text-slate-500 transition-colors hover:bg-gray-100 dark:hover:bg-slate-700 hover:text-brand-indigo"
+                        title="Hacer recurrente"
+                        aria-label={`Hacer recurrente ${tx.product_name}`}
+                      >
+                        <Repeat size={14} />
+                      </button>
+                    )}
                     <button
                       onClick={() => onEdit(tx)}
                       className="rounded-lg p-1.5 text-gray-400 dark:text-slate-500 transition-colors hover:bg-gray-100 dark:hover:bg-slate-700 hover:text-brand-indigo"
@@ -124,7 +182,8 @@ export default function TransactionTable({ transactions, onEdit, onDelete }: Tra
                   </div>
                 </td>
               </tr>
-            ))
+              );
+            })
           )}
         </tbody>
       </table>

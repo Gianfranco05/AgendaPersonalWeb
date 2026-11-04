@@ -97,3 +97,27 @@ async def test_api_nutrition_summary(api_auth_client):
 async def test_api_nutrition_requires_auth(client):
     response = await client.get("/api/v1/nutrition/meals")
     assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_nutrition_summary_usa_el_dia_local_del_cliente(api_auth_client, monkeypatch):
+    from datetime import datetime, timezone
+
+    from app.core import clock
+
+    class FakeDatetime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            # 00:30 UTC del 7/10 = 21:30 del 6/10 en Buenos Aires.
+            return datetime(2026, 10, 7, 0, 30, tzinfo=timezone.utc)
+
+    monkeypatch.setattr(clock, "datetime", FakeDatetime)
+    await api_auth_client.post("/api/v1/nutrition/meals", json={
+        "meal_date": "2026-10-06", "meal_type": "dinner", "name": "Cena", "calories": 800,
+    })
+
+    local = await api_auth_client.get("/api/v1/nutrition/summary", params={"tz_offset_minutes": -180})
+    assert local.json()["today_calories"] == 800
+    # Sin el parametro queda el "hoy" del server (UTC): ya es el 7/10.
+    utc = await api_auth_client.get("/api/v1/nutrition/summary", params={"tz_offset_minutes": 0})
+    assert utc.json()["today_calories"] == 0

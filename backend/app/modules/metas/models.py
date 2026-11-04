@@ -2,6 +2,7 @@ from uuid import uuid4
 from datetime import datetime
 
 from sqlalchemy import (
+    CheckConstraint,
     String,
     Text,
     Boolean,
@@ -11,6 +12,7 @@ from sqlalchemy import (
     Date,
     DateTime,
     func,
+    true,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -19,6 +21,15 @@ from app.core.base import Base
 
 class Goal(Base):
     __tablename__ = "goals"
+    __table_args__ = (
+        CheckConstraint(
+            "(reminder_hour IS NULL AND reminder_minute IS NULL) OR "
+            "(reminder_hour IS NOT NULL AND reminder_minute IS NOT NULL AND "
+            "reminder_hour >= 0 AND reminder_hour <= 23 AND "
+            "reminder_minute >= 0 AND reminder_minute <= 59)",
+            name="ck_goals_reminder_time",
+        ),
+    )
 
     id: Mapped[str] = mapped_column(
         String(36), primary_key=True, default=lambda: str(uuid4())
@@ -35,6 +46,13 @@ class Goal(Base):
     start_date: Mapped[datetime] = mapped_column(Date, nullable=True)
     end_date: Mapped[datetime] = mapped_column(Date, nullable=True)
     is_completed: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Aviso "no marcaste este habito hoy" (solo binary/metric). Sin hora propia
+    # (ambas null) usa la hora general de habit_reminder_settings.
+    reminder_enabled: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default=true()
+    )
+    reminder_hour: Mapped[int] = mapped_column(Integer, nullable=True)
+    reminder_minute: Mapped[int] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

@@ -52,6 +52,14 @@
   --color-brand-habits: #22c55e;
   --color-brand-nutrition: #14b8a6;
   --color-brand-goals: #a855f7;
+  --color-brand-study: #3b82f6;
+  --color-brand-library: #a16207;
+  --color-brand-media: #db2777;
+  --color-brand-work: #0284c7;
+  --color-brand-focus: #8b5cf6;
+  --color-brand-travel: #0ea5e9;
+  --color-brand-vehicle: #d97706;
+  --color-brand-projects: #e11d48;
 
   --animate-fade-in: fade-in 0.4s ease-out both;
   --animate-fade-in-up: fade-in-up 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
@@ -120,6 +128,16 @@
     background-size: 200% 100%;
     animation: shimmer 1.6s linear infinite;
   }
+}
+
+/* Resaltado del elemento al que llegó el buscador (utils/reveal.ts) */
+.search-reveal {
+  animation: search-reveal 2.5s ease-out;
+  border-radius: 0.5rem;
+}
+@keyframes search-reveal {
+  0%, 60% { box-shadow: 0 0 0 3px var(--c-brand-indigo); background-color: color-mix(in srgb, var(--c-brand-indigo) 14%, transparent); }
+  100% { box-shadow: 0 0 0 3px transparent; background-color: transparent; }
 }
 
 /* Accesibilidad: sin movimiento para quien lo pide */

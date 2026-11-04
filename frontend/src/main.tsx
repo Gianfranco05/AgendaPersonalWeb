@@ -1,8 +1,13 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import * as Sentry from '@sentry/react';
+import { z } from 'zod';
 import './index.css';
 import App from './App';
+
+// Mensajes de validación por defecto de zod en español: un campo numérico vacío
+// mostraba "Invalid input: expected number, received NaN" en medio de una UI en español.
+z.config(z.locales.es());
 
 if (import.meta.env.VITE_SENTRY_DSN) {
   Sentry.init({

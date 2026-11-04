@@ -30,10 +30,37 @@ function refreshSession(): Promise<void> {
   return refreshPromise;
 }
 
+// A dónde vuelve el navegador después del login con Google (ruta del SPA).
+// No puede colgar de /auth/: el dev server de Vite y el nginx de producción
+// mandan todo /auth/* al backend, que no tiene esa ruta y devolvía un 404 en
+// vez de la pantalla de callback.
+export const GOOGLE_CALLBACK_PATH = '/google/callback';
+
+// Páginas que se usan sin sesión. Al abrirlas, el chequeo de sesión (/me)
+// devuelve 401 y el refresh también: ahí eso solo significa "no logueado", y
+// mandar al login dejaba inaccesibles el registro, los textos legales y el
+// botón de arrepentimiento, que la ley (y Google Play) exigen públicos.
+const PUBLIC_PATHS = [
+  '/login',
+  '/register',
+  GOOGLE_CALLBACK_PATH,
+  '/olvide-password',
+  '/resetear-password',
+  '/verificar-email',
+  '/terms',
+  '/privacy',
+  '/arrepentimiento',
+];
+
+export function isPublicPath(pathname: string): boolean {
+  return PUBLIC_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`));
+}
+
 async function forceLogout(): Promise<void> {
-  const { useAuthStore } = await import('../store/authStore');
+  const { useAuthStore, resetClientCache } = await import('../store/authStore');
   useAuthStore.setState({ user: null, isAuthenticated: false, isLoading: false });
-  if (!(window.location.pathname ?? '').startsWith('/login')) {
+  await resetClientCache();
+  if (!isPublicPath(window.location.pathname ?? '')) {
     window.location.href = '/login';
   }
 }

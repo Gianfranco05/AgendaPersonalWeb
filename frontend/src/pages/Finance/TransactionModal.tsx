@@ -5,6 +5,32 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { X } from 'lucide-react';
 import { useCategories, saveTransaction } from '../../hooks/useFinance';
 import type { Transaction } from '../../types';
+import { toLocalDateString } from '../../utils/date';
+
+// Valores del enum PaymentMethod del backend. Mandar la etiqueta ("Efectivo")
+// en vez del valor rompía el alta con un 500.
+const PAYMENT_METHODS = [
+  { value: 'cash', label: 'Efectivo' },
+  { value: 'debit_card', label: 'Débito' },
+  { value: 'credit_card', label: 'Tarjeta de crédito' },
+  { value: 'transfer', label: 'Transferencia' },
+  { value: 'other', label: 'Otro' },
+] as const;
+
+// Transacciones editadas desde la web antes del fix quedaron guardadas con la
+// etiqueta en español; al volver a editarlas se traducen al valor real.
+const LEGACY_PAYMENT_LABELS: Record<string, string> = {
+  Efectivo: 'cash',
+  Tarjeta: 'credit_card',
+  Transferencia: 'transfer',
+  Débito: 'debit_card',
+};
+
+function normalizePaymentMethod(value: string | undefined): string {
+  if (!value) return 'cash';
+  if (PAYMENT_METHODS.some((m) => m.value === value)) return value;
+  return LEGACY_PAYMENT_LABELS[value] ?? 'other';
+}
 
 const schema = z.object({
   type: z.enum(['income', 'expense']),
@@ -13,7 +39,7 @@ const schema = z.object({
   transaction_date: z.string().min(1, 'La fecha es requerida'),
   product_name: z.string().min(1, 'La descripción es requerida'),
   merchant_name: z.string(),
-  category_name: z.string(),
+  category_id: z.string(),
   payment_method: z.string().min(1, 'El método de pago es requerido'),
 });
 
@@ -46,11 +72,11 @@ export default function TransactionModal({ transaction, txParams, onClose, onSav
       type: 'expense' as const,
       amount: 0,
       currency: 'ARS' as const,
-      transaction_date: new Date().toISOString().split('T')[0],
+      transaction_date: toLocalDateString(),
       product_name: '',
       merchant_name: '',
-      category_name: '',
-      payment_method: 'Efectivo',
+      category_id: '',
+      payment_method: 'cash',
     },
   });
 
@@ -65,8 +91,8 @@ export default function TransactionModal({ transaction, txParams, onClose, onSav
         transaction_date: transaction.transaction_date,
         product_name: transaction.product_name,
         merchant_name: transaction.merchant_name ?? '',
-        category_name: transaction.category_name ?? '',
-        payment_method: transaction.payment_method ?? 'Efectivo',
+        category_id: transaction.category_id ?? '',
+        payment_method: normalizePaymentMethod(transaction.payment_method),
       });
     }
   }, [transaction, reset]);
@@ -180,10 +206,10 @@ export default function TransactionModal({ transaction, txParams, onClose, onSav
           {/* Category */}
           <div>
             <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-slate-400">Categoría</label>
-            <select {...register('category_name')} className={inputCls}>
+            <select {...register('category_id')} className={inputCls}>
               <option value="">Sin categoría</option>
               {categories.map((cat) => (
-                <option key={cat.id} value={cat.name}>
+                <option key={cat.id} value={cat.id}>
                   {cat.name}
                 </option>
               ))}
@@ -194,10 +220,11 @@ export default function TransactionModal({ transaction, txParams, onClose, onSav
           <div>
             <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-slate-400">Método de pago</label>
             <select {...register('payment_method')} className={inputCls}>
-              <option value="Efectivo">Efectivo</option>
-              <option value="Tarjeta">Tarjeta</option>
-              <option value="Transferencia">Transferencia</option>
-              <option value="Débito">Débito</option>
+              {PAYMENT_METHODS.map((m) => (
+                <option key={m.value} value={m.value}>
+                  {m.label}
+                </option>
+              ))}
             </select>
             {errors.payment_method && (
               <p className={errorCls}>{errors.payment_method.message}</p>

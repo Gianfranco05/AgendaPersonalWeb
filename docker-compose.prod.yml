@@ -49,15 +49,54 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - RESEND_API_KEY=${RESEND_API_KEY:-}
       - MAIL_FROM=${MAIL_FROM:-no-reply@localhost}
-      - MAIL_FROM_NAME=${MAIL_FROM_NAME:-Vida Personal}
+      - MAIL_FROM_NAME=${MAIL_FROM_NAME:-Can_cen}
       - PUBLIC_BASE_URL=${PUBLIC_BASE_URL:-http://localhost}
+      - BILLING_PROVIDER=${BILLING_PROVIDER:-mercadopago}
+      - MERCADOPAGO_ACCESS_TOKEN=${MERCADOPAGO_ACCESS_TOKEN:-}
+      - MERCADOPAGO_WEBHOOK_SECRET=${MERCADOPAGO_WEBHOOK_SECRET:-}
+      - BILLING_CURRENCY=${BILLING_CURRENCY:-ARS}
+      - MP_PRICE_MODULE_STUDY=${MP_PRICE_MODULE_STUDY:-}
+      - MP_PRICE_MODULE_LIBRARY=${MP_PRICE_MODULE_LIBRARY:-}
+      - MP_PRICE_MODULE_MEDIA=${MP_PRICE_MODULE_MEDIA:-}
+      - MP_PRICE_MODULE_WORK=${MP_PRICE_MODULE_WORK:-}
+      - MP_PRICE_MODULE_TRAVEL=${MP_PRICE_MODULE_TRAVEL:-}
+      - MP_PRICE_MODULE_VEHICLE=${MP_PRICE_MODULE_VEHICLE:-}
+      - MP_PRICE_MODULE_PROJECTS=${MP_PRICE_MODULE_PROJECTS:-}
       - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY:-}
       - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET:-}
-      - STRIPE_PRICE_ID_PRO=${STRIPE_PRICE_ID_PRO:-}
+      - STRIPE_PRICE_ID_MODULE_STUDY=${STRIPE_PRICE_ID_MODULE_STUDY:-}
+      - STRIPE_PRICE_ID_MODULE_LIBRARY=${STRIPE_PRICE_ID_MODULE_LIBRARY:-}
+      - STRIPE_PRICE_ID_MODULE_MEDIA=${STRIPE_PRICE_ID_MODULE_MEDIA:-}
+      - STRIPE_PRICE_ID_MODULE_WORK=${STRIPE_PRICE_ID_MODULE_WORK:-}
+      - STRIPE_PRICE_ID_MODULE_TRAVEL=${STRIPE_PRICE_ID_MODULE_TRAVEL:-}
+      - STRIPE_PRICE_ID_MODULE_VEHICLE=${STRIPE_PRICE_ID_MODULE_VEHICLE:-}
+      - STRIPE_PRICE_ID_MODULE_PROJECTS=${STRIPE_PRICE_ID_MODULE_PROJECTS:-}
       - BILLING_SUCCESS_URL=${BILLING_SUCCESS_URL:-}
       - BILLING_CANCEL_URL=${BILLING_CANCEL_URL:-}
+      # Sin estas cuatro, el login con Google y Calendar no andan en prod
+      # aunque las claves esten en .env: esta lista es explicita y lo que no
+      # figura aca no llega al contenedor.
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+      - GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI:-${PUBLIC_BASE_URL:-http://localhost}/ajustes/google/callback}
+      - GOOGLE_LOGIN_REDIRECT_URI=${GOOGLE_LOGIN_REDIRECT_URI:-${PUBLIC_BASE_URL:-http://localhost}/auth/api/google/callback}
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
       - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-}
+      # Opcionales: la lista es explicita, asi que sin estas lineas el valor del
+      # .env no llega al contenedor (Sentry quedaba apagado, /metrics publico y
+      # no se podia subir la version de los Terminos sin tocar el compose).
+      - SENTRY_DSN=${SENTRY_DSN:-}
+      - SENTRY_TRACES_SAMPLE_RATE=${SENTRY_TRACES_SAMPLE_RATE:-0.1}
+      - METRICS_TOKEN=${METRICS_TOKEN:-}
+      - CURRENT_TERMS_VERSION=${CURRENT_TERMS_VERSION:-1.1}
+      # Datos de mercado (dolar, IPC, cripto): la lista es explicita, sin estas
+      # lineas el valor del .env no llega al contenedor.
+      - MARKET_DATA_ENABLED=${MARKET_DATA_ENABLED:-true}
+      - MARKET_CRYPTO_ENABLED=${MARKET_CRYPTO_ENABLED:-true}
+      - MARKET_FX_REFRESH_MINUTES=${MARKET_FX_REFRESH_MINUTES:-15}
+      - MARKET_CRYPTO_REFRESH_MINUTES=${MARKET_CRYPTO_REFRESH_MINUTES:-10}
+      - MARKET_INFLATION_REFRESH_HOURS=${MARKET_INFLATION_REFRESH_HOURS:-6}
+      - COINGECKO_API_KEY=${COINGECKO_API_KEY:-}
     volumes:
       - data:/app/data
     depends_on:

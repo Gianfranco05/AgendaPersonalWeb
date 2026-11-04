@@ -1,4 +1,4 @@
-from datetime import datetime, date
+from datetime import datetime, date, time, timezone
 from typing import Sequence, Optional
 
 from sqlalchemy import select, and_
@@ -19,16 +19,17 @@ class EventRepository:
     ) -> Sequence[Event]:
         query = select(Event).where(Event.user_id == user_id)
 
+        # Limites aware en UTC: start_datetime es timestamptz y asyncpg toma un
+        # datetime naive como hora local del servidor, asi que el filtro
+        # cambiaba segun la zona horaria de la maquina que corre el backend.
         if date_from:
-            from datetime import datetime as dt
-            from datetime import time as tm
-
-            query = query.where(Event.start_datetime >= dt.combine(date_from, tm.min))
+            query = query.where(
+                Event.start_datetime >= datetime.combine(date_from, time.min, tzinfo=timezone.utc)
+            )
         if date_to:
-            from datetime import datetime as dt
-            from datetime import time as tm
-
-            query = query.where(Event.start_datetime <= dt.combine(date_to, tm.max))
+            query = query.where(
+                Event.start_datetime <= datetime.combine(date_to, time.max, tzinfo=timezone.utc)
+            )
 
         query = query.order_by(Event.start_datetime.asc())
 
@@ -42,7 +43,7 @@ class EventRepository:
         return result.scalar_one_or_none()
 
     async def get_upcoming(self, user_id: str, limit: int = 5) -> Sequence[Event]:
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         result = await self.db.execute(
             select(Event)
             .where(

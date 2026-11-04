@@ -5,6 +5,7 @@ import { useGoals, addGoal, editGoal, removeGoal, checkInGoal } from '../../hook
 import type { Goal } from '../../types';
 import GoalCard from './GoalCard';
 import GoalForm from './GoalForm';
+import { useOpenParam } from '../../hooks/useOpenParam';
 
 export default function GoalsPage() {
   const [showForm, setShowForm] = useState(false);
@@ -12,6 +13,16 @@ export default function GoalsPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const { data: goals, isLoading, mutate } = useGoals();
+
+  useOpenParam({
+    ready: !isLoading,
+    onOpen: ({ id }) => {
+      const target = goals?.find((g) => g.id === id);
+      if (!target) return false;
+      handleEdit(target);
+      return true;
+    },
+  });
 
   function handleNew() {
     setEditingGoal(null);

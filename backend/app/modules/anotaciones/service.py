@@ -15,13 +15,19 @@ class AnotacionesService:
         self.tag_repo = TagRepository(db)
 
     async def create_note(
-        self, user_id: UUID, title: str, content: str, color: str = "#ffffff"
+        self,
+        user_id: UUID,
+        title: str,
+        content: str,
+        color: str = "#ffffff",
+        is_pinned: bool = False,
     ) -> Note:
         note = Note(
             user_id=user_id,
             title=title,
             content=content,
             color=color,
+            is_pinned=is_pinned,
         )
         return await self.note_repo.create(note)
 
@@ -75,6 +81,18 @@ class AnotacionesService:
             color=color,
         )
         return await self.tag_repo.create(tag)
+
+    async def set_note_tags(self, note: Note, user_id: UUID, tag_names: list[str]) -> None:
+        """Reemplaza los tags de la nota por exactamente `tag_names`.
+
+        `note` tiene que venir con `tags` ya cargado (selectinload): reasignar
+        una coleccion sin cargar dispara un lazy-load sincrono que en sesion
+        async explota con MissingGreenlet.
+        """
+        # dict.fromkeys: saca vacios y duplicados conservando el orden.
+        names = dict.fromkeys(n.strip() for n in tag_names if n.strip())
+        note.tags = [await self.create_tag(user_id, name) for name in names]
+        await self.db.commit()
 
     async def add_tag_to_note(self, note: Note, tag: Tag) -> None:
         if tag not in note.tags:

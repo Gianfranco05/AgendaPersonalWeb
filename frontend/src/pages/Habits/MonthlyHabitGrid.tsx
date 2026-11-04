@@ -42,6 +42,9 @@ export default function MonthlyHabitGrid() {
   }
 
   async function handleCommit(goalId: string, day: number, value: number) {
+    // Pasar el foco por una celda sin tocarla no tiene que guardar nada (llenaba
+    // el mes de registros en 0 y un POST por cada celda recorrida).
+    if (value === valueFor(goalId, day)) return;
     await logHabit(goalId, dateStr(year, month, day), value);
     await mutate();
   }

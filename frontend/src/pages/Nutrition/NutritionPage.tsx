@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { Plus, Flame, Beef, Wheat, Droplet, Apple } from 'lucide-react';
 import { LoadingSkeleton } from '../../components/LoadingSkeleton';
-import { useNutritionSummary, useMeals, removeMeal } from '../../hooks/useNutrition';
+import { useMeals, removeMeal } from '../../hooks/useNutrition';
 import type { Meal, MealType } from '../../types';
 import MealCard from './MealCard';
 import MealForm from './MealForm';
+import { toLocalDateString } from '../../utils/date';
 
 const MEAL_GROUPS: { type: MealType; label: string }[] = [
   { type: 'breakfast', label: 'Desayuno' },
@@ -17,11 +18,24 @@ export default function NutritionPage() {
   const [showForm, setShowForm] = useState(false);
   const [editingMeal, setEditingMeal] = useState<Meal | null>(null);
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = toLocalDateString();
   const params = { date_from: today, date_to: today };
 
-  const { data: summary, isLoading: summaryLoading } = useNutritionSummary();
   const { data: meals, isLoading: mealsLoading } = useMeals(params);
+
+  // Los totales de "hoy" salen de las comidas de hoy que ya se listan abajo. El
+  // /nutrition/summary calcula "hoy" con la fecha del servidor (UTC): desde las
+  // 21:00 en Argentina ya es mañana y mostraba 0 con comidas cargadas.
+  const sum = (pick: (m: Meal) => number) =>
+    Math.round((meals ?? []).reduce((acc, m) => acc + (pick(m) || 0), 0) * 10) / 10;
+  const summary = meals
+    ? {
+        today_calories: sum((m) => m.calories),
+        today_protein_g: sum((m) => m.protein_g),
+        today_carbs_g: sum((m) => m.carbs_g),
+        today_fat_g: sum((m) => m.fat_g),
+      }
+    : undefined;
 
   function handleNew() {
     setEditingMeal(null);
@@ -34,6 +48,7 @@ export default function NutritionPage() {
   }
 
   async function handleDelete(id: string) {
+    if (!window.confirm('¿Eliminar esta comida?')) return;
     await removeMeal(id, params);
   }
 
@@ -60,7 +75,7 @@ export default function NutritionPage() {
         </button>
       </div>
 
-      {summaryLoading && !summary ? (
+      {mealsLoading && !summary ? (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           <LoadingSkeleton type="card" />
           <LoadingSkeleton type="card" />

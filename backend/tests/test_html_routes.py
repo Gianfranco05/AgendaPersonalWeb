@@ -9,10 +9,10 @@ async def test_login_page(client):
 
 
 @pytest.mark.asyncio
-async def test_register_page(client):
-    response = await client.get("/auth/register")
-    assert response.status_code == 200
-    assert "Registr" in response.text or "register" in response.text.lower()
+async def test_register_page_redirects_to_spa(client):
+    response = await client.get("/auth/register", follow_redirects=False)
+    assert response.status_code == 303
+    assert response.headers["location"].endswith("/register")
 
 
 @pytest.mark.asyncio

@@ -1,7 +1,9 @@
 from datetime import date
+from typing import Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.clock import local_today
 from app.modules.fitness.models import WorkoutSession, Exercise
 from app.modules.fitness.repository import FitnessRepository
 from app.modules.fitness.schemas import (
@@ -73,8 +75,10 @@ class FitnessService:
     async def delete_session(self, session: WorkoutSession) -> None:
         await self.repo.delete(session)
 
-    async def get_summary(self, user_id: str) -> FitnessSummary:
-        today = date.today()
+    async def get_summary(
+        self, user_id: str, tz_offset_minutes: Optional[int] = None
+    ) -> FitnessSummary:
+        today = local_today(tz_offset_minutes)
         start_of_month = today.replace(day=1)
         sessions_this_month = await self.repo.count_sessions_since(
             user_id, start_of_month

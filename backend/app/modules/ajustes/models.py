@@ -1,7 +1,8 @@
 from uuid import uuid4
 from datetime import datetime
+from decimal import Decimal
 
-from sqlalchemy import String, Text, DateTime, ForeignKey, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Numeric, String, Text, false, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.base import Base
@@ -21,6 +22,29 @@ class UserPreference(Base):
     google_refresh_token: Mapped[str | None] = mapped_column(Text, nullable=True)
     google_token_expiry: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     google_calendar_id: Mapped[str] = mapped_column(String(100), default="primary")
+
+    # Cotizaciones que carga el usuario para convertir inversiones (ARS por 1
+    # USD / 1 EUR). USDT se valua 1:1 con USD. `fx_rates_updated_at` lo setea
+    # el server cuando cambia alguna; el cliente no lo manda.
+    fx_usd_ars: Mapped[Decimal | None] = mapped_column(Numeric(14, 4), nullable=True)
+    fx_eur_ars: Mapped[Decimal | None] = mapped_column(Numeric(14, 4), nullable=True)
+    fx_rates_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # De donde sale la cotizacion con la que se convierten los totales:
+    # usd -> oficial | mep | blue | manual, eur -> oficial | blue | manual.
+    # `manual` usa fx_usd_ars / fx_eur_ars (los de arriba no se tocan nunca).
+    fx_usd_source: Mapped[str] = mapped_column(String(10), default="mep", server_default="mep")
+    fx_eur_source: Mapped[str] = mapped_column(
+        String(10), default="oficial", server_default="oficial"
+    )
+    # Solo cambia la presentacion en los clientes; `balance` sigue siendo efectivo.
+    include_investments_in_balance: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=false()
+    )
+    # Version del tutorial de bienvenida que el usuario ya vio (0 = ninguno).
+    # El server solo la sube (max): ver PUT /settings.
+    onboarding_version_seen: Mapped[int] = mapped_column(
+        Integer, default=0, server_default="0"
+    )
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(

@@ -22,6 +22,8 @@ async def registered(client):
         "email": "nuevo@test.com",
         "full_name": "Nuevo",
         "password": "password123",
+        "accept_terms": True,
+        "confirm_age": True,
     })
     assert resp.status_code == 201
     return client, resp.json()

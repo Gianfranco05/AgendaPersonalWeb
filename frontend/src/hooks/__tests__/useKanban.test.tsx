@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, waitFor } from '@testing-library/react'
 import { SWRConfig } from 'swr'
 import { type ReactNode } from 'react'
-import { useKanban, addTask, updateTask, deleteTask, moveTask } from '../useKanban'
+import { useKanban, addTask, updateTask, deleteTask, moveTask, applyMove, resolveMoveIndex } from '../useKanban'
 import * as endpoints from '../../api/endpoints'
 
 vi.mock('../../api/endpoints', () => ({
@@ -104,5 +104,44 @@ describe('moveTask', () => {
     await moveTask('t1', 'pending', 0)
     expect(endpoints.moveTask).toHaveBeenCalledWith('t1', 'pending', 0)
     expect(globalMutate).toHaveBeenCalled()
+  })
+})
+
+describe('applyMove / resolveMoveIndex', () => {
+  const task = (id: string, area: string, status: 'pending' | 'in_progress' | 'completed', order: number) => ({
+    id, title: id, description: '', area, priority: 'media' as const, due_date: null, status, order,
+  })
+  // Columna 'pending' completa: A(Otra) B(Trab) C(Trab)
+  const all = [task('A', 'Otra', 'pending', 0), task('B', 'Trab', 'pending', 1), task('C', 'Trab', 'pending', 2)]
+
+  it('applyMove reindexa la columna destino como el backend', () => {
+    const moved = applyMove(all, 'C', 'pending', 0)
+    const col = moved.filter((t) => t.status === 'pending').sort((a, b) => a.order - b.order)
+    expect(col.map((t) => t.id)).toEqual(['C', 'A', 'B'])
+  })
+
+  it('applyMove cambia de columna', () => {
+    const moved = applyMove(all, 'B', 'in_progress', 0)
+    expect(moved.find((t) => t.id === 'B')).toMatchObject({ status: 'in_progress', order: 0 })
+  })
+
+  it('con filtro de área, traduce el índice visible al de la columna completa', () => {
+    // Vista filtrada 'Trab': [B, C]. Arrastrar B al final (índice 1) => queda después de C.
+    const visible = [all[1], all[2]]
+    const idx = resolveMoveIndex(all, visible, 'B', 'pending', 1)
+    const moved = applyMove(all, 'B', 'pending', idx)
+    const col = moved.filter((t) => t.status === 'pending').sort((a, b) => a.order - b.order)
+    expect(col.map((t) => t.id)).toEqual(['A', 'C', 'B'])
+  })
+
+  it('soltar en una columna visible vacía va al final de la columna completa', () => {
+    const others = [task('X', 'Otra', 'completed', 0), task('Y', 'Otra', 'completed', 1), task('B', 'Trab', 'pending', 0)]
+    expect(resolveMoveIndex(others, [], 'B', 'completed', 0)).toBe(2)
+  })
+
+  it('moveTask con la lista actual refleja el movimiento antes de la API', async () => {
+    await moveTask('B', 'pending', 2, all)
+    expect(globalMutate).toHaveBeenNthCalledWith(1, 'kanban/tasks', expect.any(Array), { revalidate: false })
+    expect(endpoints.moveTask).toHaveBeenCalledWith('B', 'pending', 2)
   })
 })

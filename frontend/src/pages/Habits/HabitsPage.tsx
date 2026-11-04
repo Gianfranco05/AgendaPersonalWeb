@@ -7,6 +7,14 @@ import type { Goal } from '../../types';
 import CheckInButton from '../Goals/CheckInButton';
 import GoalForm from '../Goals/GoalForm';
 import MonthlyHabitGrid from './MonthlyHabitGrid';
+import Switch from '../../components/Switch';
+import { useOpenParam } from '../../hooks/useOpenParam';
+import {
+  useHabitReminderSettings,
+  saveHabitReminderSettings,
+  refreshHabitReminderToday,
+  useSyncReminderOffset,
+} from '../../hooks/useHabitReminders';
 
 type Tab = 'rachas' | 'mensual';
 
@@ -16,6 +24,21 @@ export default function HabitsPage() {
   const [editingHabit, setEditingHabit] = useState<Goal | null>(null);
   const [formType, setFormType] = useState<'binary' | 'metric'>('binary');
   const [tab, setTab] = useState<Tab>('rachas');
+  const { data: reminderSettings } = useHabitReminderSettings();
+  useSyncReminderOffset(reminderSettings);
+
+  useOpenParam({
+    ready: !isLoading,
+    onOpen: ({ id }) => {
+      const target = habits?.find((h) => h.id === id);
+      if (!target) return false;
+      setTab('rachas');
+      setEditingHabit(target);
+      setFormType(target.goal_type === 'metric' ? 'metric' : 'binary');
+      setShowForm(true);
+      return true;
+    },
+  });
 
   function handleNew(type: 'binary' | 'metric' = 'binary') {
     setEditingHabit(null);
@@ -30,6 +53,7 @@ export default function HabitsPage() {
       await addHabit(data);
     }
     await mutate();
+    await refreshHabitReminderToday();
   }
 
   async function handleCheckIn(goal: Goal) {
@@ -37,6 +61,7 @@ export default function HabitsPage() {
     const delta = goal.current_value >= target ? -goal.current_value : target - goal.current_value;
     await checkInGoal(goal.id, delta);
     await mutate();
+    await refreshHabitReminderToday();
   }
 
   return (
@@ -51,6 +76,19 @@ export default function HabitsPage() {
           {tab === 'mensual' ? 'Nueva métrica' : 'Nuevo hábito'}
         </button>
       </div>
+
+      {reminderSettings && (
+        <div className="flex items-center gap-3 text-sm text-gray-600 dark:text-slate-300">
+          <Switch
+            checked={reminderSettings.enabled}
+            label="Avisos de hábitos"
+            onChange={(enabled) => void saveHabitReminderSettings({ enabled })}
+          />
+          <span>
+            Avisos de hábitos: {reminderSettings.enabled ? `activados (${reminderSettings.time})` : 'apagados'}
+          </span>
+        </div>
+      )}
 
       <div className="flex rounded-lg border border-gray-200 dark:border-slate-700 p-0.5 w-fit">
         <button

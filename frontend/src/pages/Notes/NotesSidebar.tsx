@@ -1,4 +1,4 @@
-import { Search, Plus, X } from 'lucide-react';
+import { Search, Plus, X, Download } from 'lucide-react';
 import { LoadingSkeleton } from '../../components/LoadingSkeleton';
 import type { Note, Tag } from '../../types';
 import NoteCard from './NoteCard';
@@ -11,12 +11,16 @@ interface NotesSidebarProps {
   search: string;
   activeTag: string | null;
   loading: boolean;
+  exporting: boolean;
+  /** En pantallas chicas lista y editor no entran juntos: se muestra uno u otro. */
+  hiddenOnMobile?: boolean;
   onSelect: (id: string) => void;
   onSearchChange: (value: string) => void;
   onTagSelect: (tagId: string | null) => void;
   onPin: (id: string) => void;
   onDelete: (id: string) => void;
   onNew: () => void;
+  onExport: () => void;
 }
 
 export default function NotesSidebar({
@@ -26,26 +30,41 @@ export default function NotesSidebar({
   search,
   activeTag,
   loading,
+  exporting,
+  hiddenOnMobile = false,
   onSelect,
   onSearchChange,
   onTagSelect,
   onPin,
   onDelete,
   onNew,
+  onExport,
 }: NotesSidebarProps) {
   return (
-    <div className="flex w-[300px] flex-shrink-0 flex-col border-r border-gray-100 dark:border-slate-800">
+    <div
+      className={`${hiddenOnMobile ? 'hidden md:flex' : 'flex'} w-full flex-shrink-0 flex-col md:w-[300px] md:border-r border-gray-100 dark:border-slate-800`}
+    >
       {/* Header */}
       <div className="border-b border-gray-100 dark:border-slate-800 p-4">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-gray-800 dark:text-slate-100">Notas</h2>
-          <button
-            onClick={onNew}
-            className="rounded-lg p-1.5 text-brand-charcoal dark:text-slate-100 transition-colors hover:bg-brand-surface-container"
-            title="Nueva nota"
-          >
-            <Plus size={18} />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={onExport}
+              disabled={exporting}
+              className="rounded-lg p-1.5 text-gray-500 dark:text-slate-400 transition-colors hover:bg-brand-surface-container disabled:opacity-50"
+              title="Exportar notas"
+            >
+              <Download size={16} />
+            </button>
+            <button
+              onClick={onNew}
+              className="rounded-lg p-1.5 text-brand-charcoal dark:text-slate-100 transition-colors hover:bg-brand-surface-container"
+              title="Nueva nota"
+            >
+              <Plus size={18} />
+            </button>
+          </div>
         </div>
 
         {/* Search */}

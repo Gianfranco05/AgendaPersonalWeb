@@ -26,6 +26,9 @@ class GoalUpdate(BaseModel):
     icon: Optional[str] = None
     start_date: Optional[date] = None
     end_date: Optional[date] = None
+    reminder_enabled: Optional[bool] = None
+    reminder_hour: Optional[int] = None
+    reminder_minute: Optional[int] = None
 
 
 class GoalOut(BaseModel):

@@ -56,6 +56,7 @@ export default function SavingsGoalsSection() {
   }
 
   async function handleDelete(id: string) {
+    if (!window.confirm('¿Eliminar esta meta de ahorro?')) return;
     await removeSavingsGoal(id);
     await mutate();
   }

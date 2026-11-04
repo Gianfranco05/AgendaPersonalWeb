@@ -12,6 +12,8 @@ async def _register(client: AsyncClient, email: str) -> None:
         "email": email,
         "full_name": "Test",
         "password": "testpass123",
+        "accept_terms": True,
+        "confirm_age": True,
     })
     assert resp.status_code == 201, resp.text
 
@@ -115,6 +117,38 @@ RESOURCES = [
         "path": "/api/v1/goals/{id}",
     },
     {
+        "name": "investment",
+        "create": ("POST", "/api/v1/finance/investments", {
+            "asset_type": "stock",
+            "name": "Inversion A",
+            "currency": "ARS",
+            "invested_amount": "1000",
+        }),
+        "detail": [
+            ("GET", "{id}", None),
+            ("PUT", "{id}", {"name": "hackeada"}),
+            ("DELETE", "{id}", None),
+        ],
+        "path": "/api/v1/finance/investments/{id}",
+    },
+    {
+        "name": "recurring transaction",
+        "create": ("POST", "/api/v1/finance/recurring", {
+            "type": "income",
+            "name": "Sueldo A",
+            "amount": "100",
+            "frequency": "monthly",
+            "day_of_month": 5,
+            "start_date": "2099-01-01",
+        }),
+        "detail": [
+            ("GET", "{id}", None),
+            ("PUT", "{id}", {"name": "hackeada"}),
+            ("DELETE", "{id}", None),
+        ],
+        "path": "/api/v1/finance/recurring/{id}",
+    },
+    {
         "name": "note",
         "create": ("POST", "/api/v1/notes", {"title": "Nota A", "content": "contenido"}),
         "detail": [
@@ -205,3 +239,191 @@ async def test_bearer_only_client_still_respects_tenant_boundary(user_a, user_b)
 
     resp = await user_b.patch(f"/api/v1/tasks/{task_id}", json={"title": "hackeada"})
     assert resp.status_code == 404
+
+
+async def test_user_b_net_worth_no_cuenta_los_datos_de_user_a(user_a, user_b):
+    await user_a.post("/api/v1/finance/transactions", json={
+        "amount": "5000",
+        "type": "income",
+        "transaction_date": "2026-01-01",
+        "account_type": "cash",
+        "payment_method": "cash",
+        "product_name": "Sueldo A",
+    })
+    await user_a.post("/api/v1/finance/investments", json={
+        "asset_type": "stock",
+        "name": "Inversion A",
+        "currency": "ARS",
+        "invested_amount": "7000",
+    })
+    resp = await user_b.get("/api/v1/finance/net-worth")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert float(data["cash_balance_ars"]) == 0
+    assert float(data["net_worth_ars"]) == 0
+    assert data["investments"]["count_active"] == 0
+
+    summary = (await user_b.get("/api/v1/finance/summary")).json()
+    assert float(summary["investments_value_ars"]) == 0
+    assert float(summary["net_worth_ars"]) == 0
+
+
+# ── Datos de mercado: lo compartido es global, lo personal no se mezcla ─────
+
+
+async def test_fuente_del_dolar_y_rendimiento_real_son_por_usuario(user_a, user_b):
+    from datetime import datetime, timezone
+    from decimal import Decimal
+
+    from app.database import get_db
+    from market_helpers import add_inflation, add_quote, months_back
+
+    override = app.dependency_overrides[get_db]
+    async for db in override():
+        await add_quote(db, "USD", "blue", "1565", as_of=datetime.now(timezone.utc))
+        await add_quote(db, "USD", "mep", "1563.9", as_of=datetime.now(timezone.utc))
+        await add_inflation(db, {m: 2.0 for m in months_back(14)})
+
+    await user_a.put("/api/v1/settings", json={"fx_usd_source": "blue"})
+    assert (await user_b.get("/api/v1/settings")).json()["fx_usd_source"] == "mep"
+    assert (await user_a.get("/api/v1/settings")).json()["fx_usd_source"] == "blue"
+
+    for client in (user_a, user_b):
+        await client.post("/api/v1/finance/investments", json={
+            "asset_type": "fx", "name": "USD", "currency": "USD", "invested_amount": "100",
+        })
+    rates_a = (await user_a.get("/api/v1/finance/net-worth")).json()["rates"]
+    rates_b = (await user_b.get("/api/v1/finance/net-worth")).json()["rates"]
+    assert Decimal(rates_a["usd_ars"]) == Decimal("1565")
+    assert Decimal(rates_b["usd_ars"]) == Decimal("1563.9")
+
+    pf = await user_a.post("/api/v1/finance/investments", json={
+        "asset_type": "stock", "name": "Con fecha", "currency": "ARS", "invested_amount": "1000",
+        "current_value": "1100", "start_date": "2026-09-01",
+    })
+    assert pf.json()["real_return"] is not None
+    summary_a = (await user_a.get("/api/v1/finance/investments/summary")).json()
+    summary_b = (await user_b.get("/api/v1/finance/investments/summary")).json()
+    assert summary_a["real_return_ars"]["included_count"] == 1
+    assert summary_b["real_return_ars"] is None
+
+
+async def test_user_b_no_toca_cripto_automatica_de_user_a(user_a, user_b):
+    created = await user_a.post("/api/v1/finance/investments", json={
+        "asset_type": "crypto", "name": "BTC", "ticker": "BTC", "currency": "USD",
+        "quantity": "1", "invested_amount": "1000", "price_source": "coingecko",
+    })
+    assert created.status_code == 201, created.text
+    url = f"/api/v1/finance/investments/{created.json()['id']}"
+    assert (await user_b.put(url, json={"price_source": "manual", "current_value": "1"})).status_code == 404
+    assert (await user_b.delete(url)).status_code == 404
+    assert (await user_b.get(url)).status_code == 404
+    assert (await user_a.get(url)).json()["price_source"] == "coingecko"
+    assert (await user_b.get("/api/v1/finance/investments")).json() == []
+
+
+async def test_user_b_no_toca_las_recurrentes_de_user_a(user_a, user_b):
+    created = await user_a.post("/api/v1/finance/recurring", json={
+        "type": "expense", "name": "Luz", "amount": "25000", "requires_confirmation": True,
+        "frequency": "daily", "start_date": "2000-01-01", "generate_past": False,
+    })
+    # Inicio lejano en el pasado sin backfill: arranca hoy y deja un pendiente.
+    assert created.status_code == 201, created.text
+    rec_id = created.json()["id"]
+    base = f"/api/v1/finance/recurring/{rec_id}"
+    for method, suffix in (("POST", "/pause"), ("POST", "/resume")):
+        assert (await user_b.request(method, base + suffix, json={})).status_code == 404
+
+    occ_id = (await user_a.get("/api/v1/finance/recurring/occurrences")).json()[0]["id"]
+    occ_url = f"/api/v1/finance/recurring/occurrences/{occ_id}"
+    assert (await user_b.post(occ_url + "/confirm", json={"amount": "1"})).status_code == 404
+    assert (await user_b.post(occ_url + "/skip", json={})).status_code == 404
+
+    # Nada cambio para el dueño: sigue pendiente y sin transacciones.
+    assert (await user_a.get("/api/v1/finance/recurring/occurrences")).json()[0]["status"] == "pending"
+    assert (await user_a.get("/api/v1/finance/transactions")).json()["total"] == 0
+
+
+async def test_las_listas_de_recurrentes_no_mezclan_usuarios(user_a, user_b):
+    for client, name in ((user_a, "Pendiente de A"), (user_b, "Pendiente de B")):
+        resp = await client.post("/api/v1/finance/recurring", json={
+            "type": "expense", "name": name, "amount": "10", "requires_confirmation": True,
+            "frequency": "daily", "start_date": "2000-01-01",
+        })
+        assert resp.status_code == 201, resp.text
+        resp = await client.post("/api/v1/finance/recurring", json={
+            "type": "income", "name": f"Sueldo {name}", "amount": "10",
+            "frequency": "monthly", "day_of_month": 5, "start_date": "2000-01-01",
+        })
+        assert resp.status_code == 201, resp.text
+
+    for client, own, other in ((user_a, "de A", "de B"), (user_b, "de B", "de A")):
+        listed = (await client.get("/api/v1/finance/recurring")).json()
+        assert {r["name"] for r in listed} == {f"Pendiente {own}", f"Sueldo Pendiente {own}"}
+        pending = (await client.get("/api/v1/finance/recurring/occurrences")).json()
+        assert [p["name"] for p in pending] == [f"Pendiente {own}"]
+        upcoming = (await client.get("/api/v1/finance/recurring/upcoming")).json()
+        assert all(other not in i["name"] for i in upcoming["items"])
+        assert any(own in i["name"] for i in upcoming["items"])
+
+
+async def test_user_b_no_renueva_ni_ve_renovaciones_de_user_a(user_a, user_b):
+    from datetime import date, timedelta
+
+    today = date.today()
+    created = await user_a.post("/api/v1/finance/investments", json={
+        "asset_type": "fixed_term", "name": "PF A", "currency": "ARS", "invested_amount": "1000",
+        "interest_rate_tna": "30",
+        "start_date": (today - timedelta(days=40)).isoformat(),
+        "maturity_date": (today - timedelta(days=5)).isoformat(),
+    })
+    assert created.status_code == 201, created.text
+    url = f"/api/v1/finance/investments/{created.json()['id']}"
+    body = {"mode": "principal_and_interest", "interest_rate_tna": "28", "term_days": 30}
+    assert (await user_b.post(url + "/renew", json=body)).status_code == 404
+    assert (await user_b.get(url + "/renewals")).status_code == 404
+    assert (await user_a.get(url)).json()["status"] == "active"
+
+
+async def test_user_b_does_not_see_user_a_habit_reminders(user_a, user_b):
+    created = await user_a.post("/api/v1/goals", json={
+        "title": "Habito privado A",
+        "goal_type": "binary",
+        "reminder_time": "07:30",
+    })
+    assert created.status_code == 201
+    goal_id = created.json()["id"]
+    await user_a.put("/api/v1/habit-reminders/settings", json={"enabled": False, "time": "06:00"})
+
+    # Lo de B es suyo: ni el habito, ni la hora, ni la configuracion de A.
+    overview = (await user_b.get(
+        "/api/v1/habit-reminders/today", params={"tz_offset_minutes": -180}
+    )).json()
+    assert overview["pending_count"] == 0 and overview["slots"] == []
+    theirs = (await user_b.get("/api/v1/habit-reminders/settings")).json()
+    assert theirs["enabled"] is True and theirs["time"] == "20:00"
+
+    # Y B no puede editar el aviso del habito de A.
+    resp = await user_b.put(f"/api/v1/goals/{goal_id}", json={"reminder_enabled": False})
+    assert resp.status_code == 404
+    mine = [g for g in (await user_a.get("/api/v1/goals")).json() if g["id"] == goal_id][0]
+    assert mine["reminder_enabled"] is True and mine["reminder_time"] == "07:30"
+
+
+async def test_user_b_search_never_returns_user_a_data(user_a, user_b):
+    """Buscador: ninguna entidad de A aparece en la busqueda de B (flujo por API)."""
+    await user_a.post("/api/v1/notes", json={"title": "Nota ultrasecreta A", "content": "ultrasecreto"})
+    await user_a.post("/api/v1/tasks", json={"title": "Tarea ultrasecreta A"})
+    await user_a.post("/api/v1/goals", json={"title": "Habito ultrasecreto A", "goal_type": "binary"})
+    await user_a.post("/api/v1/finance/transactions", json={
+        "amount": "10.00", "type": "expense", "transaction_date": "2026-01-01",
+        "account_type": "cash", "payment_method": "cash", "product_name": "Gasto ultrasecreto A",
+    })
+    await user_a.post("/api/v1/library/books", json={"title": "Libro ultrasecreto A"})
+
+    mine = (await user_a.get("/api/v1/search", params={"q": "ultrasecret"})).json()
+    assert {g["type"] for g in mine["groups"]} >= {"notes", "tasks", "habits", "transactions", "library"}
+
+    theirs = await user_b.get("/api/v1/search", params={"q": "ultrasecret"})
+    assert theirs.status_code == 200
+    assert theirs.json()["groups"] == []

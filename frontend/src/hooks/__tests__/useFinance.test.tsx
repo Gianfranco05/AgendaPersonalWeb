@@ -29,12 +29,12 @@ const mockSummary = {
 }
 
 const mockTxResponse = {
-  transactions: [
-    { id: '1', amount: 100, type: 'expense', product_name: 'Test', transaction_date: '2025-06-01', currency: 'ARS', merchant_name: 'Store', payment_method: 'Cash' },
+  items: [
+    { id: '1', amount: 100, type: 'expense' as const, product_name: 'Test', transaction_date: '2025-06-01', currency: 'ARS', merchant_name: 'Store', payment_method: 'Cash' },
   ],
   total: 1,
   page: 1,
-  per_page: 20,
+  page_size: 20,
 }
 
 function createWrapper(fallback: Record<string, unknown> = {}) {
@@ -75,15 +75,15 @@ describe('useTransactions', () => {
 
 describe('saveTransaction', () => {
   it('calls createTransaction for new records and invalidates', async () => {
-    const data = { amount: 100, type: 'expense' as const, product_name: 'Test', transaction_date: '2025-06-01', currency: 'ARS' as const, merchant_name: '', payment_method: 'Cash', category_name: '' }
+    const data = { amount: 100, type: 'expense' as const, product_name: 'Test', transaction_date: '2025-06-01', currency: 'ARS' as const, merchant_name: '', payment_method: 'cash', category_id: '' }
     await saveTransaction(null, data, { page: 1, per_page: 20 })
     expect(endpoints.createTransaction).toHaveBeenCalledWith(data)
     expect(globalMutate).toHaveBeenCalled()
   })
 
   it('calls updateTransaction for existing records and invalidates', async () => {
-    const existing = { id: '1', amount: 50, type: 'income' as const, product_name: 'Old', transaction_date: '2025-05-01', currency: 'ARS' as const, merchant_name: '', payment_method: 'Cash', category_name: '' }
-    const updates = { amount: 200, type: 'income' as const, product_name: 'Updated', transaction_date: '2025-06-01', currency: 'ARS' as const, merchant_name: '', payment_method: 'Bank', category_name: '' }
+    const existing = { id: '1', amount: 50, type: 'income' as const, product_name: 'Old', transaction_date: '2025-05-01', currency: 'ARS' as const, merchant_name: '', payment_method: 'cash', category_id: '' }
+    const updates = { amount: 200, type: 'income' as const, product_name: 'Updated', transaction_date: '2025-06-01', currency: 'ARS' as const, merchant_name: '', payment_method: 'transfer', category_id: '' }
     await saveTransaction(existing, updates, { page: 1, per_page: 20 })
     expect(endpoints.updateTransaction).toHaveBeenCalledWith('1', updates)
     expect(globalMutate).toHaveBeenCalled()

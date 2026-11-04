@@ -1,14 +1,24 @@
-import { useState, lazy, Suspense } from 'react';
-import { TrendingUp, TrendingDown, Wallet, Plus } from 'lucide-react';
+import { useState, useEffect, useRef, lazy, Suspense } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { TrendingUp, TrendingDown, Wallet, Plus, Repeat, X, Download, Upload } from 'lucide-react';
 import { LoadingSkeleton } from '../../components/LoadingSkeleton';
 import { useFinanceSummary, useTransactions, removeTransaction } from '../../hooks/useFinance';
-import type { Transaction } from '../../types';
+import { usePendingOccurrences } from '../../hooks/useRecurring';
+import type { Recurring, Transaction } from '../../types';
 import TransactionTable from './TransactionTable';
 import TransactionModal from './TransactionModal';
+import ExportModal from './ExportModal';
 import TransactionFilters from './TransactionFilters';
 import BudgetsSection from './BudgetsSection';
 import SavingsGoalsSection from './SavingsGoalsSection';
 import CategoriesSection from './CategoriesSection';
+import ReportsSection from './ReportsSection';
+import AccountsSection from './AccountsSection';
+import InvestmentsSection from './InvestmentsSection';
+import RecurringSection from './RecurringSection';
+import RecurringModal, { type RecurringPrefill } from './RecurringModal';
+import { findTransactionById } from './findTransaction';
+import { useOpenParam } from '../../hooks/useOpenParam';
 
 const FinanceCharts = lazy(() => import('./FinanceCharts'));
 
@@ -21,10 +31,41 @@ interface Filters {
 
 const PER_PAGE = 20;
 
-type Tab = 'transacciones' | 'presupuestos' | 'ahorro' | 'categorias';
+type Tab =
+  | 'transacciones'
+  | 'presupuestos'
+  | 'ahorro'
+  | 'categorias'
+  | 'reportes'
+  | 'cuentas'
+  | 'inversiones'
+  | 'recurrentes';
+
+const TABS: readonly Tab[] = [
+  'transacciones',
+  'presupuestos',
+  'ahorro',
+  'categorias',
+  'reportes',
+  'cuentas',
+  'inversiones',
+  'recurrentes',
+];
+
+function parseTab(value: string | null): Tab | null {
+  return TABS.find((t) => t === value) ?? null;
+}
 
 export default function FinancePage() {
-  const [tab, setTab] = useState<Tab>('transacciones');
+  // El buscador manda `?tab=`: elige la pestaña al entrar y también con la
+  // página ya montada (la URL cambia sin desmontar). Quien abre el elemento
+  // limpia luego el parámetro.
+  const [searchParams] = useSearchParams();
+  const tabParam = parseTab(searchParams.get('tab'));
+  const [tab, setTab] = useState<Tab>(tabParam ?? 'transacciones');
+  useEffect(() => {
+    if (tabParam) setTab(tabParam);
+  }, [tabParam]);
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState<Filters>({
     date_from: '',
@@ -33,7 +74,11 @@ export default function FinancePage() {
     type: '',
   });
   const [showModal, setShowModal] = useState(false);
+  const [showExport, setShowExport] = useState(false);
   const [editingTx, setEditingTx] = useState<Transaction | null>(null);
+  // Filtro "movimientos de esta recurrencia" y alta de una recurrente desde una transacción.
+  const [recurrenceFilter, setRecurrenceFilter] = useState<{ id: string; name: string } | null>(null);
+  const [recurringPrefill, setRecurringPrefill] = useState<RecurringPrefill | null>(null);
 
   const txParams = {
     page,
@@ -42,15 +87,17 @@ export default function FinancePage() {
     ...(filters.category && { category: filters.category }),
     ...(filters.date_from && { date_from: filters.date_from }),
     ...(filters.date_to && { date_to: filters.date_to }),
+    ...(recurrenceFilter && { recurrence_id: recurrenceFilter.id }),
   };
 
   const { data: summary, isLoading: summaryLoading } = useFinanceSummary();
   const { data: txData, isLoading: txLoading } = useTransactions(txParams);
+  const { data: pendingOccurrences } = usePendingOccurrences();
+  const pendingCount = pendingOccurrences?.length ?? 0;
 
   const transactions = txData?.items ?? [];
   const total = txData?.total ?? 0;
   const totalPages = Math.ceil(total / PER_PAGE);
-  const loading = summaryLoading || txLoading;
 
   function handleNew() {
     setEditingTx(null);
@@ -62,12 +109,69 @@ export default function FinancePage() {
     setShowModal(true);
   }
 
+  // Movimientos: la lista está paginada, así que si el buscador apunta a uno que
+  // no está en la página visible se lo busca en el historial (async: 'wait').
+  const txLookup = useRef<{ id: string; done: boolean; tx: Transaction | null } | null>(null);
+  const [, setLookupTick] = useState(0);
+
+  useOpenParam({
+    // Las inversiones las abre su propia sección (tiene sus datos y su modal).
+    ready: !txLoading && tabParam !== 'inversiones',
+    onOpen: ({ id }) => {
+      const local = transactions.find((t) => t.id === id);
+      if (local) {
+        txLookup.current = null;
+        handleEdit(local);
+        return true;
+      }
+      const lookup = txLookup.current;
+      if (!lookup || lookup.id !== id) {
+        txLookup.current = { id, done: false, tx: null };
+        void findTransactionById(id).then((tx) => {
+          if (txLookup.current?.id !== id) return;
+          txLookup.current = { id, done: true, tx };
+          setLookupTick((n) => n + 1);
+        });
+        return 'wait';
+      }
+      if (!lookup.done) return 'wait';
+      txLookup.current = null;
+      if (!lookup.tx) return false;
+      handleEdit(lookup.tx);
+      return true;
+    },
+  });
+
   async function handleDelete(id: string) {
+    if (!window.confirm('¿Eliminar esta transacción?')) return;
     await removeTransaction(id, txParams);
   }
 
   function handleSaved() {
     setShowModal(false);
+  }
+
+  function handleViewMovements(recurrence: Recurring) {
+    setRecurrenceFilter({ id: recurrence.id, name: recurrence.name });
+    setPage(1);
+    setTab('transacciones');
+  }
+
+  function handleViewRecurrence(id: string) {
+    setRecurrenceFilter({ id, name: 'esta recurrencia' });
+    setPage(1);
+  }
+
+  function handleMakeRecurring(tx: Transaction) {
+    setRecurringPrefill({
+      type: tx.type,
+      name: tx.product_name,
+      amount: tx.amount,
+      currency: tx.currency,
+      category_id: tx.category_id,
+      payment_method: tx.payment_method,
+      start_date: tx.transaction_date,
+    });
   }
 
   function handleFiltersChange(newFilters: Filters) {
@@ -79,28 +183,49 @@ export default function FinancePage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-gray-800 dark:text-slate-100">Finanzas</h2>
-        {tab === 'transacciones' && (
+        <div className="flex flex-wrap items-center justify-end gap-2">
           <button
-            onClick={handleNew}
-            className="flex items-center gap-2 rounded-lg bg-brand-charcoal px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-charcoal-hover"
+            type="button"
+            onClick={() => setShowExport(true)}
+            className="flex items-center gap-2 rounded-lg border border-gray-200 dark:border-slate-700 px-3 py-2 text-sm text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-700/50"
           >
-            <Plus size={16} />
-            Nueva transacción
+            <Download size={16} />
+            Exportar
           </button>
-        )}
+          <Link
+            to="/finances/import"
+            className="flex items-center gap-2 rounded-lg border border-gray-200 dark:border-slate-700 px-3 py-2 text-sm text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-700/50"
+          >
+            <Upload size={16} />
+            Importar
+          </Link>
+          {tab === 'transacciones' && (
+            <button
+              onClick={handleNew}
+              className="flex items-center gap-2 rounded-lg bg-brand-charcoal px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-charcoal-hover"
+            >
+              <Plus size={16} />
+              Nueva transacción
+            </button>
+          )}
+        </div>
       </div>
 
-      <div className="flex rounded-lg border border-gray-200 dark:border-slate-700 p-0.5 w-fit">
+      <div className="flex max-w-full overflow-x-auto rounded-lg border border-gray-200 dark:border-slate-700 p-0.5 w-fit">
         {([
           ['transacciones', 'Transacciones'],
           ['presupuestos', 'Presupuestos'],
           ['ahorro', 'Ahorro'],
           ['categorias', 'Categorías'],
+          ['reportes', 'Reportes'],
+          ['cuentas', 'Cuentas'],
+          ['inversiones', 'Inversiones'],
+          ['recurrentes', 'Recurrentes'],
         ] as const).map(([value, label]) => (
           <button
             key={value}
             onClick={() => setTab(value)}
-            className={`rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${
+            className={`shrink-0 rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${
               tab === value
                 ? 'bg-brand-charcoal text-white'
                 : 'text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-100'
@@ -114,6 +239,10 @@ export default function FinancePage() {
       {tab === 'presupuestos' && <BudgetsSection />}
       {tab === 'ahorro' && <SavingsGoalsSection />}
       {tab === 'categorias' && <CategoriesSection />}
+      {tab === 'reportes' && <ReportsSection />}
+      {tab === 'cuentas' && <AccountsSection />}
+      {tab === 'inversiones' && <InvestmentsSection />}
+      {tab === 'recurrentes' && <RecurringSection onViewMovements={handleViewMovements} />}
 
       {tab === 'transacciones' && (
       <>
@@ -154,15 +283,46 @@ export default function FinancePage() {
                 summary.balance >= 0 ? 'text-emerald-500' : 'text-rose-500'
               }`}
             >
-              ${summary.balance.toLocaleString('es-AR')}
+              {summary.balance < 0 ? '-' : ''}${Math.abs(summary.balance).toLocaleString('es-AR')}
             </p>
           </div>
         </div>
       ) : null}
 
       <Suspense fallback={<LoadingSkeleton type="card" />}>
-        <FinanceCharts transactions={transactions} loading={loading} />
+        <FinanceCharts />
       </Suspense>
+
+      {pendingCount > 0 && (
+        <button
+          type="button"
+          data-testid="pending-banner"
+          onClick={() => setTab('recurrentes')}
+          className="flex w-full items-center gap-2 rounded-xl border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 px-4 py-3 text-left text-sm font-medium text-amber-800 dark:text-amber-200"
+        >
+          <Repeat size={16} />
+          Tenés {pendingCount} {pendingCount === 1 ? 'movimiento recurrente' : 'movimientos recurrentes'} para confirmar
+        </button>
+      )}
+
+      {recurrenceFilter && (
+        <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-slate-300">
+          <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 dark:bg-slate-700 px-3 py-1">
+            Movimientos de {recurrenceFilter.name}
+            <button
+              type="button"
+              aria-label="Quitar filtro de recurrencia"
+              onClick={() => {
+                setRecurrenceFilter(null);
+                setPage(1);
+              }}
+              className="rounded-full p-0.5 hover:bg-gray-200 dark:hover:bg-slate-600"
+            >
+              <X size={12} />
+            </button>
+          </span>
+        </div>
+      )}
 
       <TransactionFilters filters={filters} onChange={handleFiltersChange} />
 
@@ -174,6 +334,8 @@ export default function FinancePage() {
             transactions={transactions}
             onEdit={handleEdit}
             onDelete={handleDelete}
+            onMakeRecurring={handleMakeRecurring}
+            onViewRecurrence={handleViewRecurrence}
           />
 
           {total > PER_PAGE && (
@@ -202,6 +364,22 @@ export default function FinancePage() {
         </>
       )}
       </>
+      )}
+
+      {recurringPrefill && (
+        <RecurringModal
+          recurring={null}
+          prefill={recurringPrefill}
+          onClose={() => setRecurringPrefill(null)}
+          onSaved={() => {
+            setRecurringPrefill(null);
+            setTab('recurrentes');
+          }}
+        />
+      )}
+
+      {showExport && (
+        <ExportModal defaults={filters} onClose={() => setShowExport(false)} />
       )}
 
       {showModal && (

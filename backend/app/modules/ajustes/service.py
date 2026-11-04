@@ -8,6 +8,7 @@ from app.config import settings as app_settings
 from app.modules.ajustes.models import UserPreference
 from app.modules.ajustes.repository import UserPreferenceRepository
 from app.modules.ajustes.schemas import UserPreferenceUpdate
+from app.modules.eventos.schemas import to_wall_clock
 
 
 class SettingsService:
@@ -71,12 +72,19 @@ class SettingsService:
 
         synced = 0
         for event in events:
-            end_dt = event.end_datetime or (event.start_datetime + timedelta(hours=1))
+            # Hora de pared sin offset: con el offset +00:00 de una columna
+            # timestamptz, Google ignoraria timeZone y correria el evento.
+            start_dt = to_wall_clock(event.start_datetime)
+            end_dt = (
+                to_wall_clock(event.end_datetime)
+                if event.end_datetime
+                else start_dt + timedelta(hours=1)
+            )
             g_event = {
                 "summary": event.title,
                 "description": event.description or "",
                 "start": {
-                    "dateTime": event.start_datetime.isoformat(),
+                    "dateTime": start_dt.isoformat(),
                     "timeZone": "America/Argentina/Buenos_Aires",
                 },
                 "end": {
@@ -87,7 +95,7 @@ class SettingsService:
             if event.location:
                 g_event["location"] = event.location
             if event.is_all_day:
-                date_str = event.start_datetime.strftime("%Y-%m-%d")
+                date_str = start_dt.strftime("%Y-%m-%d")
                 g_event["start"] = {"date": date_str}
                 g_event["end"] = {"date": date_str}
 

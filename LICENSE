@@ -1,0 +1,311 @@
+LICENCIA DE USO PERSONAL, EDUCATIVO Y DE INVESTIGACIÓN
+(NO COMERCIAL Y SIN DISTRIBUCIÓN) — CAN_CEN
+Versión 1.0
+
+Copyright (c) 2026 Gianfranco Canciani (https://github.com/Gianfranco05).
+Todos los derechos reservados, salvo los expresamente concedidos en esta
+Licencia.
+
+IMPORTANTE: esta NO es una licencia de código abierto ("open source") ni de
+software libre. El código fuente se publica para que pueda verse, estudiarse
+y usarse con los fines limitados que se describen abajo. Todo lo que esta
+Licencia no permite expresamente, está prohibido.
+
+
+-------------------------------------------------------------------------------
+RESUMEN (orientativo; en caso de diferencia prevalece el texto de la Licencia)
+-------------------------------------------------------------------------------
+
+PERMITIDO, solo para uso personal, educativo o de investigación y sin fines
+comerciales:
+  - Ver y estudiar el código fuente.
+  - Descargarlo y hacer las copias locales necesarias.
+  - Ejecutarlo localmente, para uno mismo.
+  - Modificarlo y crear versiones derivadas para ese mismo uso.
+  - Usarlo como referencia educativa.
+  - Compartir el ENLACE al repositorio oficial.
+
+PROHIBIDO sin autorización expresa y por escrito del autor:
+  - Vender el proyecto o una versión modificada.
+  - Distribuir copias a terceros, gratis o pagas.
+  - Redistribuir públicamente el código fuente.
+  - Publicar forks o versiones modificadas como proyectos independientes,
+    repositorios, aplicaciones o productos para terceros.
+  - Ofrecerlo, modificado o no, como SaaS o servicio (pago o gratuito) para
+    terceros.
+  - Incorporarlo en productos o servicios comerciales o usarlo con fines
+    comerciales.
+  - Sublicenciarlo.
+  - Presentarlo o registrarlo como propio.
+  - Quitar o modificar los avisos de copyright y de esta Licencia.
+
+MODIFICAR ESTÁ PERMITIDO, PERO NO DA PERMISO PARA DISTRIBUIR NI PARA USAR
+COMERCIALMENTE LO MODIFICADO.
+
+
+-------------------------------------------------------------------------------
+TEXTO DE LA LICENCIA
+-------------------------------------------------------------------------------
+
+0. ACEPTACIÓN
+
+Al descargar, copiar, ejecutar, modificar o usar de cualquier forma el
+Software, Usted acepta los términos de esta Licencia. Si no los acepta, no
+tiene permiso para realizar ninguno de esos actos.
+
+
+1. DEFINICIONES
+
+1.1. "Software": el código fuente, el código compilado o empaquetado, la
+     documentación, los diseños, textos, imágenes, íconos, configuraciones y
+     demás archivos de este repositorio y de cualquier otro repositorio del
+     proyecto Can_cen publicado por el Titular (incluidas la aplicación web,
+     el backend y la aplicación móvil), en cualquiera de sus versiones.
+
+1.2. "Titular" o "Autor": Gianfranco Canciani, titular de los derechos de
+     autor sobre el Software.
+
+1.3. "Usted": la persona humana o jurídica que ejerce los permisos de esta
+     Licencia.
+
+1.4. "Tercero": cualquier persona, humana o jurídica, distinta de Usted y del
+     Titular.
+
+1.5. "Modificación" u "Obra Derivada": cualquier cambio, adaptación,
+     traducción (incluida la traducción a otro lenguaje de programación),
+     fork, versión modificada o trabajo basado total o parcialmente en el
+     Software o en una parte sustancial de él.
+
+1.6. "Uso Permitido": exclusivamente alguno de los siguientes, y siempre sin
+     fines comerciales:
+     a) Uso personal: el uso por Usted, para sus propios fines privados.
+     b) Uso educativo: aprender, estudiar o enseñar cómo funciona el
+        Software, sin cobrar por el acceso al Software ni a sus
+        Modificaciones.
+     c) Uso de investigación: investigación académica o privada.
+
+1.7. "Uso Comercial": cualquier uso que tenga por objeto o por efecto,
+     directo o indirecto, obtener una ventaja económica o comercial para
+     Usted o para un Tercero. Incluye, entre otros: vender o licenciar a
+     título oneroso; cobrar por acceso, suscripción, instalación, soporte,
+     alojamiento, personalización o consultoría; obtener ingresos por
+     publicidad, datos o comisiones; usar el Software dentro de una empresa,
+     organismo o actividad profesional con fines de lucro, aunque sea en
+     forma interna; o usarlo para promocionar u ofrecer productos o
+     servicios comerciales.
+
+1.8. "Distribuir": entregar, publicar, subir, compartir, transferir o poner
+     a disposición de un Tercero una copia total o parcial del Software o de
+     una Modificación, por cualquier medio. Incluye, entre otros: repositorios
+     públicos, repositorios privados compartidos con Terceros, paquetes,
+     archivos comprimidos, tiendas de aplicaciones, gestores de paquetes,
+     dispositivos, mensajes y enlaces de descarga directa a una copia.
+
+1.9. "Poner a Disposición como Servicio": permitir que un Tercero use las
+     funcionalidades del Software o de una Modificación a través de una red
+     (internet, intranet u otra), por ejemplo alojándolo en un servidor como
+     sitio web, aplicación, API o servicio en la nube ("SaaS"), sea en forma
+     gratuita o paga.
+
+
+2. PERMISOS CONCEDIDOS
+
+Sujeto al cumplimiento de todos los términos de esta Licencia, el Titular le
+concede una licencia mundial, gratuita, no exclusiva, intransferible, no
+sublicenciable y revocable según la sección 10, para, únicamente dentro de un
+Uso Permitido:
+
+  a) ver y leer el código fuente;
+  b) descargar el Software y hacer las copias locales necesarias para ese
+     uso, incluidas copias de respaldo en dispositivos o cuentas bajo su
+     control exclusivo;
+  c) ejecutar el Software localmente, en dispositivos bajo su control, para
+     su propio uso;
+  d) modificar el Software y crear Modificaciones, conforme a la sección 3;
+  e) estudiar cómo funciona el Software y usarlo como referencia educativa,
+     incluido aprender de sus técnicas, patrones e ideas;
+  f) compartir un enlace al repositorio oficial del Titular. Compartir ese
+     enlace no se considera Distribuir.
+
+Si necesita que otras personas accedan al Software (por ejemplo, alumnos o
+compañeros de investigación), comparta el enlace al repositorio oficial: cada
+persona debe obtener su propia copia desde ahí y queda sujeta a esta
+Licencia.
+
+
+3. MODIFICACIONES
+
+3.1. Puede modificar el Software y crear Modificaciones únicamente para un
+     Uso Permitido.
+
+3.2. Modificar el Software NO le otorga ningún permiso adicional. En
+     particular, no le permite Distribuir sus Modificaciones, Ponerlas a
+     Disposición como Servicio, publicarlas como proyecto independiente ni
+     darles un Uso Comercial, aunque haya cambiado, agregado o reescrito
+     parte del código.
+
+3.3. Toda Modificación sigue sujeta a esta Licencia en la medida en que
+     contenga el Software o partes de él, y debe conservar los avisos
+     indicados en la sección 7.
+
+3.4. El código original que Usted escriba y que no contenga ni derive del
+     Software le pertenece; esta Licencia no reclama derechos sobre él.
+
+
+4. DISTRIBUCIÓN Y REDISTRIBUCIÓN
+
+Salvo autorización previa, expresa y por escrito del Titular, Usted NO puede:
+
+  a) Distribuir copias del Software, totales o parciales, a Terceros, en
+     forma gratuita u onerosa;
+  b) redistribuir públicamente el código fuente, por ejemplo subiéndolo a
+     un repositorio público, sitio web, foro o red de intercambio de
+     archivos;
+  c) publicar forks, versiones modificadas u otras Modificaciones como
+     proyectos, repositorios, aplicaciones o productos independientes, ni
+     entregarlos a Terceros;
+  d) Poner a Disposición como Servicio el Software o una Modificación para
+     Terceros, en forma gratuita u onerosa;
+  e) publicar el Software o una Modificación en tiendas de aplicaciones
+     (por ejemplo, Google Play o App Store), catálogos o gestores de
+     paquetes.
+
+Estas prohibiciones se aplican aunque no se cobre nada y aunque el Software
+haya sido modificado.
+
+
+5. USO COMERCIAL
+
+Salvo autorización previa, expresa y por escrito del Titular, Usted NO puede:
+
+  a) vender el Software o una Modificación, ni licenciarlos a título
+     oneroso;
+  b) incorporar el Software, una Modificación o partes de su código en
+     productos, servicios o proyectos comerciales, propios o de Terceros;
+  c) ofrecer el Software o una Modificación como SaaS, servicio pago,
+     servicio financiado por publicidad o con cualquier otra finalidad
+     comercial, ni prestar servicios comerciales basados en ellos (por
+     ejemplo, alojamiento, instalación, soporte o consultoría);
+  d) usar el Software o sus Modificaciones para cualquier otro Uso
+     Comercial.
+
+
+6. OTRAS RESTRICCIONES
+
+Usted NO puede:
+
+  a) sublicenciar, alquilar, prestar, ceder ni transferir el Software ni
+     esta Licencia;
+  b) presentar, registrar ni reclamar el Software o una Modificación como
+     obra propia, ni registrarlos a su nombre como obra, marca, patente,
+     nombre de dominio u otro derecho;
+  c) eliminar, ocultar o modificar los avisos de copyright, de autoría o de
+     esta Licencia;
+  d) usar el nombre "Can_cen", sus logotipos u otros signos distintivos, ni
+     el nombre del Titular, para identificar o promocionar Modificaciones,
+     productos o servicios, ni para sugerir aprobación o relación con el
+     Titular. Esta Licencia no concede ningún derecho sobre marcas;
+  e) eludir estas restricciones por medios indirectos, por ejemplo
+     reescribiendo de forma mecánica, automatizada o superficial partes
+     sustanciales del Software para luego Distribuirlas o darles un Uso
+     Comercial.
+
+
+7. ATRIBUCIÓN Y AVISOS DE COPYRIGHT
+
+7.1. Toda copia o Modificación que Usted conserve debe mantener íntegro este
+     archivo LICENSE y los avisos de copyright y de autoría existentes.
+
+7.2. Puede citar fragmentos breves del código con fines de cita, crítica,
+     comentario o enseñanza (por ejemplo, en un trabajo académico o un
+     artículo), en la medida permitida por la ley aplicable, siempre que
+     indique: "Fragmento de Can_cen — Copyright (c) 2026 Gianfranco Canciani —
+     uso sujeto a su licencia". Esta autorización no alcanza a partes
+     sustanciales del Software ni a fragmentos que, en conjunto, permitan
+     reconstruirlo.
+
+
+8. CONTRIBUCIONES
+
+Si Usted envía al Titular una contribución (por ejemplo, un pull request, un
+parche o código sugerido), declara que tiene derecho a hacerlo y le otorga al
+Titular una licencia perpetua, mundial, gratuita, no exclusiva e irrevocable
+para usar, modificar, distribuir y sublicenciar esa contribución como parte
+del Software o de otros proyectos del Titular, incluso con fines comerciales.
+Enviar una contribución no le otorga a Usted ningún permiso adicional sobre
+el Software.
+
+
+9. PLATAFORMAS DE ALOJAMIENTO Y COMPONENTES DE TERCEROS
+
+9.1. Si el Software está alojado en una plataforma (por ejemplo, GitHub)
+     cuyos términos de servicio otorgan a sus usuarios ciertos derechos sobre
+     los repositorios públicos, como verlos o hacer un "fork" dentro de la
+     plataforma, esos derechos se limitan estrictamente a lo que exigen
+     dichos términos y no amplían los permisos de esta Licencia. Un fork
+     creado dentro de la plataforma no autoriza a Distribuirlo, publicarlo
+     como proyecto independiente, Ponerlo a Disposición como Servicio ni
+     darle un Uso Comercial.
+
+9.2. El Software utiliza bibliotecas y componentes de terceros que se rigen
+     por sus propias licencias. Esta Licencia se aplica solo al código y al
+     material cuyo titular es el Titular, y no restringe ni modifica los
+     derechos que esas licencias otorgan sobre dichos componentes.
+
+
+10. AUTORIZACIONES, TERMINACIÓN Y RESERVA DE DERECHOS
+
+10.1. Cualquier uso que esta Licencia no permita expresamente requiere
+      autorización previa, expresa y por escrito del Titular, que puede
+      solicitarse por los medios de contacto indicados en su perfil de
+      GitHub (https://github.com/Gianfranco05). El silencio del Titular no
+      implica autorización.
+
+10.2. Si Usted incumple cualquier término de esta Licencia, sus permisos
+      terminan automáticamente, sin necesidad de aviso. En ese caso debe
+      dejar de usar el Software y destruir todas las copias y Modificaciones
+      en su poder. La terminación no afecta los derechos del Titular a
+      reclamar por el incumplimiento.
+
+10.3. Todos los derechos no concedidos expresamente en esta Licencia quedan
+      reservados al Titular. Esta Licencia no otorga licencias implícitas.
+      Sus permisos se interpretan en forma restrictiva: lo que no está
+      expresamente permitido, no está permitido.
+
+10.4. El Titular puede publicar nuevas versiones de esta Licencia para
+      versiones futuras del Software. Cada copia se rige por la versión de
+      la Licencia bajo la cual fue obtenida.
+
+
+11. DESCARGO DE GARANTÍAS
+
+EL SOFTWARE SE PROPORCIONA "TAL CUAL" Y "SEGÚN DISPONIBILIDAD", SIN
+GARANTÍAS DE NINGÚN TIPO, EXPRESAS O IMPLÍCITAS, INCLUIDAS, ENTRE OTRAS, LAS
+GARANTÍAS DE COMERCIABILIDAD, IDONEIDAD PARA UN PROPÓSITO PARTICULAR,
+TITULARIDAD Y NO INFRACCIÓN. USTED ASUME TODO EL RIESGO DERIVADO DE SU USO,
+INCLUIDA LA PÉRDIDA O CORRUPCIÓN DE DATOS.
+
+
+12. LIMITACIÓN DE RESPONSABILIDAD
+
+EN LA MEDIDA MÁXIMA PERMITIDA POR LA LEY APLICABLE, EL TITULAR NO SERÁ
+RESPONSABLE POR NINGÚN DAÑO, DIRECTO O INDIRECTO, INCIDENTAL, ESPECIAL O
+CONSECUENTE (INCLUIDOS, ENTRE OTROS, EL LUCRO CESANTE, LA PÉRDIDA DE DATOS O
+LA INTERRUPCIÓN DE ACTIVIDADES) QUE SURJA DEL USO O DE LA IMPOSIBILIDAD DE
+USO DEL SOFTWARE, AUN CUANDO HUBIERA SIDO ADVERTIDO DE SU POSIBILIDAD.
+
+
+13. LEY APLICABLE Y JURISDICCIÓN
+
+Esta Licencia se rige por las leyes de la República Argentina, en particular
+por la Ley 11.723 de Propiedad Intelectual. Toda controversia se someterá a
+los tribunales ordinarios competentes de la Ciudad de Mendoza, Provincia de
+Mendoza, República Argentina, salvo que una norma imperativa disponga otra
+cosa.
+
+
+14. DIVISIBILIDAD
+
+Si alguna disposición de esta Licencia fuera declarada inválida o
+inaplicable, las demás seguirán vigentes, y la disposición afectada se
+interpretará de la forma más cercana posible a su finalidad original.

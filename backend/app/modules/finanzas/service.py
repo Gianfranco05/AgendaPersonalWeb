@@ -4,6 +4,7 @@ from decimal import Decimal
 from uuid import UUID
 from typing import Optional
 
+from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.finanzas.enums import (
@@ -30,7 +31,18 @@ from app.modules.finanzas.schemas import (
     BudgetCreate,
     BudgetProgress,
     CategoryCreate,
+    BankAccountCreate,
 )
+
+
+_NULLABLE_TRANSACTION_FIELDS = {
+    "category_id",
+    "notes",
+    "transaction_time",
+    "product_description",
+    "quantity",
+    "unit_price",
+}
 
 
 class FinanzasService:
@@ -41,10 +53,25 @@ class FinanzasService:
         self.bank_account_repo = BankAccountRepository(db)
         self.budget_repo = BudgetRepository(db)
 
-    async def create_transaction(
-        self, user_id: UUID, data: TransactionCreate
-    ) -> Transaction:
-        transaction = Transaction(
+    async def _ensure_own_category(self, user_id: UUID, category_id) -> None:
+        """404 si la categoria no existe o es de otro usuario.
+
+        category_id llega del cliente: sin validarlo, una transaccion o un
+        presupuesto podia apuntar a la categoria de otra persona (y los
+        reportes, que joinean por category_id, le mostraban su nombre), o a una
+        inexistente, lo que en Postgres rompe la FK con un 500.
+        """
+        if category_id is None:
+            return
+        if await self.category_repo.get_by_id(str(category_id), str(user_id)) is None:
+            raise HTTPException(status_code=404, detail="Categoría no encontrada")
+
+    async def build_transaction(self, user_id: UUID, data: TransactionCreate) -> Transaction:
+        """Arma la transaccion (valida enums y que la categoria sea propia) sin
+        agregarla a la sesion ni hacer `commit`: quien la usa decide cuando
+        confirmar (ej. las recurrentes la crean junto con el cursor)."""
+        await self._ensure_own_category(user_id, data.category_id)
+        return Transaction(
             user_id=user_id,
             amount=data.amount,
             currency=data.currency,
@@ -64,6 +91,11 @@ class FinanzasService:
             notes=data.notes,
             category_id=str(data.category_id) if data.category_id else None,
         )
+
+    async def create_transaction(
+        self, user_id: UUID, data: TransactionCreate
+    ) -> Transaction:
+        transaction = await self.build_transaction(user_id, data)
         return await self.transaction_repo.create(transaction)
 
     async def get_transactions(
@@ -75,9 +107,10 @@ class FinanzasService:
         date_to: Optional[date] = None,
         transaction_type: Optional[str] = None,
         category_id: Optional[UUID] = None,
+        recurrence_id: Optional[str] = None,
     ):
         return await self.transaction_repo.get_all(
-            user_id, skip, limit, date_from, date_to, transaction_type, category_id
+            user_id, skip, limit, date_from, date_to, transaction_type, category_id, recurrence_id
         )
 
     async def get_transactions_paginated(
@@ -89,12 +122,13 @@ class FinanzasService:
         date_to: Optional[date] = None,
         transaction_type: Optional[str] = None,
         category_id: Optional[UUID] = None,
+        recurrence_id: Optional[str] = None,
     ) -> tuple:
         items = await self.transaction_repo.get_all(
-            user_id, skip, limit, date_from, date_to, transaction_type, category_id
+            user_id, skip, limit, date_from, date_to, transaction_type, category_id, recurrence_id
         )
         total = await self.transaction_repo.count(
-            user_id, date_from, date_to, transaction_type, category_id
+            user_id, date_from, date_to, transaction_type, category_id, recurrence_id
         )
         return items, total
 
@@ -102,11 +136,19 @@ class FinanzasService:
         return await self.transaction_repo.get_by_id(transaction_id, user_id)
 
     async def update_transaction(self, transaction: Transaction, data: dict):
+        await self._ensure_own_category(transaction.user_id, data.get("category_id"))
+        # `data` viene con exclude_unset, asi que un None es un null mandado a
+        # proposito ("quitar la categoria"), no un campo omitido. Se respeta
+        # solo en columnas que aceptan vacio; en el resto (amount, type...)
+        # un null romperia el NOT NULL, asi que se ignora como antes.
         for key, value in data.items():
-            if value is not None and hasattr(transaction, key):
-                if key == "category_id":
-                    value = str(value)
-                setattr(transaction, key, value)
+            if not hasattr(transaction, key):
+                continue
+            if value is None and key not in _NULLABLE_TRANSACTION_FIELDS:
+                continue
+            if key == "category_id" and value is not None:
+                value = str(value)
+            setattr(transaction, key, value)
         return await self.transaction_repo.update(transaction)
 
     async def delete_transaction(self, transaction: Transaction):
@@ -147,6 +189,7 @@ class FinanzasService:
         return await self.category_repo.get_by_id(category_id, user_id)
 
     async def create_category(self, user_id: UUID, data: CategoryCreate) -> Category:
+        await self._ensure_own_category(user_id, data.parent_id)
         category = Category(
             user_id=user_id,
             name=data.name,
@@ -157,6 +200,7 @@ class FinanzasService:
         return await self.category_repo.create(category)
 
     async def update_category(self, category: Category, data: dict) -> Category:
+        await self._ensure_own_category(category.user_id, data.get("parent_id"))
         for key, value in data.items():
             if key == "parent_id" and value is not None:
                 value = str(value)
@@ -167,29 +211,63 @@ class FinanzasService:
         await self.category_repo.delete(category)
 
     async def get_bank_accounts(self, user_id: UUID):
-        return await self.bank_account_repo.get_all(user_id)
+        return await self.bank_account_repo.get_all(str(user_id))
 
-    async def create_bank_account(
-        self,
-        user_id: UUID,
-        name: str,
-        bank_name: str,
-        account_type: str,
-        account_number: str,
-        currency: str,
-    ) -> BankAccount:
+    async def get_bank_account(self, account_id: UUID, user_id: UUID) -> Optional[BankAccount]:
+        return await self.bank_account_repo.get_by_id(str(account_id), str(user_id))
+
+    async def create_bank_account(self, user_id: UUID, data: BankAccountCreate) -> BankAccount:
+        # AccountType(...) valida el valor recibido (422 si no es uno de los
+        # tipos conocidos) antes de guardarlo; la columna en si es un String
+        # plano, no un enum de base de datos.
+        account_type = AccountType(data.account_type)
+        last4 = data.last4 or (
+            data.account_number[-4:] if len(data.account_number) >= 4 else data.account_number
+        )
         account = BankAccount(
-            user_id=user_id,
-            name=name,
-            bank_name=bank_name,
-            account_type=AccountType(account_type),
-            account_number=account_number,
-            last4=account_number[-4:] if len(account_number) >= 4 else account_number,
-            currency=currency,
+            user_id=str(user_id),
+            name=data.name,
+            bank_name=data.bank_name,
+            account_type=account_type.value,
+            account_number=data.account_number,
+            last4=last4,
+            currency=data.currency,
+            balance=data.balance,
         )
         return await self.bank_account_repo.create(account)
 
+    async def update_bank_account(self, account: BankAccount, data: dict) -> BankAccount:
+        if "account_type" in data and data["account_type"] is not None:
+            data["account_type"] = AccountType(data["account_type"]).value
+        for key, value in data.items():
+            setattr(account, key, value)
+        return await self.bank_account_repo.update(account)
+
+    async def delete_bank_account(self, account: BankAccount) -> None:
+        await self.bank_account_repo.delete(account)
+
+    async def get_reports(self, user_id: UUID) -> dict:
+        """Desglose de gastos por categoria + tendencia de los ultimos 6
+        meses — mismo calculo que tenia la ruta HTML legacy
+        (`finanzas/routes.py::reportes`), portado para servir como JSON."""
+        by_category = await self.transaction_repo.get_expense_breakdown_by_category(str(user_id))
+
+        today = date.today()
+        month_starts = []
+        for i in range(5, -1, -1):
+            month = (today.month - i - 1) % 12 + 1
+            year = today.year - ((i + (12 - today.month)) // 12)
+            month_starts.append(date(year, month, 1))
+        monthly = await self.transaction_repo.get_monthly_totals(str(user_id), month_starts)
+
+        return {
+            "by_category": by_category,
+            "monthly": monthly,
+            "total_expenses": sum((row["total"] for row in by_category), Decimal("0")),
+        }
+
     async def create_budget(self, user_id: UUID, data: BudgetCreate) -> Budget:
+        await self._ensure_own_category(user_id, data.category_id)
         budget = Budget(
             user_id=user_id,
             category_id=str(data.category_id),
@@ -206,6 +284,7 @@ class FinanzasService:
         return await self.budget_repo.get_by_id(budget_id, user_id)
 
     async def update_budget(self, budget: Budget, data: dict) -> Budget:
+        await self._ensure_own_category(budget.user_id, data.get("category_id"))
         for key, value in data.items():
             if key == "category_id" and value is not None:
                 value = str(value)

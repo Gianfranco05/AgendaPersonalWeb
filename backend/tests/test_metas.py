@@ -331,3 +331,107 @@ async def test_list_goals_with_existing_goal(auth_client):
     response = await auth_client.get("/metas/")
     assert response.status_code == 200
     assert "Leer" in response.text
+
+
+@pytest.mark.asyncio
+async def test_checkin_binario_negativo_deshace_la_meta(api_auth_client):
+    goal_id = (await api_auth_client.post("/api/v1/goals", json={
+        "title": "Meditar", "goal_type": "binary",
+    })).json()["id"]
+
+    done = await api_auth_client.put(
+        f"/api/v1/goals/{goal_id}/checkin", json={"record_date": "2026-10-06", "value": 1}
+    )
+    assert done.json()["is_completed"] is True
+
+    # El "reset" de la web manda el delta negativo.
+    reset = await api_auth_client.put(
+        f"/api/v1/goals/{goal_id}/checkin", json={"record_date": "2026-10-06", "value": -1}
+    )
+    body = reset.json()
+    assert body["is_completed"] is False
+    assert body["current_value"] == 0.0
+
+    # Y no quedan registros: ni el positivo ni uno negativo.
+    records = await api_auth_client.get(
+        f"/api/v1/goals/{goal_id}/records", params={"year": 2026, "month": 10}
+    )
+    assert records.json() == []
+
+
+@pytest.mark.asyncio
+async def test_checkin_negativo_no_baja_de_cero_y_desmarca_la_meta_de_progreso(api_auth_client):
+    goal_id = (await api_auth_client.post("/api/v1/goals", json={
+        "title": "Ahorro", "goal_type": "progress", "target_value": 10,
+    })).json()["id"]
+
+    full = await api_auth_client.put(
+        f"/api/v1/goals/{goal_id}/checkin", json={"record_date": "2026-10-06", "value": 10}
+    )
+    assert full.json()["is_completed"] is True
+
+    back = await api_auth_client.put(
+        f"/api/v1/goals/{goal_id}/checkin", json={"record_date": "2026-10-06", "value": -4}
+    )
+    assert (back.json()["current_value"], back.json()["is_completed"]) == (6.0, False)
+
+    below = await api_auth_client.put(
+        f"/api/v1/goals/{goal_id}/checkin", json={"record_date": "2026-10-06", "value": -100}
+    )
+    assert below.json()["current_value"] == 0.0
+
+
+@pytest.mark.asyncio
+async def test_checkin_binario_es_idempotente_por_dia(api_auth_client):
+    goal_id = (await api_auth_client.post("/api/v1/goals", json={
+        "title": "Agua", "goal_type": "binary",
+    })).json()["id"]
+
+    for _ in range(2):  # doble toque o reintento de la cola offline
+        resp = await api_auth_client.put(
+            f"/api/v1/goals/{goal_id}/checkin", json={"record_date": "2026-10-09", "value": 1}
+        )
+    assert resp.json()["current_value"] == 1.0
+
+    records = await api_auth_client.get(
+        f"/api/v1/goals/{goal_id}/records", params={"year": 2026, "month": 10}
+    )
+    assert len(records.json()) == 1
+
+
+@pytest.mark.asyncio
+async def test_deshacer_binario_resta_lo_que_borra(api_auth_client):
+    goal_id = (await api_auth_client.post("/api/v1/goals", json={
+        "title": "Leer", "goal_type": "binary",
+    })).json()["id"]
+    for day in ("2026-10-08", "2026-10-09"):
+        await api_auth_client.put(
+            f"/api/v1/goals/{goal_id}/checkin", json={"record_date": day, "value": 1}
+        )
+
+    # Deshacer hoy deja solo el dia de ayer: contador y registros coinciden.
+    body = (await api_auth_client.put(
+        f"/api/v1/goals/{goal_id}/checkin", json={"record_date": "2026-10-09", "value": -1}
+    )).json()
+    assert (body["current_value"], body["is_completed"]) == (1.0, True)
+    records = (await api_auth_client.get(
+        f"/api/v1/goals/{goal_id}/records", params={"year": 2026, "month": 10}
+    )).json()
+    assert [r["record_date"] for r in records] == ["2026-10-08"]
+
+
+@pytest.mark.asyncio
+async def test_descontar_progreso_ajusta_el_registro_del_dia(api_auth_client):
+    goal_id = (await api_auth_client.post("/api/v1/goals", json={
+        "title": "Km", "goal_type": "progress", "target_value": 20,
+    })).json()["id"]
+    await api_auth_client.put(
+        f"/api/v1/goals/{goal_id}/checkin", json={"record_date": "2026-10-09", "value": 10}
+    )
+    await api_auth_client.put(
+        f"/api/v1/goals/{goal_id}/checkin", json={"record_date": "2026-10-09", "value": -4}
+    )
+    records = (await api_auth_client.get(
+        f"/api/v1/goals/{goal_id}/records", params={"year": 2026, "month": 10}
+    )).json()
+    assert sum(r["value"] for r in records) == 6.0

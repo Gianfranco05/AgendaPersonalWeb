@@ -1,9 +1,12 @@
-from datetime import datetime
+import logging
+import secrets
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Request, Response, HTTPException, status
-from pydantic import BaseModel, EmailStr, field_validator
-from sqlalchemy import select
+from fastapi.responses import RedirectResponse
+from pydantic import BaseModel, EmailStr, Field, field_validator
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -11,12 +14,24 @@ from app.config import settings
 from app.core.security import verify_password, create_access_token, hash_password
 from app.core.dependencies import get_current_user
 from app.core.http_security import rate_limit_auth
+from app.core.redirect_safety import validate_app_redirect
 from app.core.email import send_password_reset_email, send_verification_email
 from app.modules.auth.models import User, VerificationPurpose
 from app.modules.auth.refresh_service import RefreshService, RefreshTokenReuseError
 from app.modules.auth.verification_service import VerificationService
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/auth/api", tags=["auth-json"])
+
+
+AGE_CONFIRMATION_ERROR = "Tenés que confirmar que tenés 16 años o más"
+
+
+def _require_age_confirmed(v: bool) -> bool:
+    if not v:
+        raise ValueError(AGE_CONFIRMATION_ERROR)
+    return v
 
 
 class LoginRequest(BaseModel):
@@ -28,6 +43,18 @@ class RegisterRequest(BaseModel):
     email: EmailStr
     full_name: str
     password: str
+    # Checkbox obligatorio del formulario. Sin default a proposito: Pydantic
+    # v2 no corre validators sobre un valor default salvo validate_default=True,
+    # asi que un default=False dejaria pasar el campo ausente sin chequear
+    # nada. Sin default, omitirlo ya da 422 "field required" solo. Tampoco es
+    # solo un chequeo de UI: el backend lo exige para que "creaste la cuenta"
+    # implique siempre "aceptaste la version vigente" — sin esto, alguien
+    # podria pegarle directo a la API salteando el checkbox del cliente.
+    accept_terms: bool
+    # Declaracion de edad minima (16+), mismo criterio que accept_terms: sin
+    # default a proposito, para que un cliente viejo que no la muestra falle con
+    # 422 en vez de registrar una declaracion que la persona nunca vio.
+    confirm_age: bool
 
     @field_validator("password")
     @classmethod
@@ -36,12 +63,34 @@ class RegisterRequest(BaseModel):
             raise ValueError("La contraseña debe tener al menos 6 caracteres")
         return v
 
+    @field_validator("accept_terms")
+    @classmethod
+    def must_accept_terms(cls, v):
+        if not v:
+            raise ValueError("Tenés que aceptar los Términos y la Política de Privacidad")
+        return v
+
+    @field_validator("confirm_age")
+    @classmethod
+    def must_confirm_age(cls, v):
+        return _require_age_confirmed(v)
+
 
 class UserOut(BaseModel):
     id: str
     email: str
     full_name: str
     is_verified: bool = True
+    # None = todavia no acepto la version vigente (current_terms_version).
+    # El cliente compara ambos campos para decidir si muestra el gate de
+    # aceptacion antes de dejar usar el resto de la app — asi la version
+    # "vigente" vive en un solo lugar (settings.CURRENT_TERMS_VERSION) en vez
+    # de duplicarse como constante en cada cliente (web, mobile).
+    terms_accepted_version: Optional[str] = None
+    current_terms_version: str = Field(default_factory=lambda: settings.CURRENT_TERMS_VERSION)
+    # True si users.age_confirmed_at no es null. Solo el booleano: la fecha no
+    # hace falta en los clientes (queda en el export de cuenta).
+    age_confirmed: bool = False
 
 
 class AuthResponse(BaseModel):
@@ -51,6 +100,9 @@ class AuthResponse(BaseModel):
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
+    terms_accepted_version: Optional[str] = None
+    current_terms_version: str = Field(default_factory=lambda: settings.CURRENT_TERMS_VERSION)
+    age_confirmed: bool = False
 
 
 class RefreshRequest(BaseModel):
@@ -104,6 +156,38 @@ class UpdateMeRequest(BaseModel):
         return v
 
 
+async def _find_user_by_email(db: AsyncSession, email: str) -> Optional[User]:
+    """Busca por email sin distinguir mayusculas. EmailStr solo normaliza el
+    dominio, y el login con Google devuelve el email en minusculas: con una
+    comparacion exacta "Ana@x.com" (registrada a mano) y "ana@x.com" (Google)
+    terminaban siendo dos cuentas distintas para la misma persona."""
+    result = await db.execute(select(User).where(func.lower(User.email) == email.lower()))
+    return result.scalars().first()
+
+
+def _user_out(user: User) -> UserOut:
+    return UserOut(
+        id=str(user.id),
+        email=user.email,
+        full_name=user.full_name,
+        is_verified=user.is_verified,
+        terms_accepted_version=user.terms_accepted_version,
+        age_confirmed=user.age_confirmed_at is not None,
+    )
+
+
+def _auth_response(user: User, access_token: str, refresh_token: str) -> AuthResponse:
+    return AuthResponse(
+        id=str(user.id),
+        email=user.email,
+        full_name=user.full_name,
+        access_token=access_token,
+        refresh_token=refresh_token,
+        terms_accepted_version=user.terms_accepted_version,
+        age_confirmed=user.age_confirmed_at is not None,
+    )
+
+
 def _set_access_cookie(response: Response, access_token: str) -> None:
     response.set_cookie(
         key=settings.JWT_COOKIE_NAME,
@@ -146,8 +230,7 @@ async def api_login(
     response: Response,
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(select(User).where(User.email == data.email))
-    user = result.scalar_one_or_none()
+    user = await _find_user_by_email(db, data.email)
 
     if not user or not verify_password(data.password, user.password_hash):
         raise HTTPException(
@@ -168,13 +251,7 @@ async def api_login(
         await db.commit()
 
     access_token, refresh_token = await _issue_session(db, response, request, user)
-    return AuthResponse(
-        id=str(user.id),
-        email=user.email,
-        full_name=user.full_name,
-        access_token=access_token,
-        refresh_token=refresh_token,
-    )
+    return _auth_response(user, access_token, refresh_token)
 
 
 @router.post("/register", status_code=status.HTTP_201_CREATED, response_model=AuthResponse, dependencies=[Depends(rate_limit_auth)])
@@ -184,18 +261,23 @@ async def api_register(
     response: Response,
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(select(User).where(User.email == data.email))
-    existing = result.scalar_one_or_none()
+    existing = await _find_user_by_email(db, data.email)
     if existing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Este email ya está registrado",
         )
 
+    now = datetime.now(timezone.utc)
     user = User(
-        email=data.email,
+        email=data.email.lower(),
         full_name=data.full_name,
         password_hash=hash_password(data.password),
+        # accept_terms=True ya lo garantizo el validator del schema.
+        terms_accepted_version=settings.CURRENT_TERMS_VERSION,
+        terms_accepted_at=now,
+        # confirm_age=True tambien lo garantizo el validator del schema.
+        age_confirmed_at=now,
     )
     db.add(user)
     await db.commit()
@@ -207,23 +289,12 @@ async def api_register(
     await send_verification_email(user.email, verify_token)
 
     access_token, refresh_token = await _issue_session(db, response, request, user)
-    return AuthResponse(
-        id=str(user.id),
-        email=user.email,
-        full_name=user.full_name,
-        access_token=access_token,
-        refresh_token=refresh_token,
-    )
+    return _auth_response(user, access_token, refresh_token)
 
 
 @router.get("/me", response_model=UserOut)
 async def api_me(current_user: User = Depends(get_current_user)):
-    return UserOut(
-        id=str(current_user.id),
-        email=current_user.email,
-        full_name=current_user.full_name,
-        is_verified=current_user.is_verified,
-    )
+    return _user_out(current_user)
 
 
 @router.patch("/me", response_model=UserOut)
@@ -236,12 +307,50 @@ async def api_update_me(
     db.add(current_user)
     await db.commit()
     await db.refresh(current_user)
-    return UserOut(
-        id=str(current_user.id),
-        email=current_user.email,
-        full_name=current_user.full_name,
-        is_verified=current_user.is_verified,
-    )
+    return _user_out(current_user)
+
+
+class AcceptTermsRequest(BaseModel):
+    # El cliente manda la version que esta mostrando (embebida en el bundle),
+    # no la actual del server: si no coinciden, es porque el cliente quedo
+    # desactualizado (mostro un texto viejo) y el server rechaza la
+    # aceptacion en vez de guardar silenciosamente que acepto "la vigente" —
+    # eso invalidaria la evidencia de que acepto el texto que en verdad leyo.
+    version: str
+    # Misma declaracion de edad que en el registro. Se exige siempre (aunque el
+    # usuario ya la tenga guardada): la casilla del gate la incluye en todos los
+    # casos, asi el contrato es uno solo y un cliente viejo falla en vez de
+    # aceptar sin haber mostrado la edad.
+    confirm_age: bool
+
+    @field_validator("confirm_age")
+    @classmethod
+    def must_confirm_age(cls, v):
+        return _require_age_confirmed(v)
+
+
+@router.post("/accept-terms", response_model=UserOut)
+async def api_accept_terms(
+    data: AcceptTermsRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if data.version != settings.CURRENT_TERMS_VERSION:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Los Términos cambiaron. Actualizá la app antes de continuar.",
+        )
+    now = datetime.now(timezone.utc)
+    current_user.terms_accepted_version = data.version
+    current_user.terms_accepted_at = now
+    # Solo la primera declaracion: las aceptaciones de versiones siguientes no
+    # la pisan (la fecha de cada aceptacion ya queda en terms_accepted_at).
+    if current_user.age_confirmed_at is None:
+        current_user.age_confirmed_at = now
+    db.add(current_user)
+    await db.commit()
+    await db.refresh(current_user)
+    return _user_out(current_user)
 
 
 @router.post("/refresh", response_model=TokenResponse, dependencies=[Depends(rate_limit_auth)])
@@ -347,12 +456,7 @@ async def api_verify_email(
     db.add(user)
     await db.commit()
     await db.refresh(user)
-    return UserOut(
-        id=str(user.id),
-        email=user.email,
-        full_name=user.full_name,
-        is_verified=user.is_verified,
-    )
+    return _user_out(user)
 
 
 @router.post("/forgot-password", dependencies=[Depends(rate_limit_auth)])
@@ -360,8 +464,7 @@ async def api_forgot_password(
     data: ForgotPasswordRequest,
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(select(User).where(User.email == data.email))
-    user = result.scalar_one_or_none()
+    user = await _find_user_by_email(db, data.email)
 
     if user is not None and user.is_active:
         token = await VerificationService(db).issue(
@@ -419,3 +522,164 @@ async def api_logout(
     response.delete_cookie(settings.JWT_COOKIE_NAME)
     response.delete_cookie(settings.REFRESH_COOKIE_NAME)
     return {"ok": True}
+
+
+# ── Iniciar sesion con Google ──────────────────────────────────────────────
+#
+# El intercambio con Google lo hace siempre el backend, nunca el cliente: el
+# celular no puede guardar un client secret con seguridad. El flujo es:
+#
+#   1. GET /google/login?app_redirect=<url a la que el navegador debe volver
+#      dentro de la app> -> redirige a la pantalla de consentimiento de
+#      Google, con esta URL viajando (firmada) en el parametro `state`.
+#   2. Google vuelve a GET /google/callback?code&state -> el backend valida
+#      el state, canjea el code, verifica la identidad, crea o encuentra al
+#      usuario, emite la sesion propia, y redirige de vuelta a `app_redirect`
+#      con el access/refresh token en la query string.
+#
+def _sign_oauth_state(app_redirect: str) -> str:
+    import base64
+    import hashlib
+    import hmac
+    import json
+    import time
+
+    payload = json.dumps({"r": app_redirect, "exp": time.time() + 300}).encode()
+    body = base64.urlsafe_b64encode(payload).decode()
+    sig = hmac.new(settings.SECRET_KEY.encode(), body.encode(), hashlib.sha256).hexdigest()
+    return f"{body}.{sig}"
+
+
+def _verify_oauth_state(state: str) -> Optional[str]:
+    import base64
+    import hashlib
+    import hmac
+    import json
+    import time
+
+    try:
+        body, sig = state.split(".", 1)
+        expected = hmac.new(settings.SECRET_KEY.encode(), body.encode(), hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(sig, expected):
+            return None
+        payload = json.loads(base64.urlsafe_b64decode(body.encode()))
+        if payload.get("exp", 0) < time.time():
+            return None
+        return payload.get("r")
+    except Exception:
+        return None
+
+
+def _build_google_login_flow():
+    from google_auth_oauthlib.flow import Flow
+
+    return Flow.from_client_config(
+        client_config={
+            "web": {
+                "client_id": settings.GOOGLE_CLIENT_ID,
+                "client_secret": settings.GOOGLE_CLIENT_SECRET,
+                "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                "token_uri": "https://oauth2.googleapis.com/token",
+                "redirect_uris": [settings.GOOGLE_LOGIN_REDIRECT_URI],
+            }
+        },
+        scopes=[
+            "openid",
+            "https://www.googleapis.com/auth/userinfo.email",
+            "https://www.googleapis.com/auth/userinfo.profile",
+        ],
+        redirect_uri=settings.GOOGLE_LOGIN_REDIRECT_URI,
+    )
+
+
+@router.get("/google/login")
+async def api_google_login_start(app_redirect: str):
+    if not settings.GOOGLE_CLIENT_ID or not settings.GOOGLE_CLIENT_SECRET:
+        raise HTTPException(status_code=503, detail="Login con Google no esta configurado")
+
+    validate_app_redirect(app_redirect)
+
+    flow = _build_google_login_flow()
+    auth_url, _ = flow.authorization_url(
+        access_type="online",
+        include_granted_scopes="true",
+        prompt="select_account",
+        state=_sign_oauth_state(app_redirect),
+    )
+    return RedirectResponse(url=auth_url, status_code=303)
+
+
+@router.get("/google/callback")
+async def api_google_login_callback(
+    request: Request,
+    code: Optional[str] = None,
+    state: Optional[str] = None,
+    error: Optional[str] = None,
+    db: AsyncSession = Depends(get_db),
+):
+    app_redirect = _verify_oauth_state(state) if state else None
+    if not app_redirect:
+        raise HTTPException(status_code=400, detail="Sesión de login inválida o vencida")
+
+    if error or not code:
+        return RedirectResponse(url=f"{app_redirect}?error=google_denied", status_code=303)
+
+    try:
+        import asyncio
+
+        from google.auth.transport import requests as google_requests
+        from google.oauth2 import id_token as google_id_token
+
+        flow = _build_google_login_flow()
+        await asyncio.to_thread(flow.fetch_token, code=code)
+        credentials = flow.credentials
+
+        idinfo = await asyncio.to_thread(
+            google_id_token.verify_oauth2_token,
+            credentials.id_token,
+            google_requests.Request(),
+            settings.GOOGLE_CLIENT_ID,
+        )
+        if idinfo.get("email_verified") is False:
+            # Cuenta de Google con el email sin confirmar: no prueba que el
+            # email sea suyo, y se lo usa para ubicar/crear la cuenta.
+            raise ValueError("email de Google sin verificar")
+        email = idinfo["email"].lower()
+        full_name = idinfo.get("name") or email.split("@")[0]
+    except Exception:
+        logger.exception("Fallo el intercambio de codigo o la verificacion de identidad con Google")
+        return RedirectResponse(url=f"{app_redirect}?error=google_failed", status_code=303)
+
+    user = await _find_user_by_email(db, email)
+
+    if user is None:
+        # Cuenta nueva, creada solo por Google: el hash es aleatorio e
+        # inutilizable — nadie puede loguearse con password en esta cuenta.
+        # El email ya viene verificado por Google, asi que is_verified=True.
+        user = User(
+            email=email,
+            full_name=full_name,
+            password_hash=hash_password(secrets.token_urlsafe(32)),
+            is_verified=True,
+        )
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
+    elif not user.is_active:
+        return RedirectResponse(url=f"{app_redirect}?error=inactive_account", status_code=303)
+    elif not user.is_verified:
+        # Cuenta creada con email+password que nunca confirmo el mail: Google
+        # acaba de probar que el email es de quien esta entrando. Quien la
+        # registro pudo ser otra persona (nada impedia anotarse con el email
+        # ajeno) y conoce su password: se lo invalida y se cierran sus sesiones
+        # para que no quede con acceso a la cuenta de la victima.
+        user.is_verified = True
+        user.password_hash = hash_password(secrets.token_urlsafe(32))
+        db.add(user)
+        await db.commit()
+        await RefreshService(db).revoke_all(str(user.id))
+
+    redirect_response = RedirectResponse(url="about:blank", status_code=303)
+    access_token, refresh_token = await _issue_session(db, redirect_response, request, user)
+    redirect_response.headers["location"] = f"{app_redirect}?access_token={access_token}&refresh_token={refresh_token}"
+    return redirect_response

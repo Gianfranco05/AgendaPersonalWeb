@@ -115,6 +115,20 @@ describe('apiClient', () => {
       expect(mockLocation.href).toBe('/login')
     })
 
+    it.each(['/register', '/privacy', '/terms', '/arrepentimiento'])(
+      'does not redirect to /login from the public page %s',
+      async (pathname) => {
+        // Sin sesión, el chequeo /me y el refresh dan 401: en una página
+        // pública eso es "no logueado", no hay que sacar al visitante de ahí.
+        mockLocation.pathname = pathname
+        mockPost.mockRejectedValue(new Error('sin sesion'))
+
+        const error = { response: { status: 401 }, config: { url: '/auth/api/me' } }
+        await expect(rejectedFn(error)).rejects.toBe(error)
+        expect(mockLocation.href).toBe('')
+      },
+    )
+
     it('does not retry a request that was already retried', async () => {
       const error = {
         response: { status: 401 },
@@ -155,6 +169,20 @@ describe('apiClient', () => {
 
       expect(mockPost).not.toHaveBeenCalled()
       expect(mockLocation.href).toBe('')
+    })
+  })
+
+  describe('isPublicPath', () => {
+    it('matches public pages and their subpaths, not lookalikes', async () => {
+      const { isPublicPath } = await import('../client')
+      expect(isPublicPath('/privacy')).toBe(true)
+      expect(isPublicPath('/google/callback')).toBe(true)
+      expect(isPublicPath('/verificar-email')).toBe(true)
+      expect(isPublicPath('/resetear-password')).toBe(true)
+      expect(isPublicPath('/olvide-password')).toBe(true)
+      expect(isPublicPath('/')).toBe(false)
+      expect(isPublicPath('/store')).toBe(false)
+      expect(isPublicPath('/privacy-old')).toBe(false)
     })
   })
 })

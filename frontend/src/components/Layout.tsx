@@ -1,8 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, PiggyBank, StickyNote, ListTodo, Calendar, Target, Settings, Menu, X, LogOut, Dumbbell, Apple, Repeat, Sun, Moon } from 'lucide-react';
+import { LayoutDashboard, PiggyBank, StickyNote, ListTodo, Calendar, Target, Settings, Menu, X, LogOut, Dumbbell, Apple, Repeat, Sun, Moon, LayoutGrid, Timer, Undo2, Search } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { useTheme } from '../context/ThemeContext';
+import PublicFooter from './PublicFooter';
+import OnboardingModal from './Onboarding/OnboardingModal';
+import SearchPalette from './search/SearchPalette';
+import ToastHost from './ToastHost';
 
 const navItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -12,17 +16,34 @@ const navItems = [
   { to: '/fitness', label: 'Fitness', icon: Dumbbell },
   { to: '/nutrition', label: 'Nutrición', icon: Apple },
   { to: '/habits', label: 'Hábitos', icon: Repeat },
+  { to: '/focus', label: 'Enfoque', icon: Timer },
   { to: '/notes', label: 'Notas', icon: StickyNote },
   { to: '/tasks', label: 'Tareas', icon: ListTodo },
+  { to: '/modules', label: 'Módulos', icon: LayoutGrid },
   { to: '/settings', label: 'Configuración', icon: Settings },
 ];
 
 export default function Layout() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const { user, logout } = useAuthStore();
   const { theme, toggle } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Ctrl+K / Cmd+K abre el buscador desde cualquier página (también escribiendo
+  // en un campo: lleva modificador). preventDefault evita que el navegador
+  // enfoque su barra de direcciones.
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setSearchOpen((open) => !open);
+      }
+    }
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, []);
 
   async function handleLogout() {
     await logout();
@@ -55,7 +76,7 @@ export default function Layout() {
         `}
       >
         <div className="flex h-16 items-center justify-between px-6">
-          <h1 className="text-xl font-bold tracking-tight">Vida Personal</h1>
+          <h1 className="text-xl font-bold tracking-tight">Can_cen</h1>
           <button
             onClick={() => setMobileOpen(false)}
             className="rounded-lg p-1 hover:bg-white/20 lg:hidden"
@@ -65,7 +86,23 @@ export default function Layout() {
           </button>
         </div>
 
-        <nav className="mt-4 space-y-1 px-3">
+        <div className="mt-4 px-3">
+          <button
+            type="button"
+            onClick={() => {
+              setMobileOpen(false);
+              setSearchOpen(true);
+            }}
+            aria-label="Buscar"
+            className="flex w-full items-center gap-3 rounded-lg bg-white/10 px-3 py-2.5 text-sm font-medium text-white/80 transition-colors hover:bg-white/15 hover:text-white"
+          >
+            <Search size={18} aria-hidden="true" />
+            <span className="flex-1 text-left">Buscar</span>
+            <kbd className="hidden rounded border border-white/30 px-1.5 text-[10px] text-white/60 lg:inline">Ctrl K</kbd>
+          </button>
+        </div>
+
+        <nav className="mt-2 space-y-1 px-3">
           {navItems.map(({ to, label, icon: Icon }) => (
             <NavLink
               key={to}
@@ -87,6 +124,16 @@ export default function Layout() {
         </nav>
 
         <div className="absolute bottom-0 left-0 right-0 border-t border-white/20 p-4">
+          {/* Res. 424/2020: el botón de arrepentimiento tiene que estar a la
+              vista en todo el sitio, no escondido en un submenú. */}
+          <NavLink
+            to="/arrepentimiento"
+            onClick={() => setMobileOpen(false)}
+            className="mb-3 flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-medium text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+          >
+            <Undo2 size={16} aria-hidden="true" />
+            Botón de arrepentimiento
+          </NavLink>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3 min-w-0">
               <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/20 text-xs font-semibold">
@@ -127,7 +174,14 @@ export default function Layout() {
           >
             <Menu size={20} />
           </button>
-          <h1 className="text-lg font-bold text-brand-charcoal dark:text-slate-100">Vida Personal</h1>
+          <h1 className="flex-1 text-lg font-bold text-brand-charcoal dark:text-slate-100">Can_cen</h1>
+          <button
+            onClick={() => setSearchOpen(true)}
+            className="rounded-lg p-1 text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700"
+            aria-label="Buscar"
+          >
+            <Search size={20} />
+          </button>
         </header>
 
         <main className="flex-1 overflow-y-auto p-4 lg:p-6">
@@ -137,8 +191,12 @@ export default function Layout() {
           <div key={location.pathname} className="animate-fade-in">
             <Outlet />
           </div>
+          <PublicFooter className="mt-10 pb-2" />
         </main>
       </div>
+      <SearchPalette open={searchOpen} onClose={() => setSearchOpen(false)} />
+      <ToastHost />
+      <OnboardingModal />
     </div>
   );
 }

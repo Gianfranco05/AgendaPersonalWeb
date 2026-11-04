@@ -1,4 +1,5 @@
 import pytest
+from app.config import settings
 from app.core.security import hash_password
 from app.modules.auth.models import User
 
@@ -35,52 +36,29 @@ async def test_login_wrong_email(client, test_user):
 
 
 @pytest.mark.asyncio
-async def test_register_success(client, db_session):
+async def test_legacy_register_post_redirige_a_la_spa_y_no_crea_usuario(client, db_session):
+    """El registro HTML se apago: crea cuentas sin Terminos ni declaracion de
+    edad. Redirige a /register de la SPA sin leer ni guardar nada."""
+    from sqlalchemy import select
+
     response = await client.post("/auth/register", data={
         "email": "new@test.com",
         "full_name": "New User",
         "password": "newpassword123",
         "password_confirm": "newpassword123",
-    })
+    }, follow_redirects=False)
     assert response.status_code == 303
-    assert response.headers["location"] == "/finanzas/"
-    assert "vida_token" in response.headers.get("set-cookie", "")
+    assert response.headers["location"] == f"{settings.PUBLIC_BASE_URL.rstrip('/')}/register"
+    assert "vida_token" not in response.headers.get("set-cookie", "")
+    result = await db_session.execute(select(User).where(User.email == "new@test.com"))
+    assert result.scalar_one_or_none() is None
 
 
 @pytest.mark.asyncio
-async def test_register_duplicate_email(client, test_user):
-    response = await client.post("/auth/register", data={
-        "email": "test@test.com",
-        "full_name": "Another User",
-        "password": "another123",
-        "password_confirm": "another123",
-    })
-    assert response.status_code == 400
-    assert "ya está registrado" in response.text
-
-
-@pytest.mark.asyncio
-async def test_register_password_mismatch(client):
-    response = await client.post("/auth/register", data={
-        "email": "mismatch@test.com",
-        "full_name": "Mismatch",
-        "password": "password123",
-        "password_confirm": "different",
-    })
-    assert response.status_code == 400
-    assert "no coinciden" in response.text
-
-
-@pytest.mark.asyncio
-async def test_register_short_password(client):
-    response = await client.post("/auth/register", data={
-        "email": "short@test.com",
-        "full_name": "Short",
-        "password": "1234567",
-        "password_confirm": "1234567",
-    })
-    assert response.status_code == 400
-    assert "8 caracteres" in response.text
+async def test_legacy_register_get_redirige_a_la_spa(client):
+    response = await client.get("/auth/register", follow_redirects=False)
+    assert response.status_code == 303
+    assert response.headers["location"] == f"{settings.PUBLIC_BASE_URL.rstrip('/')}/register"
 
 
 @pytest.mark.asyncio
@@ -108,7 +86,7 @@ async def test_protected_route_without_auth(client):
 async def test_dashboard_with_auth(auth_client):
     response = await auth_client.get("/finanzas/")
     assert response.status_code == 200
-    assert "Dashboard" in response.text or "Vida Personal" in response.text
+    assert "Dashboard" in response.text or "Can_cen" in response.text
 
 
 @pytest.mark.asyncio
@@ -119,7 +97,11 @@ async def test_login_page_get(client):
 
 
 @pytest.mark.asyncio
-async def test_register_page_get(client):
-    response = await client.get("/auth/register")
-    assert response.status_code == 200
-    assert "Crear Cuenta" in response.text
+async def test_legacy_login_html_rechaza_usuario_inactivo(client, db_session, test_user):
+    test_user.is_active = False
+    await db_session.commit()
+    response = await client.post(
+        "/auth/login", data={"email": "test@test.com", "password": "test123"}
+    )
+    assert response.status_code == 403
+    assert "vida_token" not in response.cookies

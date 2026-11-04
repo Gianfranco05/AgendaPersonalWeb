@@ -4,10 +4,26 @@ import { useKanban } from '../../hooks/useKanban';
 import KanbanColumn from './KanbanColumn';
 import AddTaskForm from './AddTaskForm';
 import type { TaskStatus } from '../../types';
+import { useOpenParam } from '../../hooks/useOpenParam';
+import { revealItem } from '../../utils/reveal';
 
 export default function KanbanBoard() {
   const [selectedArea, setSelectedArea] = useState('Todas');
-  const { columns, areas, addTask, updateTask, deleteTask, moveTask } = useKanban(selectedArea);
+  const { tasks, columns, areas, isLoading, addTask, updateTask, deleteTask, moveTask } = useKanban(selectedArea);
+
+  // Las tareas se editan en la propia tarjeta (no hay modal): se lleva la vista
+  // hasta ella y se la resalta. Si el filtro de área la oculta, primero se quita.
+  useOpenParam({
+    ready: !isLoading,
+    onOpen: ({ id }) => {
+      if (!tasks.some((t) => t.id === id)) return false;
+      if (!columns.some((c) => c.tasks.some((t) => t.id === id))) {
+        setSelectedArea('Todas');
+        return 'wait';
+      }
+      return revealItem(id);
+    },
+  });
 
   function handleDragEnd(result: DropResult) {
     const { draggableId, destination, source } = result;

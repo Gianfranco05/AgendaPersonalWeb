@@ -1,8 +1,14 @@
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 
-export default function ProtectedRoute() {
-  const { isAuthenticated, isLoading } = useAuthStore();
+interface ProtectedRouteProps {
+  // /accept-terms también requiere sesión iniciada, pero no puede pasar por
+  // su propio gate — eso generaría un loop de redirección.
+  skipTermsGate?: boolean;
+}
+
+export default function ProtectedRoute({ skipTermsGate = false }: ProtectedRouteProps) {
+  const { isAuthenticated, isLoading, user } = useAuthStore();
 
   if (isLoading) {
     return (
@@ -12,5 +18,18 @@ export default function ProtectedRoute() {
     );
   }
 
-  return isAuthenticated ? <Outlet /> : <Navigate to="/login" replace />;
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  // Gate: versión de términos distinta de la vigente O edad sin declarar.
+  if (
+    !skipTermsGate &&
+    user &&
+    (user.terms_accepted_version !== user.current_terms_version || user.age_confirmed === false)
+  ) {
+    return <Navigate to="/accept-terms" replace />;
+  }
+
+  return <Outlet />;
 }
